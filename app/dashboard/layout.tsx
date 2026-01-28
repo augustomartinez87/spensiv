@@ -1,57 +1,123 @@
+'use client'
+
 import { UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
-import { CreditCard, LayoutDashboard, Plus, Settings } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import {
+  CreditCard,
+  LayoutDashboard,
+  Plus,
+  TrendingUp,
+  FileUp,
+  Menu,
+  X,
+  CreditCard as CardsIcon,
+  ListOrdered
+} from 'lucide-react'
+import { useState } from 'react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+
+const navigation = [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Tarjetas', href: '/dashboard/cards', icon: CardsIcon },
+  { name: 'Movimientos', href: '/dashboard/transactions', icon: ListOrdered },
+  { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
+  { name: 'Importar', href: '/dashboard/import', icon: FileUp },
+]
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const pathname = usePathname()
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-white">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="font-bold text-xl">
-              💳 Spensiv
+    <div className="flex min-h-screen bg-slate-50">
+      {/* Sidebar Mobile Toggle */}
+      <div className="md:hidden fixed top-4 left-4 z-50">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="bg-white shadow-md"
+        >
+          {isSidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
+      </div>
+
+      {/* Sidebar Navigation */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-40 w-64 bg-white border-r transition-transform md:translate-x-0 md:static md:inset-0",
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="flex flex-col h-full">
+          {/* Logo */}
+          <div className="h-16 flex items-center px-6 border-b">
+            <Link href="/dashboard" className="font-bold text-2xl flex items-center gap-2">
+              <span className="text-blue-600">💳</span> Spensiv
             </Link>
-            
-            <nav className="hidden md:flex items-center gap-6 text-sm">
-              <Link 
-                href="/dashboard" 
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition"
-              >
-                <LayoutDashboard className="h-4 w-4" />
-                Dashboard
-              </Link>
-              <Link 
-                href="/dashboard/cards" 
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition"
-              >
-                <CreditCard className="h-4 w-4" />
-                Tarjetas
-              </Link>
-              <Link 
-                href="/dashboard/transactions" 
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition"
-              >
-                <Plus className="h-4 w-4" />
-                Gastos
-              </Link>
-            </nav>
           </div>
 
-          <div className="flex items-center gap-4">
-            <UserButton afterSignOutUrl="/" />
+          {/* Nav Links */}
+          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+            {navigation.map((item) => {
+              const isActive = pathname === item.href
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  )}
+                  onClick={() => setIsSidebarOpen(false)}
+                >
+                  <item.icon className={cn("h-4 w-4", isActive ? "text-blue-600" : "text-slate-400")} />
+                  {item.name}
+                </Link>
+              )
+            })}
+          </nav>
+
+          {/* User Profile Hook */}
+          <div className="p-4 border-t flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <UserButton afterSignOutUrl="/" />
+              <div className="hidden lg:block">
+                <p className="text-xs font-medium text-slate-900 leading-none">Mi Cuenta</p>
+                <p className="text-[10px] text-slate-500 mt-1">Configuración</p>
+              </div>
+            </div>
           </div>
         </div>
-      </header>
+      </aside>
 
-      {/* Main Content */}
-      <main className="container py-8">
-        {children}
-      </main>
+      {/* Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Mobile Header (optional if sidebar hides) */}
+        <header className="md:hidden h-16 flex items-center px-6 border-b bg-white justify-end">
+          <UserButton afterSignOutUrl="/" />
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="mx-auto max-w-6xl">
+            {children}
+          </div>
+        </main>
+      </div>
+
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 z-30 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -23,14 +23,15 @@ export const dashboardRouter = router({
   getBalanceProjection: protectedProcedure
     .input(
       z.object({
-        startPeriod: z.string().regex(/^\d{4}-\d{2}$/),
+        startPeriod: z.string().regex(/^\d{4}-\d{2}$/).optional(),
         months: z.number().min(1).max(12).optional(),
       })
     )
     .query(async ({ ctx, input }) => {
+      const startPeriod = input.startPeriod || new Date().toISOString().slice(0, 7)
       return getCashFlowProjection(
         ctx.user.id,
-        input.startPeriod,
+        startPeriod,
         input.months || 6
       )
     }),

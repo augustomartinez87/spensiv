@@ -1,21 +1,62 @@
 'use client'
 
+import { useState } from 'react'
 import { trpc } from '@/lib/trpc-client'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatCurrency } from '@/lib/utils'
-import { ArrowUpRight, CreditCard, TrendingUp, Calendar, Plus } from 'lucide-react'
-import Link from 'next/link'
+import { StatCard } from '@/components/dashboard/stat-card'
+import { MonthSelector } from '@/components/dashboard/month-selector'
+import { CategoryPieChart } from '@/components/dashboard/category-pie-chart'
+import { TransactionForm } from '@/components/transactions/transaction-form'
+import { IncomeForm } from '@/components/transactions/income-form'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
+import { formatCurrency, cn } from '@/lib/utils'
+import { Calendar, CreditCard, TrendingUp, AlertCircle } from 'lucide-react'
 
 export default function DashboardPage() {
-  const { data: currentMonth, isLoading: loadingMonth } = trpc.dashboard.getCurrentMonth.useQuery()
+  const now = new Date()
+  const [period, setPeriod] = useState(
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  )
+
+  const { data: balance, isLoading: isLoadingBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period })
   const { data: totalDebt, isLoading: loadingDebt } = trpc.dashboard.getTotalDebt.useQuery()
   const { data: upcomingPayments, isLoading: loadingPayments } = trpc.dashboard.getUpcomingPayments.useQuery()
 
-  if (loadingMonth || loadingDebt || loadingPayments) {
+  const isLoading = isLoadingBalance || loadingDebt || loadingPayments
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-48" />
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="h-[400px]" />
+          <Skeleton className="h-[400px]" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!balance) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground">Cargando...</div>
+        <div className="text-center">
+          <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-4" />
+          <p className="text-slate-600">No se pudo cargar el balance. Verifica tu conexión.</p>
+        </div>
       </div>
     )
   }
@@ -24,157 +65,171 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Resumen de tu situación financiera
-        </p>
+      {/* Header with Title and Actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
+          <p className="text-slate-500 mt-1">Tu motor de cashflow personal</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <IncomeForm />
+          <TransactionForm />
+        </div>
       </div>
 
-      {/* Métricas principales */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* Gasto del mes */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Impacto del mes
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(currentMonth?.totalImpact || 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {currentMonth?.installmentCount || 0} cuotas activas
-            </p>
-          </CardContent>
-        </Card>
+      {/* Main Period Selector & Stats */}
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+        <div className="flex items-center justify-between">
+          <MonthSelector value={period} onChange={setPeriod} />
+          <div className="hidden sm:block text-right">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Deuda Total</p>
+            <p className="text-lg font-bold text-slate-900">{formatCurrency(totalDebt?.amount || 0)}</p>
+          </div>
+        </div>
 
-        {/* Deuda total */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Deuda total
-            </CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(totalDebt?.amount || 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {totalDebt?.cardCount || 0} tarjetas activas
-            </p>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+          <StatCard
+            title="📤 EGRESOS DEL PERIODO"
+            value={balance.totalExpense}
+            count={balance.installments.length}
+            type="expense"
+          />
+          <StatCard
+            title="📥 INGRESOS DEL PERIODO"
+            value={balance.totalIncome}
+            count={balance.incomes.length}
+            type="income"
+          />
+          <StatCard
+            title="💰 BALANCE NETO"
+            value={balance.balance}
+            type="balance"
+          />
+        </div>
+      </div>
 
-        {/* Próximo vencimiento */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Próximo vencimiento
-            </CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {nextPayment ? (
-              <>
-                <div className="text-2xl font-bold">
-                  {formatCurrency(nextPayment.amount)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {nextPayment.card.name} • En {nextPayment.daysUntil} días
-                </p>
-              </>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                Sin vencimientos próximos
+      {/* Secondary Metrics & Charts */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        {/* Charts Section (2/3) */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <CategoryPieChart
+              data={balance.aggregations.expensesByCategory}
+              title="📊 Gastos por categoría"
+            />
+            <CategoryPieChart
+              data={balance.aggregations.expensesByType}
+              title="🎯 Tipos de gasto"
+            />
+          </div>
+
+          {/* Recent List */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50 py-4">
+              <CardTitle className="text-base font-semibold">📋 Movimientos recientes</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-slate-100">
+                {balance.installments.slice(0, 5).map((inst) => (
+                  <div key={inst.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                    <div>
+                      <p className="font-medium text-sm text-slate-900">
+                        {inst.transaction.description}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {format(new Date(inst.transaction.purchaseDate), 'd MMM', { locale: es })}
+                        {inst.transaction.installments > 1 &&
+                          ` • Cuota ${inst.installmentNumber}/${inst.transaction.installments}`
+                        }
+                        {inst.transaction.card && ` • ${inst.transaction.card.name}`}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-sm text-slate-900">
+                      {formatCurrency(Number(inst.amount))}
+                    </p>
+                  </div>
+                ))}
+                {balance.incomes.slice(0, 5).map((income: any) => (
+                  <div key={income.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                    <div>
+                      <p className="font-medium text-sm text-slate-900">{income.description}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {format(new Date(income.date), 'd MMM', { locale: es })}
+                        {income.category === 'active_income' ? ' • Sueldo' : ' • Otro'}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-sm text-green-600">
+                      {formatCurrency(Number(income.amount))}
+                    </p>
+                  </div>
+                ))}
+                {balance.installments.length === 0 && balance.incomes.length === 0 && (
+                  <div className="p-8 text-center bg-slate-50/50">
+                    <p className="text-slate-400 text-sm">No hay actividad registrada en este periodo</p>
+                  </div>
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Distribución por tarjeta */}
-      {currentMonth && Object.keys(currentMonth.byCard).length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribución por tarjeta</CardTitle>
-            <CardDescription>
-              Cuotas que impactan este mes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {Object.entries(currentMonth.byCard).map(([card, amount]) => (
-                <div key={card} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-primary" />
-                    <span className="text-sm font-medium">{card}</span>
-                  </div>
-                  <span className="text-sm font-bold">
-                    {formatCurrency(amount as number)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Próximos vencimientos */}
-      {upcomingPayments && upcomingPayments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Próximos vencimientos</CardTitle>
-            <CardDescription>
-              Fechas de pago de tus tarjetas
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {upcomingPayments.map((payment, idx) => (
-                <div key={idx} className="flex items-center justify-between">
+        {/* Sidebar Info Section (1/3) */}
+        <div className="space-y-6">
+          {/* Next Payment */}
+          <Card className="border-slate-200 shadow-sm overflow-hidden">
+            <CardHeader className="bg-blue-600 text-white py-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <CardTitle className="text-sm font-semibold">Próximo Vencimiento</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {nextPayment ? (
+                <div className="space-y-4 text-center">
                   <div>
-                    <div className="font-medium">{payment.card.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Vence {new Date(payment.dueDate).toLocaleDateString('es-AR')}
-                    </div>
+                    <p className="text-3xl font-bold text-slate-900 tracking-tight">
+                      {formatCurrency(nextPayment.amount)}
+                    </p>
+                    <p className="text-sm font-medium text-slate-600 mt-1">{nextPayment.card.name}</p>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold">{formatCurrency(payment.amount)}</div>
-                    <div className={`text-xs ${payment.daysUntil <= 3 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      En {payment.daysUntil} días
-                    </div>
+                  <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-100 rounded-full text-xs font-semibold text-slate-700">
+                    <AlertCircle className={cn("h-3 w-3", nextPayment.daysUntil <= 3 ? "text-red-500" : "text-blue-500")} />
+                    En {nextPayment.daysUntil} días ({format(new Date(nextPayment.dueDate), 'd MMM', { locale: es })})
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              ) : (
+                <div className="text-center py-6 text-slate-400 text-sm italic">
+                  No hay vencimientos próximos
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Empty state si no hay datos */}
-      {(!currentMonth || currentMonth.installmentCount === 0) && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <CreditCard className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No hay gastos registrados</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Agregá tu primera tarjeta y empezá a registrar tus gastos
-            </p>
-            <div className="flex gap-2">
-              <Button asChild>
-                <Link href="/dashboard/cards">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar tarjeta
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          {/* Cards Debt List */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="py-4">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <CardsIcon className="h-4 w-4" /> Tarjetas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 pb-2">
+              <div className="space-y-1">
+                {upcomingPayments?.map((p, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                    <span className="text-sm text-slate-600">{p.card.name}</span>
+                    <span className="text-sm font-bold text-slate-900">{formatCurrency(p.amount)}</span>
+                  </div>
+                ))}
+                {!upcomingPayments?.length && (
+                  <p className="text-xs text-slate-400 text-center py-4 italic">Sin deudas activas</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }
+
+const CardsIcon = CreditCard
