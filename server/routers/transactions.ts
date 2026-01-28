@@ -9,16 +9,18 @@ import {
 
 export const transactionsRouter = router({
   /**
-   * Crear transacción con cuotas
+   * Crear transacción
+   * Soporta: credit_card (con cuotas), cash, transfer
    */
   create: protectedProcedure
     .input(
       z.object({
-        cardId: z.string(),
+        paymentMethod: z.enum(['credit_card', 'debit_card', 'cash', 'transfer']),
+        cardId: z.string().optional(), // Solo requerido si paymentMethod = 'credit_card'
         description: z.string().min(1),
         totalAmount: z.number().positive(),
         purchaseDate: z.date(),
-        installments: z.number().min(1).max(60),
+        installments: z.number().min(1).max(60).default(1), // Solo aplica a credit_card
         categoryId: z.string().optional(),
         expenseType: z
           .enum(['structural', 'emotional_recurrent', 'emotional_impulsive'])
@@ -29,6 +31,13 @@ export const transactionsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Validar que si es tarjeta, tenga cardId
+      if (input.paymentMethod === 'credit_card' && !input.cardId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Se requiere seleccionar una tarjeta para pagos con tarjeta de crédito',
+        })
+      }
       return createTransactionWithInstallments({
         userId: ctx.user.id,
         ...input,
@@ -200,8 +209,10 @@ export const transactionsRouter = router({
 
       const byCard = transactions.reduce(
         (acc, t) => {
-          const cardName = t.card.name
-          acc[cardName] = (acc[cardName] || 0) + Number(t.totalAmount)
+          if (t.card) {
+            const cardName = t.card.name
+            acc[cardName] = (acc[cardName] || 0) + Number(t.totalAmount)
+          }
           return acc
         },
         {} as Record<string, number>

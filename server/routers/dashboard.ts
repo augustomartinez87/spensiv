@@ -1,8 +1,40 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { startOfMonth, endOfMonth, addMonths } from 'date-fns'
+import { getMonthlyBalance, getCashFlowProjection } from '@/lib/balance'
 
 export const dashboardRouter = router({
+  /**
+   * Balance mensual completo (Ingresos - Egresos)
+   */
+  getMonthlyBalance: protectedProcedure
+    .input(
+      z.object({
+        period: z.string().regex(/^\d{4}-\d{2}$/), // "2025-01"
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      return getMonthlyBalance(ctx.user.id, input.period)
+    }),
+
+  /**
+   * Proyección de flujo de caja
+   */
+  getBalanceProjection: protectedProcedure
+    .input(
+      z.object({
+        startPeriod: z.string().regex(/^\d{4}-\d{2}$/),
+        months: z.number().min(1).max(12).optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      return getCashFlowProjection(
+        ctx.user.id,
+        input.startPeriod,
+        input.months || 6
+      )
+    }),
+
   /**
    * Resumen del mes actual
    */
@@ -60,7 +92,7 @@ export const dashboardRouter = router({
 
     const byCard = installments.reduce(
       (acc, inst) => {
-        const cardName = inst.transaction.card.name
+        const cardName = inst.transaction.card?.name || 'Sin tarjeta'
         acc[cardName] = (acc[cardName] || 0) + Number(inst.amount)
         return acc
       },
@@ -204,7 +236,7 @@ export const dashboardRouter = router({
 
         const byCard = installments.reduce(
           (acc, inst) => {
-            const cardName = inst.transaction.card.name
+            const cardName = inst.transaction.card?.name || 'Sin tarjeta'
             acc[cardName] = (acc[cardName] || 0) + Number(inst.amount)
             return acc
           },
