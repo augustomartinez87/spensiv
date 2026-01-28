@@ -7,9 +7,9 @@ import { Decimal } from '@prisma/client/runtime/library'
  * Esta es la lógica portada desde tu Apps Script
  */
 
-type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'transfer'
+export type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'transfer'
 
-interface CreateTransactionInput {
+export interface CreateTransactionInput {
   userId: string
   paymentMethod: PaymentMethod
   cardId?: string // Solo requerido si paymentMethod = 'credit_card'

@@ -14,56 +14,54 @@ export async function getMonthlyBalance(userId: string, period: string) {
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)
 
-    // ========== INGRESOS ==========
-    const incomes = await prisma.income.findMany({
-        where: {
-            userId,
-            date: {
-                gte: startDate,
-                lt: endDate,
-            },
-        },
-        orderBy: {
-            date: 'desc',
-        },
-    })
-
-    const totalIncome = incomes.reduce((sum, inc) => sum + Number(inc.amount), 0)
-
-    // ========== EGRESOS ==========
-    // Obtener todas las cuotas que impactan en este mes
-    const installments = await prisma.installment.findMany({
-        where: {
-            billingCycle: {
-                period,
-                card: {
-                    userId,
+    // ========== INGRESOS Y EGRESOS EN PARALELO ==========
+    const [incomes, installments] = await Promise.all([
+        prisma.income.findMany({
+            where: {
+                userId,
+                date: {
+                    gte: startDate,
+                    lt: endDate,
                 },
             },
-            transaction: {
-                isVoided: false,
+            orderBy: {
+                date: 'desc',
             },
-        },
-        include: {
-            transaction: {
-                include: {
-                    category: true,
-                    card: true,
+        }),
+        prisma.installment.findMany({
+            where: {
+                billingCycle: {
+                    period,
+                    card: {
+                        userId,
+                    },
+                },
+                transaction: {
+                    isVoided: false,
                 },
             },
-            billingCycle: {
-                include: {
-                    card: true,
+            include: {
+                transaction: {
+                    include: {
+                        category: true,
+                        card: true,
+                    },
+                },
+                billingCycle: {
+                    include: {
+                        card: true,
+                    },
                 },
             },
-        },
-        orderBy: {
-            impactDate: 'asc',
-        },
-    })
+            orderBy: {
+                impactDate: 'asc',
+            },
+        })
+    ])
 
+    const totalIncome = incomes.reduce((sum: number, inc: any) => sum + Number(inc.amount), 0)
     const totalExpense = installments.reduce(
-        (sum, inst) => sum + Number(inst.amount),
+        (sum: number, inst: any) => sum + Number(inst.amount),
         0
     )
 
@@ -71,7 +69,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
 
     // Gastos por categoría
     const expensesByCategory = installments.reduce(
-        (acc, inst) => {
+        (acc: Record<string, number>, inst: any) => {
             const catName = inst.transaction.category?.name || 'Sin categoría'
             acc[catName] = (acc[catName] || 0) + Number(inst.amount)
             return acc
@@ -81,7 +79,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
 
     // Gastos por tipo
     const expensesByType = installments.reduce(
-        (acc, inst) => {
+        (acc: Record<string, number>, inst: any) => {
             const type = inst.transaction.expenseType || 'sin_clasificar'
             acc[type] = (acc[type] || 0) + Number(inst.amount)
             return acc
@@ -91,7 +89,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
 
     // Gastos por tarjeta
     const expensesByCard = installments.reduce(
-        (acc, inst) => {
+        (acc: Record<string, number>, inst: any) => {
             const cardName = inst.billingCycle.card.name
             acc[cardName] = (acc[cardName] || 0) + Number(inst.amount)
             return acc
@@ -101,7 +99,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
 
     // Ingresos por categoría
     const incomesByCategory = incomes.reduce(
-        (acc, inc) => {
+        (acc: Record<string, number>, inc: any) => {
             acc[inc.category] = (acc[inc.category] || 0) + Number(inc.amount)
             return acc
         },
@@ -135,16 +133,18 @@ export async function getCashFlowProjection(
     startPeriod: string,
     months: number = 6
 ) {
-    const projections = []
+    const [startYear, startMonth] = startPeriod.split('-').map(Number)
 
-    for (let i = 0; i < months; i++) {
-        const [year, month] = startPeriod.split('-').map(Number)
-        const date = new Date(year, month - 1 + i, 1)
-        const period = date.toISOString().slice(0, 7)
+    // Generar los periodos primero
+    const periods = Array.from({ length: months }, (_, i) => {
+        const date = new Date(startYear, startMonth - 1 + i, 1)
+        return date.toISOString().slice(0, 7)
+    })
 
-        const monthlyData = await getMonthlyBalance(userId, period)
-        projections.push(monthlyData)
-    }
+    // Ejecutar todas las consultas en paralelo
+    const projections = await Promise.all(
+        periods.map(period => getMonthlyBalance(userId, period))
+    )
 
     return projections
 }

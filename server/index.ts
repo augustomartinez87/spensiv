@@ -3,16 +3,14 @@ import { cardsRouter } from './routers/cards'
 import { transactionsRouter } from './routers/transactions'
 import { dashboardRouter } from './routers/dashboard'
 import { incomesRouter } from './routers/incomes'
+import { importRouter } from './routers/import'
 
-/**
- * Router principal de la aplicación
- */
 export const appRouter = router({
   cards: cardsRouter,
   transactions: transactionsRouter,
-  incomes: incomesRouter,
   dashboard: dashboardRouter,
+  incomes: incomesRouter,
+  import: importRouter,
 })
 
 export type AppRouter = typeof appRouter
-

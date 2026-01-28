@@ -44,47 +44,47 @@ export const dashboardRouter = router({
     const startDate = startOfMonth(now)
     const endDate = endOfMonth(now)
 
-    // Total gastado este mes (en compras)
-    const transactions = await ctx.prisma.transaction.findMany({
-      where: {
-        userId: ctx.user.id,
-        purchaseDate: {
-          gte: startDate,
-          lte: endDate,
+    // Obtener transacciones y cuotas en paralelo
+    const period = now.toISOString().slice(0, 7) // "2025-01"
+
+    const [transactions, installments] = await Promise.all([
+      ctx.prisma.transaction.findMany({
+        where: {
+          userId: ctx.user.id,
+          purchaseDate: {
+            gte: startDate,
+            lte: endDate,
+          },
+          isVoided: false,
         },
-        isVoided: false,
-      },
-    })
+      }),
+      ctx.prisma.installment.findMany({
+        where: {
+          billingCycle: {
+            period,
+            card: {
+              userId: ctx.user.id,
+            },
+          },
+          transaction: {
+            isVoided: false,
+          },
+        },
+        include: {
+          transaction: {
+            include: {
+              card: true,
+              category: true,
+            },
+          },
+        },
+      })
+    ])
 
     const totalSpent = transactions.reduce(
       (sum, t) => sum + Number(t.totalAmount),
       0
     )
-
-    // Cuotas que impactan este mes
-    const period = now.toISOString().slice(0, 7) // "2025-01"
-
-    const installments = await ctx.prisma.installment.findMany({
-      where: {
-        billingCycle: {
-          period,
-          card: {
-            userId: ctx.user.id,
-          },
-        },
-        transaction: {
-          isVoided: false,
-        },
-      },
-      include: {
-        transaction: {
-          include: {
-            card: true,
-            category: true,
-          },
-        },
-      },
-    })
 
     const totalImpact = installments.reduce(
       (sum, inst) => sum + Number(inst.amount),
