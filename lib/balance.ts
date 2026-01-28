@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { formatPeriod } from './periods'
 
 /**
  * Obtener balance mensual (Ingresos - Egresos)
@@ -10,7 +11,10 @@ import { prisma } from './prisma'
 export async function getMonthlyBalance(userId: string, period: string) {
     // period = "2025-01" (YYYY-MM)
 
-    const [year, month] = period.split('-').map(Number)
+    const { year, month } = {
+        year: parseInt(period.split('-')[0]),
+        month: parseInt(period.split('-')[1])
+    }
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)
 
@@ -137,8 +141,9 @@ export async function getCashFlowProjection(
 
     // Generar los periodos primero
     const periods = Array.from({ length: months }, (_, i) => {
-        const date = new Date(startYear, startMonth - 1 + i, 1)
-        return date.toISOString().slice(0, 7)
+        const [year, month] = startPeriod.split('-').map(Number)
+        const date = new Date(year, month - 1 + i, 1)
+        return formatPeriod(date)
     })
 
     // Ejecutar todas las consultas en paralelo

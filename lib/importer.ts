@@ -9,7 +9,12 @@ export function parseExcelPaste(text: string) {
     const results = []
 
     for (const line of lines) {
-        const cols = line.split('\t') // Excel suele usar tabs al pegar
+        // Intentar separar por Tab (Excel) o por múltiples espacios
+        let cols = line.split('\t')
+        if (cols.length < 5) {
+            cols = line.split(/\s{2,}/) // Split by 2 or more spaces
+        }
+
         if (cols.length < 9) continue // Ignorar lineas incompletas
 
         const dateStr = cols[0].trim()

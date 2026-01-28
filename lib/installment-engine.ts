@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { Decimal } from '@prisma/client/runtime/library'
+import { formatPeriod } from './periods'
 
 /**
  * MOTOR DE CUOTAS - LÓGICA CORE DE SPENSIV
@@ -56,7 +57,7 @@ async function getOrCreateBillingCycle(
   cardId: string,
   impactDate: Date
 ): Promise<{ id: string; closeDate: Date; dueDate: Date }> {
-  const period = impactDate.toISOString().slice(0, 7) // "2025-01"
+  const period = formatPeriod(impactDate) // "2025-01"
 
   // Buscar si ya existe
   let cycle = await prisma.billingCycle.findUnique({

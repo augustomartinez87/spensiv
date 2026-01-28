@@ -22,8 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, CreditCard, Pencil, Trash2 } from 'lucide-react'
+import { Plus, CreditCard, Pencil, Trash2, CalendarDays } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { BillingCycleEditor } from '@/components/cards/billing-cycle-editor'
 
 type CardBrand = 'visa' | 'mastercard' | 'amex'
 
@@ -51,6 +52,7 @@ export default function CardsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [isCyclesOpen, setIsCyclesOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
   const [formData, setFormData] = useState<CardFormData>(initialFormData)
 
@@ -305,6 +307,17 @@ export default function CardsPage() {
                     <CardDescription>{card.bank} - {getBrandName(card.brand)}</CardDescription>
                   </div>
                   <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSelectedCard(card.id)
+                        setIsCyclesOpen(true)
+                      }}
+                      title="Ver Calendario"
+                    >
+                      <CalendarDays className="h-4 w-4 text-blue-600" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(card)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -462,6 +475,24 @@ export default function CardsPage() {
             <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Billing Cycles Dialog */}
+      <Dialog open={isCyclesOpen} onOpenChange={setIsCyclesOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Ciclos de Facturación</DialogTitle>
+            <DialogDescription>
+              Ajusta las fechas reales de cierre y vencimiento para cada mes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {selectedCard && <BillingCycleEditor cardId={selectedCard} />}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsCyclesOpen(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

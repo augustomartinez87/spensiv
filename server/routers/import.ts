@@ -75,11 +75,28 @@ export const importRouter = router({
                     let cardId: string | undefined
 
                     if (item.paymentMethod === 'credit_card' && item.cardName) {
-                        const card = userCards.find(c =>
+                        let card = userCards.find(c =>
+                            c.name.toLowerCase().trim() === item.cardName!.toLowerCase().trim() ||
                             c.name.toLowerCase().includes(item.cardName!.toLowerCase()) ||
                             item.cardName!.toLowerCase().includes(c.name.toLowerCase())
                         )
-                        cardId = card?.id
+
+                        // SI NO EXISTE, LA CREAMOS AUTOMATICAMENTE
+                        if (!card) {
+                            card = await ctx.prisma.creditCard.create({
+                                data: {
+                                    userId: ctx.user.id,
+                                    name: item.cardName!,
+                                    bank: item.bank || item.cardName!.split(' ')[0] || 'Desconocido',
+                                    brand: item.cardName!.toLowerCase().includes('master') ? 'mastercard' : 'visa',
+                                    closingDay: 20, // Default conservador
+                                    dueDay: 1,      // Default conservador
+                                }
+                            })
+                            // Actualizamos la lista local para no crearla dos veces
+                            userCards.push(card)
+                        }
+                        cardId = card.id
                     }
 
                     // We use the existing engine to handle installments correctly

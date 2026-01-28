@@ -171,10 +171,61 @@ export const cardsRouter = router({
         totalDebt,
         nextPayment: nextPayment
           ? {
-              amount: Number(nextPayment.totalAmount || 0),
-              dueDate: nextPayment.dueDate,
-            }
+            amount: Number(nextPayment.totalAmount || 0),
+            dueDate: nextPayment.dueDate,
+          }
           : null,
       }
+    }),
+
+  /**
+   * Listar ciclos de facturación de una tarjeta
+   */
+  listBillingCycles: protectedProcedure
+    .input(z.string())
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.billingCycle.findMany({
+        where: {
+          cardId: input,
+          card: { userId: ctx.user.id }
+        },
+        orderBy: {
+          period: 'desc',
+        },
+        take: 12,
+      })
+    }),
+
+  /**
+   * Actualizar fechas de un ciclo de facturación
+   */
+  updateBillingCycle: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        closeDate: z.date(),
+        dueDate: z.date(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const cycle = await ctx.prisma.billingCycle.findUnique({
+        where: { id: input.id },
+        include: { card: true },
+      })
+
+      if (!cycle || cycle.card.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Ciclo no encontrado',
+        })
+      }
+
+      return ctx.prisma.billingCycle.update({
+        where: { id: input.id },
+        data: {
+          closeDate: input.closeDate,
+          dueDate: input.dueDate,
+        },
+      })
     }),
 })

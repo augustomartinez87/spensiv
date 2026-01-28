@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { startOfMonth, endOfMonth, addMonths } from 'date-fns'
 import { getMonthlyBalance, getCashFlowProjection } from '@/lib/balance'
+import { formatPeriod } from '@/lib/periods'
 
 export const dashboardRouter = router({
   /**
@@ -45,7 +46,7 @@ export const dashboardRouter = router({
     const endDate = endOfMonth(now)
 
     // Obtener transacciones y cuotas en paralelo
-    const period = now.toISOString().slice(0, 7) // "2025-01"
+    const period = formatPeriod(now) // "2025-01"
 
     const [transactions, installments] = await Promise.all([
       ctx.prisma.transaction.findMany({
