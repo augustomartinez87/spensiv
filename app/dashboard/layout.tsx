@@ -84,15 +84,9 @@ export default function DashboardLayout({
             })}
           </nav>
 
-          {/* User Profile Hook */}
-          <div className="p-4 border-t flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <UserButton afterSignOutUrl="/" />
-              <div className="hidden lg:block">
-                <p className="text-xs font-medium text-foreground leading-none">Mi Cuenta</p>
-                <p className="text-[10px] text-muted-foreground mt-1">Configuración</p>
-              </div>
-            </div>
+          {/* User Profile - UserButton only */}
+          <div className="p-4 border-t flex items-center justify-center">
+            <UserButton afterSignOutUrl="/" />
           </div>
         </div>
       </aside>
