@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 import {
   Dialog,
   DialogContent,
@@ -22,13 +23,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard, Banknote, ArrowRightLeft } from 'lucide-react'
+import { Plus, ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard, Banknote, ArrowRightLeft, TrendingUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 type PaymentMethod = 'credit_card' | 'cash' | 'transfer'
 type ExpenseType = 'structural' | 'emotional_recurrent' | 'emotional_impulsive'
+type TabType = 'gastos' | 'ingresos'
 
 interface TransactionFormData {
   paymentMethod: PaymentMethod
@@ -39,6 +41,15 @@ interface TransactionFormData {
   installments: number
   expenseType: ExpenseType | undefined
   notes: string
+}
+
+interface IncomeFormData {
+  description: string
+  amount: number
+  date: string
+  category: 'active_income' | 'other_income'
+  subcategory: string
+  isRecurring: boolean
 }
 
 const initialFormData: TransactionFormData = {
@@ -52,13 +63,26 @@ const initialFormData: TransactionFormData = {
   notes: '',
 }
 
+const initialIncomeFormData: IncomeFormData = {
+  description: '',
+  amount: 0,
+  date: new Date().toISOString().split('T')[0],
+  category: 'active_income',
+  subcategory: '',
+  isRecurring: false,
+}
+
 export default function TransactionsPage() {
+  const [activeTab, setActiveTab] = useState<TabType>('gastos')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isIncomeCreateOpen, setIsIncomeCreateOpen] = useState(false)
   const [formData, setFormData] = useState<TransactionFormData>(initialFormData)
+  const [incomeFormData, setIncomeFormData] = useState<IncomeFormData>(initialIncomeFormData)
   const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null)
 
   const utils = trpc.useUtils()
-  const { data: transactions, isLoading } = trpc.transactions.list.useQuery()
+  const { data: transactions, isLoading: isLoadingTransactions } = trpc.transactions.list.useQuery()
+  const { data: incomes, isLoading: isLoadingIncomes } = trpc.incomes.list.useQuery()
   const { data: cards } = trpc.cards.list.useQuery()
 
   const createMutation = trpc.transactions.create.useMutation({
@@ -68,6 +92,15 @@ export default function TransactionsPage() {
       utils.dashboard.getTotalDebt.invalidate()
       setIsCreateOpen(false)
       setFormData(initialFormData)
+    },
+  })
+
+  const createIncomeMutation = trpc.incomes.create.useMutation({
+    onSuccess: () => {
+      utils.incomes.list.invalidate()
+      utils.dashboard.getCurrentMonth.invalidate()
+      setIsIncomeCreateOpen(false)
+      setIncomeFormData(initialIncomeFormData)
     },
   })
 
@@ -87,6 +120,8 @@ export default function TransactionsPage() {
     },
   })
 
+  // Nota: Los ingresos no tienen funcionalidad de anulación por ahora
+
   const handleCreate = () => {
     createMutation.mutate({
       paymentMethod: formData.paymentMethod,
@@ -97,6 +132,17 @@ export default function TransactionsPage() {
       installments: formData.paymentMethod === 'credit_card' ? formData.installments : 1,
       expenseType: formData.expenseType,
       notes: formData.notes || undefined,
+    })
+  }
+
+  const handleCreateIncome = () => {
+    createIncomeMutation.mutate({
+      description: incomeFormData.description,
+      amount: incomeFormData.amount,
+      date: new Date(incomeFormData.date),
+      category: incomeFormData.category,
+      subcategory: incomeFormData.subcategory || undefined,
+      isRecurring: incomeFormData.isRecurring,
     })
   }
 
@@ -165,351 +211,571 @@ export default function TransactionsPage() {
     }
   }
 
+  const getIncomeCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'active_income':
+        return 'Ingreso Activo'
+      case 'other_income':
+        return 'Otro Ingreso'
+      default:
+        return category
+    }
+  }
+
+  const getIncomeCategoryColor = (category: string) => {
+    switch (category) {
+      case 'active_income':
+        return 'bg-green-500/15 text-green-400'
+      case 'other_income':
+        return 'bg-blue-500/15 text-blue-400'
+      default:
+        return 'bg-secondary text-muted-foreground'
+    }
+  }
+
   const isFormValid = () => {
     if (!formData.description || formData.totalAmount <= 0) return false
     if (formData.paymentMethod === 'credit_card' && !formData.cardId) return false
     return true
   }
 
-  if (isLoading) {
+  const isIncomeFormValid = () => {
+    return incomeFormData.description && incomeFormData.amount > 0
+  }
+
+  if (isLoadingTransactions || isLoadingIncomes) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground">Cargando gastos...</div>
+        <div className="text-muted-foreground">Cargando movimientos...</div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Gastos</h1>
+          <h1 className="text-3xl font-bold">Movimientos</h1>
           <p className="text-muted-foreground">
-            Registra y administra tus compras
+            Registra y administra tus gastos e ingresos
           </p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setFormData(initialFormData)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo gasto
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Nuevo gasto</DialogTitle>
-              <DialogDescription>
-                Registra una nueva compra
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              {/* Metodo de pago */}
-              <div className="grid gap-2">
-                <Label>Metodo de pago</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    type="button"
-                    variant={formData.paymentMethod === 'credit_card' ? 'default' : 'outline'}
-                    className="flex flex-col h-auto py-3"
-                    onClick={() => setFormData({ ...formData, paymentMethod: 'credit_card' })}
-                  >
-                    <CreditCard className="h-5 w-5 mb-1" />
-                    <span className="text-xs">Tarjeta</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={formData.paymentMethod === 'cash' ? 'default' : 'outline'}
-                    className="flex flex-col h-auto py-3"
-                    onClick={() => setFormData({ ...formData, paymentMethod: 'cash', cardId: '', installments: 1 })}
-                  >
-                    <Banknote className="h-5 w-5 mb-1" />
-                    <span className="text-xs">Efectivo</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={formData.paymentMethod === 'transfer' ? 'default' : 'outline'}
-                    className="flex flex-col h-auto py-3"
-                    onClick={() => setFormData({ ...formData, paymentMethod: 'transfer', cardId: '', installments: 1 })}
-                  >
-                    <ArrowRightLeft className="h-5 w-5 mb-1" />
-                    <span className="text-xs">Transferencia</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Tarjeta (solo si es credit_card) */}
-              {formData.paymentMethod === 'credit_card' && (
+        {activeTab === 'gastos' ? (
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setFormData(initialFormData)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo gasto
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Nuevo gasto</DialogTitle>
+                <DialogDescription>
+                  Registra una nueva compra
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                {/* Metodo de pago */}
                 <div className="grid gap-2">
-                  <Label htmlFor="cardId">Tarjeta</Label>
-                  <Select
-                    value={formData.cardId}
-                    onValueChange={(value) => setFormData({ ...formData, cardId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona tarjeta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cards?.map((card) => (
-                        <SelectItem key={card.id} value={card.id}>
-                          {card.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {!cards?.length && (
-                    <p className="text-xs text-muted-foreground">
-                      No tenes tarjetas. <a href="/dashboard/cards" className="text-primary underline">Agrega una</a>
-                    </p>
-                  )}
+                  <Label>Método de pago</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button
+                      type="button"
+                      variant={formData.paymentMethod === 'credit_card' ? 'default' : 'outline'}
+                      className="flex flex-col h-auto py-3"
+                      onClick={() => setFormData({ ...formData, paymentMethod: 'credit_card' })}
+                    >
+                      <CreditCard className="h-5 w-5 mb-1" />
+                      <span className="text-xs">Tarjeta</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={formData.paymentMethod === 'cash' ? 'default' : 'outline'}
+                      className="flex flex-col h-auto py-3"
+                      onClick={() => setFormData({ ...formData, paymentMethod: 'cash', cardId: '', installments: 1 })}
+                    >
+                      <Banknote className="h-5 w-5 mb-1" />
+                      <span className="text-xs">Efectivo</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={formData.paymentMethod === 'transfer' ? 'default' : 'outline'}
+                      className="flex flex-col h-auto py-3"
+                      onClick={() => setFormData({ ...formData, paymentMethod: 'transfer', cardId: '', installments: 1 })}
+                    >
+                      <ArrowRightLeft className="h-5 w-5 mb-1" />
+                      <span className="text-xs">Transferencia</span>
+                    </Button>
+                  </div>
                 </div>
-              )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="description">Descripción</Label>
-                <Input
-                  id="description"
-                  placeholder="ej: Smart TV Samsung 55"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="totalAmount">Monto total</Label>
-                  <Input
-                    id="totalAmount"
-                    type="number"
-                    placeholder="Ej: 15000"
-                    value={formData.totalAmount || ''}
-                    onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
+                {/* Tarjeta (solo si es credit_card) */}
                 {formData.paymentMethod === 'credit_card' && (
                   <div className="grid gap-2">
-                    <Label htmlFor="installments">Cuotas</Label>
-                    <Input
-                      id="installments"
-                      type="number"
-                      min={1}
-                      max={60}
-                      value={formData.installments}
-                      onChange={(e) => setFormData({ ...formData, installments: parseInt(e.target.value) || 1 })}
-                    />
+                    <Label htmlFor="cardId">Tarjeta</Label>
+                    <Select
+                      value={formData.cardId}
+                      onValueChange={(value) => setFormData({ ...formData, cardId: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona tarjeta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cards?.map((card) => (
+                          <SelectItem key={card.id} value={card.id}>
+                            {card.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!cards?.length && (
+                      <p className="text-xs text-muted-foreground">
+                        No tenés tarjetas. <a href="/dashboard/cards" className="text-primary underline">Agregá una</a>
+                      </p>
+                    )}
                   </div>
                 )}
-              </div>
 
-              {formData.paymentMethod === 'credit_card' && formData.totalAmount > 0 && formData.installments > 0 && (
-                <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
-                  Cuota mensual: {formatCurrency(formData.totalAmount / formData.installments)}
+                <div className="grid gap-2">
+                  <Label htmlFor="description">Descripción</Label>
+                  <Input
+                    id="description"
+                    placeholder="ej: Smart TV Samsung 55"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
                 </div>
-              )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="purchaseDate">Fecha de compra</Label>
-                <Input
-                  id="purchaseDate"
-                  type="date"
-                  value={formData.purchaseDate}
-                  onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="totalAmount">Monto total</Label>
+                    <Input
+                      id="totalAmount"
+                      type="number"
+                      placeholder="Ej: 15000"
+                      value={formData.totalAmount || ''}
+                      onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  {formData.paymentMethod === 'credit_card' && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="installments">Cuotas</Label>
+                      <Input
+                        id="installments"
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={formData.installments}
+                        onChange={(e) => setFormData({ ...formData, installments: parseInt(e.target.value) || 1 })}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {formData.paymentMethod === 'credit_card' && formData.totalAmount > 0 && formData.installments > 0 && (
+                  <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                    Cuota mensual: {formatCurrency(formData.totalAmount / formData.installments)}
+                  </div>
+                )}
+
+                <div className="grid gap-2">
+                  <Label htmlFor="purchaseDate">Fecha de compra</Label>
+                  <Input
+                    id="purchaseDate"
+                    type="date"
+                    value={formData.purchaseDate}
+                    onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="expenseType">Tipo de gasto</Label>
+                  <Select
+                    value={formData.expenseType || ''}
+                    onValueChange={(value) => setFormData({ ...formData, expenseType: value as ExpenseType })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona tipo (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="structural">Estructural</SelectItem>
+                      <SelectItem value="emotional_recurrent">Emocional Recurrente</SelectItem>
+                      <SelectItem value="emotional_impulsive">Emocional Impulsivo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="notes">Notas (opcional)</Label>
+                  <Input
+                    id="notes"
+                    placeholder="Notas adicionales..."
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  />
+                </div>
               </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="expenseType">Tipo de gasto</Label>
-                <Select
-                  value={formData.expenseType || ''}
-                  onValueChange={(value) => setFormData({ ...formData, expenseType: value as ExpenseType })}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleCreate}
+                  disabled={createMutation.isPending || !isFormValid()}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona tipo (opcional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="structural">Estructural</SelectItem>
-                    <SelectItem value="emotional_recurrent">Emocional Recurrente</SelectItem>
-                    <SelectItem value="emotional_impulsive">Emocional Impulsivo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  {createMutation.isPending ? 'Guardando...' : 'Guardar'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <Dialog open={isIncomeCreateOpen} onOpenChange={setIsIncomeCreateOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setIncomeFormData(initialIncomeFormData)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo ingreso
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Nuevo ingreso</DialogTitle>
+                <DialogDescription>
+                  Registra un nuevo ingreso
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="income-description">Descripción</Label>
+                  <Input
+                    id="income-description"
+                    placeholder="ej: Sueldo Enero"
+                    value={incomeFormData.description}
+                    onChange={(e) => setIncomeFormData({ ...incomeFormData, description: e.target.value })}
+                  />
+                </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="notes">Notas (opcional)</Label>
-                <Input
-                  id="notes"
-                  placeholder="Notas adicionales..."
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="income-amount">Monto</Label>
+                    <Input
+                      id="income-amount"
+                      type="number"
+                      placeholder="Ej: 50000"
+                      value={incomeFormData.amount || ''}
+                      onChange={(e) => setIncomeFormData({ ...incomeFormData, amount: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="income-date">Fecha</Label>
+                    <Input
+                      id="income-date"
+                      type="date"
+                      value={incomeFormData.date}
+                      onChange={(e) => setIncomeFormData({ ...incomeFormData, date: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="income-category">Categoría</Label>
+                  <Select
+                    value={incomeFormData.category}
+                    onValueChange={(value: 'active_income' | 'other_income') => setIncomeFormData({ ...incomeFormData, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active_income">Ingresos Activos</SelectItem>
+                      <SelectItem value="other_income">Otros Ingresos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="income-subcategory">Subcategoría (opcional)</Label>
+                  <Input
+                    id="income-subcategory"
+                    placeholder="ej: Sueldo, Freelance, etc."
+                    value={incomeFormData.subcategory}
+                    onChange={(e) => setIncomeFormData({ ...incomeFormData, subcategory: e.target.value })}
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="income-isRecurring"
+                    checked={incomeFormData.isRecurring}
+                    onChange={(e) => setIncomeFormData({ ...incomeFormData, isRecurring: e.target.checked })}
+                    className="rounded"
+                  />
+                  <Label htmlFor="income-isRecurring" className="cursor-pointer">
+                    Es recurrente (mensual)
+                  </Label>
+                </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={createMutation.isPending || !isFormValid()}
-              >
-                {createMutation.isPending ? 'Guardando...' : 'Guardar'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsIncomeCreateOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleCreateIncome}
+                  disabled={createIncomeMutation.isPending || !isIncomeFormValid()}
+                >
+                  {createIncomeMutation.isPending ? 'Guardando...' : 'Guardar'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
-      {transactions?.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <ShoppingCart className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No tenes gastos registrados</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Registra tu primer gasto para comenzar a trackear tus finanzas
-            </p>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo gasto
-            </Button>
-          </CardContent>
-        </Card>
+      {/* Tabs */}
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setActiveTab('gastos')}
+          className={cn(
+            "px-4 py-2 rounded-md text-sm font-medium transition-colors",
+            activeTab === 'gastos'
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Gastos
+        </button>
+        <button
+          onClick={() => setActiveTab('ingresos')}
+          className={cn(
+            "px-4 py-2 rounded-md text-sm font-medium transition-colors",
+            activeTab === 'ingresos'
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Ingresos
+        </button>
+      </div>
+
+      {/* Content */}
+      {activeTab === 'gastos' ? (
+        <>
+          {transactions?.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <ShoppingCart className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No tenés gastos registrados</h3>
+                <p className="text-muted-foreground text-center mb-4">
+                  Registrá tu primer gasto para comenzar a trackear tus finanzas
+                </p>
+                <Button onClick={() => setIsCreateOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuevo gasto
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {transactions?.map((transaction) => (
+                <Card
+                  key={transaction.id}
+                  className={transaction.isVoided ? 'opacity-60' : ''}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">
+                            {transaction.description}
+                          </CardTitle>
+                          {transaction.isVoided && (
+                            <span className="text-xs bg-red-500/15 text-red-400 px-2 py-0.5 rounded">
+                              ANULADO
+                            </span>
+                          )}
+                        </div>
+                        <CardDescription className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${getPaymentMethodColor((transaction as any).paymentMethod || 'credit_card')}`}>
+                            {getPaymentMethodIcon((transaction as any).paymentMethod || 'credit_card')}
+                            {getPaymentMethodLabel((transaction as any).paymentMethod || 'credit_card')}
+                          </span>
+                          {transaction.card && (
+                            <span>{transaction.card.name}</span>
+                          )}
+                          <span>-</span>
+                          <span>{format(new Date(transaction.purchaseDate), "d 'de' MMMM, yyyy", { locale: es })}</span>
+                        </CardDescription>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold">
+                          {formatCurrency(Number(transaction.totalAmount))}
+                        </div>
+                        {(transaction as any).paymentMethod === 'credit_card' && transaction.installments > 1 && (
+                          <div className="text-sm text-muted-foreground">
+                            {transaction.installments} cuotas de{' '}
+                            {formatCurrency(Number(transaction.totalAmount) / transaction.installments)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded ${getExpenseTypeColor(transaction.expenseType)}`}>
+                          {getExpenseTypeLabel(transaction.expenseType)}
+                        </span>
+                        {transaction.notes && (
+                          <span className="text-xs text-muted-foreground">
+                            {transaction.notes}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {transaction.isVoided ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => unvoidMutation.mutate(transaction.id)}
+                            disabled={unvoidMutation.isPending}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Restaurar
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => voidMutation.mutate(transaction.id)}
+                            disabled={voidMutation.isPending}
+                          >
+                            <Ban className="h-4 w-4 mr-1" />
+                            Anular
+                          </Button>
+                        )}
+                        {(transaction as any).paymentMethod === 'credit_card' && transaction.installmentsList?.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setExpandedTransaction(
+                              expandedTransaction === transaction.id ? null : transaction.id
+                            )}
+                          >
+                            {expandedTransaction === transaction.id ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                            Ver cuotas
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {expandedTransaction === transaction.id && transaction.installmentsList?.length > 0 && (
+                      <div className="mt-4 border-t pt-4">
+                        <h4 className="text-sm font-medium mb-2">Detalle de cuotas</h4>
+                        <div className="grid gap-2">
+                          {transaction.installmentsList.map((installment) => (
+                            <div
+                              key={installment.id}
+                              className="flex items-center justify-between text-sm p-2 bg-muted rounded"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">
+                                  Cuota {installment.installmentNumber}/{transaction.installments}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {format(new Date(installment.impactDate), "MMMM yyyy", { locale: es })}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">
+                                  {formatCurrency(Number(installment.amount))}
+                                </span>
+                                {installment.isPaid ? (
+                                  <span className="text-xs bg-green-500/15 text-green-400 px-2 py-0.5 rounded">
+                                    Pagada
+                                  </span>
+                                ) : (
+                                  <span className="text-xs bg-yellow-500/15 text-yellow-400 px-2 py-0.5 rounded">
+                                    Pendiente
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       ) : (
-        <div className="space-y-4">
-          {transactions?.map((transaction) => (
-            <Card
-              key={transaction.id}
-              className={transaction.isVoided ? 'opacity-60' : ''}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-lg">
-                        {transaction.description}
-                      </CardTitle>
-                      {transaction.isVoided && (
-                        <span className="text-xs bg-red-500/15 text-red-400 px-2 py-0.5 rounded">
-                          ANULADO
+        <>
+          {incomes?.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No tenés ingresos registrados</h3>
+                <p className="text-muted-foreground text-center mb-4">
+                  Registrá tu primer ingreso para comenzar a trackear tus finanzas
+                </p>
+                <Button onClick={() => setIsIncomeCreateOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuevo ingreso
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {incomes?.map((income) => (
+                <Card key={income.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">
+                            {income.description}
+                          </CardTitle>
+                          {income.isRecurring && (
+                            <span className="text-xs bg-blue-500/15 text-blue-400 px-2 py-0.5 rounded">
+                              RECURRENTE
+                            </span>
+                          )}
+                        </div>
+                        <CardDescription className="flex items-center gap-2 mt-1">
+                          <span>{format(new Date(income.date), "d 'de' MMMM, yyyy", { locale: es })}</span>
+                        </CardDescription>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-green-400">
+                          +{formatCurrency(Number(income.amount))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs px-2 py-0.5 rounded ${getIncomeCategoryColor(income.category)}`}>
+                        {getIncomeCategoryLabel(income.category)}
+                      </span>
+                      {income.subcategory && (
+                        <span className="text-xs text-muted-foreground">
+                          {income.subcategory}
                         </span>
                       )}
                     </div>
-                    <CardDescription className="flex items-center gap-2 mt-1">
-                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${getPaymentMethodColor((transaction as any).paymentMethod || 'credit_card')}`}>
-                        {getPaymentMethodIcon((transaction as any).paymentMethod || 'credit_card')}
-                        {getPaymentMethodLabel((transaction as any).paymentMethod || 'credit_card')}
-                      </span>
-                      {transaction.card && (
-                        <span>{transaction.card.name}</span>
-                      )}
-                      <span>-</span>
-                      <span>{format(new Date(transaction.purchaseDate), "d 'de' MMMM, yyyy", { locale: es })}</span>
-                    </CardDescription>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold">
-                      {formatCurrency(Number(transaction.totalAmount))}
-                    </div>
-                    {(transaction as any).paymentMethod === 'credit_card' && transaction.installments > 1 && (
-                      <div className="text-sm text-muted-foreground">
-                        {transaction.installments} cuotas de{' '}
-                        {formatCurrency(Number(transaction.totalAmount) / transaction.installments)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded ${getExpenseTypeColor(transaction.expenseType)}`}>
-                      {getExpenseTypeLabel(transaction.expenseType)}
-                    </span>
-                    {transaction.notes && (
-                      <span className="text-xs text-muted-foreground">
-                        {transaction.notes}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {transaction.isVoided ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => unvoidMutation.mutate(transaction.id)}
-                        disabled={unvoidMutation.isPending}
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Restaurar
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => voidMutation.mutate(transaction.id)}
-                        disabled={voidMutation.isPending}
-                      >
-                        <Ban className="h-4 w-4 mr-1" />
-                        Anular
-                      </Button>
-                    )}
-                    {(transaction as any).paymentMethod === 'credit_card' && transaction.installmentsList?.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setExpandedTransaction(
-                          expandedTransaction === transaction.id ? null : transaction.id
-                        )}
-                      >
-                        {expandedTransaction === transaction.id ? (
-                          <ChevronUp className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                        Ver cuotas
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {expandedTransaction === transaction.id && transaction.installmentsList?.length > 0 && (
-                  <div className="mt-4 border-t pt-4">
-                    <h4 className="text-sm font-medium mb-2">Detalle de cuotas</h4>
-                    <div className="grid gap-2">
-                      {transaction.installmentsList.map((installment) => (
-                        <div
-                          key={installment.id}
-                          className="flex items-center justify-between text-sm p-2 bg-muted rounded"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">
-                              Cuota {installment.installmentNumber}/{transaction.installments}
-                            </span>
-                            <span className="text-muted-foreground">
-                              {format(new Date(installment.impactDate), "MMMM yyyy", { locale: es })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">
-                              {formatCurrency(Number(installment.amount))}
-                            </span>
-                            {installment.isPaid ? (
-                              <span className="text-xs bg-green-500/15 text-green-400 px-2 py-0.5 rounded">
-                                Pagada
-                              </span>
-                            ) : (
-                              <span className="text-xs bg-yellow-500/15 text-yellow-400 px-2 py-0.5 rounded">
-                                Pendiente
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
