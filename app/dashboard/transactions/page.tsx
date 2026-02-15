@@ -80,6 +80,7 @@ export default function TransactionsPage() {
   const [formData, setFormData] = useState<TransactionFormData>(initialFormData)
   const [incomeFormData, setIncomeFormData] = useState<IncomeFormData>(initialIncomeFormData)
   const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null)
+  const [transactionToVoid, setTransactionToVoid] = useState<{ id: string; description: string; amount: number } | null>(null)
 
   const utils = trpc.useUtils()
   const { data: transactions, isLoading: isLoadingTransactions } = trpc.transactions.list.useQuery()
@@ -644,8 +645,11 @@ export default function TransactionsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => voidMutation.mutate(transaction.id)}
-                            disabled={voidMutation.isPending}
+                            onClick={() => setTransactionToVoid({ 
+                              id: transaction.id, 
+                              description: transaction.description,
+                              amount: Number(transaction.totalAmount)
+                            })}
                           >
                             <Ban className="h-4 w-4 mr-1" />
                             Anular
@@ -774,6 +778,37 @@ export default function TransactionsPage() {
           )}
         </>
       )}
+
+      {/* Confirmación para anular gasto */}
+      <Dialog open={!!transactionToVoid} onOpenChange={() => setTransactionToVoid(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>¿Estás seguro?</DialogTitle>
+            <DialogDescription>
+              ¿Querés anular <strong>{transactionToVoid?.description}</strong> por{' '}
+              <strong>{transactionToVoid ? formatCurrency(transactionToVoid.amount) : ''}</strong>?{' '}
+              Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setTransactionToVoid(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (transactionToVoid) {
+                  voidMutation.mutate(transactionToVoid.id)
+                  setTransactionToVoid(null)
+                }
+              }}
+              disabled={voidMutation.isPending}
+            >
+              {voidMutation.isPending ? 'Anulando...' : 'Sí, anular'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
