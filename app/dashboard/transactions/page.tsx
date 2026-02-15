@@ -280,7 +280,7 @@ export default function TransactionsPage() {
                   <Input
                     id="totalAmount"
                     type="number"
-                    placeholder="150000"
+                    placeholder="Ej: 15000"
                     value={formData.totalAmount || ''}
                     onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
                   />

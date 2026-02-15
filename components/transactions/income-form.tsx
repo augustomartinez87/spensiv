@@ -97,7 +97,7 @@ export function IncomeForm() {
                                 step="0.01"
                                 value={formData.amount}
                                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                placeholder="1202019.35"
+                                placeholder="Ej: 50000"
                                 required
                             />
                         </div>
