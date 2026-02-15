@@ -316,7 +316,7 @@ export default function CardsPage() {
                       }}
                       title="Ver Calendario"
                     >
-                      <CalendarDays className="h-4 w-4 text-blue-600" />
+                      <CalendarDays className="h-4 w-4 text-primary" />
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(card)}>
                       <Pencil className="h-4 w-4" />

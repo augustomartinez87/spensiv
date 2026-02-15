@@ -47,15 +47,15 @@ export default function ProjectionsPage() {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-3xl font-bold text-slate-900">Proyección de Cashflow</h1>
-                <p className="text-slate-500 mt-1">Escalera de cuotas y balance neto para los próximos 6 meses</p>
+                <h1 className="text-3xl font-bold text-foreground">Proyección de Cashflow</h1>
+                <p className="text-muted-foreground mt-1">Escalera de cuotas y balance neto para los próximos 6 meses</p>
             </div>
 
             {/* Main Chart */}
-            <Card className="border-slate-200 shadow-sm">
+            <Card>
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-blue-600" />
+                        <TrendingUp className="h-5 w-5 text-primary" />
                         Consolidado Mensual
                     </CardTitle>
                     <CardDescription>Comparativa de ingresos recurrentes vs. vencimientos de cuotas</CardDescription>
@@ -64,22 +64,29 @@ export default function ProjectionsPage() {
                     <div className="h-[400px] w-full mt-4">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(228 10% 20%)" />
                                 <XAxis
                                     dataKey="name"
                                     axisLine={false}
                                     tickLine={false}
-                                    tick={{ fill: '#64748b', fontSize: 12 }}
+                                    tick={{ fill: 'hsl(228 5% 55%)', fontSize: 12 }}
                                 />
                                 <YAxis
                                     axisLine={false}
                                     tickLine={false}
-                                    tick={{ fill: '#64748b', fontSize: 12 }}
+                                    tick={{ fill: 'hsl(228 5% 55%)', fontSize: 12 }}
                                     tickFormatter={(val) => `$${(val / 1000)}k`}
                                 />
                                 <Tooltip
-                                    cursor={{ fill: '#f8fafc' }}
-                                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    cursor={{ fill: 'hsl(228 14% 14%)' }}
+                                    contentStyle={{
+                                        backgroundColor: 'hsl(228 14% 12%)',
+                                        border: '1px solid hsl(228 10% 20%)',
+                                        borderRadius: '8px',
+                                        color: 'hsl(0 0% 95%)',
+                                    }}
+                                    itemStyle={{ color: 'hsl(0 0% 95%)' }}
+                                    labelStyle={{ color: 'hsl(0 0% 95%)' }}
                                     formatter={(val: number) => [formatCurrency(val), '']}
                                 />
                                 <Legend iconType="circle" />
@@ -96,31 +103,31 @@ export default function ProjectionsPage() {
                 {projection?.map((p, idx) => {
                     const isDeficit = (p.totalIncome - p.totalExpense) < 0
                     return (
-                        <Card key={idx} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                            <CardHeader className="pb-2 border-b bg-slate-50/50">
+                        <Card key={idx} className="hover:shadow-md transition-shadow">
+                            <CardHeader className="pb-2 border-b bg-muted">
                                 <div className="flex items-center justify-between">
-                                    <p className="font-bold text-slate-700">{p.period}</p>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-slate-200 rounded text-slate-600">
+                                    <p className="font-bold text-foreground">{p.period}</p>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-secondary rounded text-muted-foreground">
                                         {p.installments.length} CUOTAS
                                     </span>
                                 </div>
                             </CardHeader>
                             <CardContent className="pt-4 space-y-4">
                                 <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <Banknote className="h-4 w-4" /> Ingresos
                                     </div>
-                                    <span className="font-semibold text-green-600">{formatCurrency(p.totalIncome)}</span>
+                                    <span className="font-semibold text-green-400">{formatCurrency(p.totalIncome)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <CreditCard className="h-4 w-4" /> Tarjetas
                                     </div>
-                                    <span className="font-semibold text-blue-600">{formatCurrency(p.totalExpense)}</span>
+                                    <span className="font-semibold text-blue-400">{formatCurrency(p.totalExpense)}</span>
                                 </div>
                                 <div className="pt-3 border-t flex justify-between items-center">
-                                    <span className="text-sm font-bold text-slate-900">Saldo Final</span>
-                                    <span className={cn("text-lg font-black", isDeficit ? "text-red-500" : "text-slate-900")}>
+                                    <span className="text-sm font-bold text-foreground">Saldo Final</span>
+                                    <span className={cn("text-lg font-black", isDeficit ? "text-red-400" : "text-foreground")}>
                                         {formatCurrency(p.totalIncome - p.totalExpense)}
                                     </span>
                                 </div>

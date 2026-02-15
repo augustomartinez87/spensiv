@@ -116,13 +116,13 @@ export default function TransactionsPage() {
   const getExpenseTypeColor = (type: string | null) => {
     switch (type) {
       case 'structural':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-500/15 text-blue-400'
       case 'emotional_recurrent':
-        return 'bg-purple-100 text-purple-800'
+        return 'bg-purple-500/15 text-purple-400'
       case 'emotional_impulsive':
-        return 'bg-orange-100 text-orange-800'
+        return 'bg-orange-500/15 text-orange-400'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-secondary text-muted-foreground'
     }
   }
 
@@ -155,13 +155,13 @@ export default function TransactionsPage() {
   const getPaymentMethodColor = (method: string) => {
     switch (method) {
       case 'credit_card':
-        return 'bg-indigo-100 text-indigo-800'
+        return 'bg-indigo-500/15 text-indigo-400'
       case 'cash':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-500/15 text-green-400'
       case 'transfer':
-        return 'bg-cyan-100 text-cyan-800'
+        return 'bg-cyan-500/15 text-cyan-400'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-secondary text-muted-foreground'
     }
   }
 
@@ -387,7 +387,7 @@ export default function TransactionsPage() {
                         {transaction.description}
                       </CardTitle>
                       {transaction.isVoided && (
-                        <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
+                        <span className="text-xs bg-red-500/15 text-red-400 px-2 py-0.5 rounded">
                           ANULADO
                         </span>
                       )}
@@ -492,11 +492,11 @@ export default function TransactionsPage() {
                               {formatCurrency(Number(installment.amount))}
                             </span>
                             {installment.isPaid ? (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                              <span className="text-xs bg-green-500/15 text-green-400 px-2 py-0.5 rounded">
                                 Pagada
                               </span>
                             ) : (
-                              <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
+                              <span className="text-xs bg-yellow-500/15 text-yellow-400 px-2 py-0.5 rounded">
                                 Pendiente
                               </span>
                             )}

@@ -55,7 +55,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-4" />
-          <p className="text-slate-600">No se pudo cargar el balance. Verifica tu conexión.</p>
+          <p className="text-muted-foreground">No se pudo cargar el balance. Verifica tu conexión.</p>
         </div>
       </div>
     )
@@ -83,8 +83,8 @@ export default function DashboardPage() {
       {/* Header with Title and Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
-          <p className="text-slate-500 mt-1">Tu motor de cashflow personal</p>
+          <h1 className="text-3xl font-bold text-foreground tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Tu motor de cashflow personal</p>
         </div>
         <div className="flex items-center gap-2">
           <IncomeForm />
@@ -93,12 +93,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Main Period Selector & Stats */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+      <div className="bg-card p-6 rounded-xl border border-border shadow-sm space-y-6">
         <div className="flex items-center justify-between">
           <MonthSelector value={period} onChange={setPeriod} />
           <div className="hidden sm:block text-right">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Deuda Total</p>
-            <p className="text-lg font-bold text-slate-900">{formatCurrency(totalDebt?.amount || 0)}</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Deuda Total</p>
+            <p className="text-lg font-bold text-foreground">{formatCurrency(totalDebt?.amount || 0)}</p>
           </div>
         </div>
 
@@ -139,19 +139,19 @@ export default function DashboardPage() {
           </div>
 
           {/* Recent List */}
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50 py-4">
+          <Card>
+            <CardHeader className="border-b bg-muted py-4">
               <CardTitle className="text-base font-semibold">📋 Movimientos recientes</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-border">
                 {balance.installments.slice(0, 5).map((inst) => (
-                  <div key={inst.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                  <div key={inst.id} className="flex items-center justify-between p-4 hover:bg-accent transition-colors">
                     <div>
-                      <p className="font-medium text-sm text-slate-900">
+                      <p className="font-medium text-sm text-foreground">
                         {inst.transaction.description}
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {format(new Date(inst.transaction.purchaseDate), 'd MMM', { locale: es })}
                         {inst.transaction.installments > 1 &&
                           ` • Cuota ${inst.installmentNumber}/${inst.transaction.installments}`
@@ -159,42 +159,42 @@ export default function DashboardPage() {
                         {inst.transaction.card && ` • ${inst.transaction.card.name}`}
                       </p>
                     </div>
-                    <p className="font-semibold text-sm text-slate-900">
+                    <p className="font-semibold text-sm text-foreground">
                       {formatCurrency(Number(inst.amount))}
                     </p>
                   </div>
                 ))}
                 {balance.cashTransactions?.slice(0, 5).map((tx: any) => (
-                  <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                  <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-accent transition-colors">
                     <div>
-                      <p className="font-medium text-sm text-slate-900">{tx.description}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="font-medium text-sm text-foreground">{tx.description}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {format(new Date(tx.purchaseDate), 'd MMM', { locale: es })}
                         {` • ${tx.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia'}`}
                       </p>
                     </div>
-                    <p className="font-semibold text-sm text-slate-900">
+                    <p className="font-semibold text-sm text-foreground">
                       {formatCurrency(Number(tx.totalAmount))}
                     </p>
                   </div>
                 ))}
                 {balance.incomes.slice(0, 5).map((income: any) => (
-                  <div key={income.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                  <div key={income.id} className="flex items-center justify-between p-4 hover:bg-accent transition-colors">
                     <div>
-                      <p className="font-medium text-sm text-slate-900">{income.description}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="font-medium text-sm text-foreground">{income.description}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {format(new Date(income.date), 'd MMM', { locale: es })}
                         {income.category === 'active_income' ? ' • Sueldo' : ' • Otro'}
                       </p>
                     </div>
-                    <p className="font-semibold text-sm text-green-600">
+                    <p className="font-semibold text-sm text-green-400">
                       {formatCurrency(Number(income.amount))}
                     </p>
                   </div>
                 ))}
                 {balance.installments.length === 0 && (!balance.cashTransactions || balance.cashTransactions.length === 0) && balance.incomes.length === 0 && (
-                  <div className="p-8 text-center bg-slate-50/50">
-                    <p className="text-slate-400 text-sm">No hay actividad registrada en este periodo</p>
+                  <div className="p-8 text-center bg-muted">
+                    <p className="text-muted-foreground text-sm">No hay actividad registrada en este periodo</p>
                   </div>
                 )}
               </div>
@@ -205,8 +205,8 @@ export default function DashboardPage() {
         {/* Sidebar Info Section (1/3) */}
         <div className="space-y-6">
           {/* Next Payment */}
-          <Card className="border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="bg-blue-600 text-white py-4">
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-primary text-primary-foreground py-4">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 <CardTitle className="text-sm font-semibold">Próximo Vencimiento</CardTitle>
@@ -216,18 +216,18 @@ export default function DashboardPage() {
               {nextPayment ? (
                 <div className="space-y-4 text-center">
                   <div>
-                    <p className="text-3xl font-bold text-slate-900 tracking-tight">
+                    <p className="text-3xl font-bold text-foreground tracking-tight">
                       {formatCurrency(nextPayment.amount)}
                     </p>
-                    <p className="text-sm font-medium text-slate-600 mt-1">{nextPayment.card.name}</p>
+                    <p className="text-sm font-medium text-muted-foreground mt-1">{nextPayment.card.name}</p>
                   </div>
-                  <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-100 rounded-full text-xs font-semibold text-slate-700">
-                    <AlertCircle className={cn("h-3 w-3", nextPayment.daysUntil <= 3 ? "text-red-500" : "text-blue-500")} />
+                  <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-muted rounded-full text-xs font-semibold text-foreground">
+                    <AlertCircle className={cn("h-3 w-3", nextPayment.daysUntil <= 3 ? "text-red-500" : "text-primary")} />
                     En {nextPayment.daysUntil} días ({format(new Date(nextPayment.dueDate), 'd MMM', { locale: es })})
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-6 text-slate-400 text-sm italic">
+                <div className="text-center py-6 text-muted-foreground text-sm italic">
                   No hay vencimientos próximos
                 </div>
               )}
@@ -235,7 +235,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Cards Debt List */}
-          <Card className="border-slate-200 shadow-sm">
+          <Card>
             <CardHeader className="py-4">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <CardsIcon className="h-4 w-4" /> Tarjetas
@@ -244,13 +244,13 @@ export default function DashboardPage() {
             <CardContent className="px-2 pb-2">
               <div className="space-y-1">
                 {groupedPayments?.map((p) => (
-                  <div key={p.card.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
-                    <span className="text-sm text-slate-600">{p.card.name}</span>
-                    <span className="text-sm font-bold text-slate-900">{formatCurrency(p.amount)}</span>
+                  <div key={p.card.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-accent transition-colors">
+                    <span className="text-sm text-muted-foreground">{p.card.name}</span>
+                    <span className="text-sm font-bold text-foreground">{formatCurrency(p.amount)}</span>
                   </div>
                 ))}
                 {!groupedPayments?.length && (
-                  <p className="text-xs text-slate-400 text-center py-4 italic">Sin deudas activas</p>
+                  <p className="text-xs text-muted-foreground text-center py-4 italic">Sin deudas activas</p>
                 )}
               </div>
             </CardContent>

@@ -64,6 +64,14 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                                 </Pie>
                                 <Tooltip
                                     formatter={(value: number) => `$${value.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
+                                    contentStyle={{
+                                        backgroundColor: 'hsl(228 14% 12%)',
+                                        border: '1px solid hsl(228 10% 20%)',
+                                        borderRadius: '8px',
+                                        color: 'hsl(0 0% 95%)',
+                                    }}
+                                    itemStyle={{ color: 'hsl(0 0% 95%)' }}
+                                    labelStyle={{ color: 'hsl(0 0% 95%)' }}
                                 />
                                 <Legend />
                             </PieChart>

@@ -41,10 +41,10 @@ export function BillingCycleEditor({ cardId }: BillingCycleEditorProps) {
 
     return (
         <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900 px-1">Ciclos de Facturación</h3>
-            <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+            <h3 className="text-sm font-semibold text-foreground px-1">Ciclos de Facturación</h3>
+            <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
                 <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 border-b text-slate-500 font-medium">
+                    <thead className="bg-muted border-b text-muted-foreground font-medium">
                         <tr>
                             <th className="px-4 py-3">Periodo</th>
                             <th className="px-4 py-3">Cierre</th>
@@ -52,13 +52,13 @@ export function BillingCycleEditor({ cardId }: BillingCycleEditorProps) {
                             <th className="px-4 py-3 text-right">Acción</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-border">
                         {cycles?.map((cycle) => {
                             const isEditing = editingId === cycle.id
 
                             return (
-                                <tr key={cycle.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="px-4 py-3 font-medium text-slate-900">{cycle.period}</td>
+                                <tr key={cycle.id} className="hover:bg-accent transition-colors">
+                                    <td className="px-4 py-3 font-medium text-foreground">{cycle.period}</td>
                                     <td className="px-4 py-3">
                                         {isEditing ? (
                                             <DatePicker
@@ -66,7 +66,7 @@ export function BillingCycleEditor({ cardId }: BillingCycleEditorProps) {
                                                 setDate={(d) => setEditData(prev => ({ ...prev!, closeDate: d! }))}
                                             />
                                         ) : (
-                                            <span className="text-slate-600">{format(cycle.closeDate, 'dd MMM', { locale: es })}</span>
+                                            <span className="text-muted-foreground">{format(cycle.closeDate, 'dd MMM', { locale: es })}</span>
                                         )}
                                     </td>
                                     <td className="px-4 py-3">
@@ -76,7 +76,7 @@ export function BillingCycleEditor({ cardId }: BillingCycleEditorProps) {
                                                 setDate={(d) => setEditData(prev => ({ ...prev!, dueDate: d! }))}
                                             />
                                         ) : (
-                                            <span className="text-slate-600">{format(cycle.dueDate, 'dd MMM', { locale: es })}</span>
+                                            <span className="text-muted-foreground">{format(cycle.dueDate, 'dd MMM', { locale: es })}</span>
                                         )}
                                     </td>
                                     <td className="px-4 py-3 text-right">
@@ -85,7 +85,7 @@ export function BillingCycleEditor({ cardId }: BillingCycleEditorProps) {
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    className="h-8 w-8 text-green-600"
+                                                    className="h-8 w-8 text-green-400"
                                                     onClick={() => updateMutation.mutate({ id: cycle.id, ...editData! })}
                                                     disabled={updateMutation.isPending}
                                                 >
@@ -94,7 +94,7 @@ export function BillingCycleEditor({ cardId }: BillingCycleEditorProps) {
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    className="h-8 w-8 text-red-600"
+                                                    className="h-8 w-8 text-red-400"
                                                     onClick={() => setEditingId(null)}
                                                 >
                                                     <X className="h-4 w-4" />
@@ -104,7 +104,7 @@ export function BillingCycleEditor({ cardId }: BillingCycleEditorProps) {
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                className="h-8 w-8 text-slate-400"
+                                                className="h-8 w-8 text-muted-foreground"
                                                 onClick={() => {
                                                     setEditingId(cycle.id)
                                                     setEditData({ closeDate: cycle.closeDate, dueDate: cycle.dueDate })
@@ -131,7 +131,7 @@ function DatePicker({ date, setDate }: { date: Date; setDate: (d: Date | undefin
                 <Button
                     variant={"outline"}
                     className={cn(
-                        "h-8 px-2 text-xs font-normal justify-start text-left bg-white",
+                        "h-8 px-2 text-xs font-normal justify-start text-left",
                         !date && "text-muted-foreground"
                     )}
                 >

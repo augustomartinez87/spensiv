@@ -35,14 +35,14 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-background">
       {/* Sidebar Mobile Toggle */}
       <div className="md:hidden fixed top-4 left-4 z-50">
         <Button
           variant="outline"
           size="icon"
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="bg-white shadow-md"
+          className="bg-card shadow-md"
         >
           {isSidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </Button>
@@ -50,14 +50,14 @@ export default function DashboardLayout({
 
       {/* Sidebar Navigation */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-64 bg-white border-r transition-transform md:translate-x-0 md:static md:inset-0",
+        "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r transition-transform md:translate-x-0 md:static md:inset-0",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="h-16 flex items-center px-6 border-b">
             <Link href="/dashboard" className="font-bold text-2xl flex items-center gap-2">
-              <span className="text-blue-600">💳</span> Spensiv
+              <span className="text-primary">💳</span> Spensiv
             </Link>
           </div>
 
@@ -72,12 +72,12 @@ export default function DashboardLayout({
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-blue-50 text-blue-600"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   )}
                   onClick={() => setIsSidebarOpen(false)}
                 >
-                  <item.icon className={cn("h-4 w-4", isActive ? "text-blue-600" : "text-slate-400")} />
+                  <item.icon className={cn("h-4 w-4", isActive ? "text-accent-foreground" : "text-muted-foreground")} />
                   {item.name}
                 </Link>
               )
@@ -89,8 +89,8 @@ export default function DashboardLayout({
             <div className="flex items-center gap-3">
               <UserButton afterSignOutUrl="/" />
               <div className="hidden lg:block">
-                <p className="text-xs font-medium text-slate-900 leading-none">Mi Cuenta</p>
-                <p className="text-[10px] text-slate-500 mt-1">Configuración</p>
+                <p className="text-xs font-medium text-foreground leading-none">Mi Cuenta</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Configuración</p>
               </div>
             </div>
           </div>
@@ -100,7 +100,7 @@ export default function DashboardLayout({
       {/* Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile Header (optional if sidebar hides) */}
-        <header className="md:hidden h-16 flex items-center px-6 border-b bg-white justify-end">
+        <header className="md:hidden h-16 flex items-center px-6 border-b bg-card justify-end">
           <UserButton afterSignOutUrl="/" />
         </header>
 
@@ -114,7 +114,7 @@ export default function DashboardLayout({
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/50 z-30 md:hidden"
+          className="fixed inset-0 bg-black/60 z-30 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
