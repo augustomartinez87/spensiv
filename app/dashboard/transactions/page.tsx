@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Plus, ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard, Banknote, ArrowRightLeft, TrendingUp } from 'lucide-react'
+import { DatePicker } from '@/components/ui/date-picker'
 import { formatCurrency } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -379,15 +380,13 @@ export default function TransactionsPage() {
                   </div>
                 )}
 
-                <div className="grid gap-2">
-                  <Label htmlFor="purchaseDate">Fecha de compra</Label>
-                  <Input
-                    id="purchaseDate"
-                    type="date"
-                    value={formData.purchaseDate}
-                    onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-                  />
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="purchaseDate">Fecha de compra</Label>
+                <DatePicker
+                  date={formData.purchaseDate ? new Date(formData.purchaseDate) : undefined}
+                  onSelect={(date) => setFormData({ ...formData, purchaseDate: date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0] })}
+                />
+              </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="expenseType">Tipo de gasto</Label>
@@ -468,11 +467,9 @@ export default function TransactionsPage() {
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="income-date">Fecha</Label>
-                    <Input
-                      id="income-date"
-                      type="date"
-                      value={incomeFormData.date}
-                      onChange={(e) => setIncomeFormData({ ...incomeFormData, date: e.target.value })}
+                    <DatePicker
+                      date={incomeFormData.date ? new Date(incomeFormData.date) : undefined}
+                      onSelect={(date) => setIncomeFormData({ ...incomeFormData, date: date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0] })}
                     />
                   </div>
                 </div>

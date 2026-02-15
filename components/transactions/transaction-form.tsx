@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/hooks/use-toast'
 import { Plus } from 'lucide-react'
 
@@ -110,12 +111,9 @@ export function TransactionForm() {
 
                         <div className="space-y-2">
                             <Label htmlFor="date">Fecha</Label>
-                            <Input
-                                id="date"
-                                type="date"
-                                value={formData.purchaseDate}
-                                onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-                                required
+                            <DatePicker
+                                date={formData.purchaseDate ? new Date(formData.purchaseDate) : undefined}
+                                onSelect={(date) => setFormData({ ...formData, purchaseDate: date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0] })}
                             />
                         </div>
                     </div>
