@@ -99,6 +99,7 @@ export default function DashboardPage() {
           <div className="hidden sm:block text-right">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Deuda Total</p>
             <p className="text-lg font-bold text-foreground">{formatCurrency(totalDebt?.amount || 0)}</p>
+            <p className="text-[10px] text-muted-foreground">Suma de todas las tarjetas</p>
           </div>
         </div>
 
