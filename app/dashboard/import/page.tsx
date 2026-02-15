@@ -27,14 +27,14 @@ export default function ImportPage() {
             setStep('success')
             utils.transactions.list.invalidate()
             utils.dashboard.getMonthlyBalance.invalidate()
-            toast({
-                title: "Importacion finalizada!",
-                description: `Se procesaron ${data.success} movimientos correctamente.`,
-            })
+toast({
+            title: "Importación finalizada!",
+            description: `Se procesaron ${data.success} movimientos correctamente.`,
+        })
         },
         onError: (error) => {
             toast({
-                title: "Error en la importacion",
+                title: "Error en la importación",
                 description: error.message,
                 variant: "destructive",
             })
@@ -46,14 +46,14 @@ export default function ImportPage() {
             setResults(data)
             setStep('success')
             utils.dashboard.getMonthlyBalance.invalidate()
-            toast({
-                title: "Importacion finalizada!",
+toast({
+                title: "Importación finalizada!",
                 description: `Se procesaron ${data.success} ingresos correctamente.`,
             })
         },
         onError: (error) => {
             toast({
-                title: "Error en la importacion",
+                title: "Error en la importación",
                 description: error.message,
                 variant: "destructive",
             })
@@ -159,8 +159,8 @@ export default function ImportPage() {
                             <CardContent className="space-y-4">
                                 <Textarea
                                     placeholder={activeTab === 'gastos'
-                                        ? "Pega aqui (Fecha | Descripcion | Categoria | Subcategoria | Tipo | Medio | Banco | Tarjeta | Monto | Cuotas)"
-                                        : "Pega aqui (Fecha | Descripcion | Categoria | Subcategoria | Monto | Mes_Impacto)"}
+                                        ? "Pegá aquí (Fecha | Descripción | Categoría | Subcategoría | Tipo | Medio | Banco | Tarjeta | Monto | Cuotas)"
+                                        : "Pegá aquí (Fecha | Descripción | Categoría | Subcategoría | Monto | Mes_Impacto)"}
                                     className="min-h-[200px] font-mono text-xs"
                                     value={pasteData}
                                     onChange={(e) => setPasteData(e.target.value)}
@@ -189,13 +189,13 @@ export default function ImportPage() {
                                     </div>
                                 </CardHeader>
                                 <CardContent className="text-sm text-muted-foreground space-y-4">
-                                    <p>Para una importacion exitosa, asegurate de que las columnas coincidan con este orden:</p>
+                                    <p>Para una importación exitosa, asegurate de que las columnas coincidan con este orden:</p>
                                     {activeTab === 'gastos' ? (
                                         <ol className="list-decimal list-inside space-y-1 bg-muted p-3 rounded-lg text-[11px] font-semibold text-foreground">
                                             <li>Fecha (DD/MM/YYYY)</li>
-                                            <li>Descripcion</li>
-                                            <li>Categoria</li>
-                                            <li>Subcategoria</li>
+                                            <li>Descripción</li>
+                                            <li>Categoría</li>
+                                            <li>Subcategoría</li>
                                             <li>Tipo (Estructural/Emocional)</li>
                                             <li>Medio (Credito/Efectivo/Transfer)</li>
                                             <li>Banco</li>
@@ -206,9 +206,9 @@ export default function ImportPage() {
                                     ) : (
                                         <ol className="list-decimal list-inside space-y-1 bg-muted p-3 rounded-lg text-[11px] font-semibold text-foreground">
                                             <li>Fecha (DD/MM/YYYY)</li>
-                                            <li>Descripcion</li>
-                                            <li>Categoria (Sueldo/Otro)</li>
-                                            <li>Subcategoria (opcional)</li>
+                                            <li>Descripción</li>
+                                            <li>Categoría (Sueldo/Otro)</li>
+                                            <li>Subcategoría (opcional)</li>
                                             <li>Monto (Sin letras ni $)</li>
                                             <li>Mes Impacto (YYYY-MM, opcional)</li>
                                         </ol>

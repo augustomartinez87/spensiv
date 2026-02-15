@@ -265,7 +265,7 @@ export default function TransactionsPage() {
               )}
 
               <div className="grid gap-2">
-                <Label htmlFor="description">Descripcion</Label>
+                <Label htmlFor="description">Descripción</Label>
                 <Input
                   id="description"
                   placeholder="ej: Smart TV Samsung 55"

@@ -169,7 +169,7 @@ export default function CardsPage() {
         <div>
           <h1 className="text-3xl font-bold">Tarjetas</h1>
           <p className="text-muted-foreground">
-            Administra tus tarjetas de credito
+            Administra tus tarjetas de crédito
           </p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -183,7 +183,7 @@ export default function CardsPage() {
             <DialogHeader>
               <DialogTitle>Nueva tarjeta</DialogTitle>
               <DialogDescription>
-                Agrega una nueva tarjeta de credito para trackear tus gastos
+                Agrega una nueva tarjeta de crédito para trackear tus gastos
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -256,7 +256,7 @@ export default function CardsPage() {
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="creditLimit">Limite de credito (opcional)</Label>
+                <Label htmlFor="creditLimit">Límite de crédito (opcional)</Label>
                 <Input
                   id="creditLimit"
                   type="number"
@@ -439,7 +439,7 @@ export default function CardsPage() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-creditLimit">Limite de credito</Label>
+              <Label htmlFor="edit-creditLimit">Límite de crédito</Label>
               <Input
                 id="edit-creditLimit"
                 type="number"
