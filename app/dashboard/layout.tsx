@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation'
 import {
   CreditCard,
   LayoutDashboard,
-  Plus,
   TrendingUp,
   FileUp,
   Menu,
