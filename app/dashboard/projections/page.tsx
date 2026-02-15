@@ -17,6 +17,8 @@ import {
 } from 'recharts'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Calendar, TrendingUp, CreditCard, Banknote } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 export default function ProjectionsPage() {
     const { data: projection, isLoading } = trpc.dashboard.getBalanceProjection.useQuery({
@@ -36,13 +38,18 @@ export default function ProjectionsPage() {
         )
     }
 
-    const chartData = projection?.map(p => ({
-        name: p.period,
-        Total: p.totalExpense,
-        Cuotas: p.installments.length,
-        Incomes: p.totalIncome,
-        Neto: p.totalIncome - p.totalExpense
-    })) || []
+    const chartData = projection?.map(p => {
+        const [year, month] = p.period.split('-')
+        const date = new Date(parseInt(year), parseInt(month) - 1)
+        return {
+            name: format(date, 'MMM yyyy', { locale: es }),
+            period: p.period,
+            Total: p.totalExpense,
+            Cuotas: p.installments.length,
+            Incomes: p.totalIncome,
+            Neto: p.totalIncome - p.totalExpense
+        }
+    }) || []
 
     return (
         <div className="space-y-8">
@@ -102,11 +109,13 @@ export default function ProjectionsPage() {
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 {projection?.map((p, idx) => {
                     const isDeficit = (p.totalIncome - p.totalExpense) < 0
+                    const [year, month] = p.period.split('-')
+                    const date = new Date(parseInt(year), parseInt(month) - 1)
                     return (
                         <Card key={idx} className="hover:shadow-md transition-shadow">
                             <CardHeader className="pb-2 border-b bg-muted">
                                 <div className="flex items-center justify-between">
-                                    <p className="font-bold text-foreground">{p.period}</p>
+                                    <p className="font-bold text-foreground">{format(date, 'MMMM yyyy', { locale: es })}</p>
                                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-secondary rounded text-muted-foreground">
                                         {p.installments.length} CUOTAS
                                     </span>
