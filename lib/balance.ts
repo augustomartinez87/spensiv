@@ -19,7 +19,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
     const endDate = new Date(year, month, 1)
 
     // ========== INGRESOS Y EGRESOS EN PARALELO ==========
-    const [incomes, installments] = await Promise.all([
+    const [incomes, installments, cashTransactions] = await Promise.all([
         prisma.income.findMany({
             where: {
                 userId,
@@ -60,14 +60,37 @@ export async function getMonthlyBalance(userId: string, period: string) {
             orderBy: {
                 impactDate: 'asc',
             },
-        })
+        }),
+        // Transacciones no-crédito (efectivo, transferencia, débito)
+        prisma.transaction.findMany({
+            where: {
+                userId,
+                isVoided: false,
+                paymentMethod: { in: ['cash', 'transfer', 'debit_card'] },
+                purchaseDate: {
+                    gte: startDate,
+                    lt: endDate,
+                },
+            },
+            include: {
+                category: true,
+            },
+            orderBy: {
+                purchaseDate: 'asc',
+            },
+        }),
     ])
 
     const totalIncome = incomes.reduce((sum: number, inc: any) => sum + Number(inc.amount), 0)
-    const totalExpense = installments.reduce(
+    const totalCreditExpense = installments.reduce(
         (sum: number, inst: any) => sum + Number(inst.amount),
         0
     )
+    const totalCashExpense = cashTransactions.reduce(
+        (sum: number, tx: any) => sum + Number(tx.totalAmount),
+        0
+    )
+    const totalExpense = totalCreditExpense + totalCashExpense
 
     // ========== AGREGACIONES ==========
 
@@ -80,6 +103,11 @@ export async function getMonthlyBalance(userId: string, period: string) {
         },
         {} as Record<string, number>
     )
+    // Sumar transacciones no-crédito a categorías
+    for (const tx of cashTransactions) {
+        const catName = (tx as any).category?.name || 'Sin categoría'
+        expensesByCategory[catName] = (expensesByCategory[catName] || 0) + Number(tx.totalAmount)
+    }
 
     // Gastos por tipo (con traducción a español)
     const expenseTypeLabels: Record<string, string> = {
@@ -97,8 +125,14 @@ export async function getMonthlyBalance(userId: string, period: string) {
         },
         {} as Record<string, number>
     )
+    // Sumar transacciones no-crédito a tipos
+    for (const tx of cashTransactions) {
+        const rawType = (tx as any).expenseType || 'sin_clasificar'
+        const type = expenseTypeLabels[rawType] || rawType
+        expensesByType[type] = (expensesByType[type] || 0) + Number(tx.totalAmount)
+    }
 
-    // Gastos por tarjeta
+    // Gastos por tarjeta/medio de pago
     const expensesByCard = installments.reduce(
         (acc: Record<string, number>, inst: any) => {
             const cardName = inst.billingCycle.card.name
@@ -107,6 +141,11 @@ export async function getMonthlyBalance(userId: string, period: string) {
         },
         {} as Record<string, number>
     )
+    // Sumar transacciones no-crédito agrupadas por medio de pago
+    for (const tx of cashTransactions) {
+        const label = (tx as any).paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia'
+        expensesByCard[label] = (expensesByCard[label] || 0) + Number(tx.totalAmount)
+    }
 
     // Ingresos por categoría
     const incomesByCategory = incomes.reduce(
@@ -127,6 +166,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
         balance,
         incomes,
         installments,
+        cashTransactions,
         aggregations: {
             expensesByCategory,
             expensesByType,

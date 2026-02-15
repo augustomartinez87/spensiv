@@ -106,7 +106,7 @@ export default function DashboardPage() {
           <StatCard
             title="📤 EGRESOS DEL PERIODO"
             value={balance.totalExpense}
-            count={balance.installments.length}
+            count={balance.installments.length + (balance.cashTransactions?.length || 0)}
             type="expense"
           />
           <StatCard
@@ -164,6 +164,20 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 ))}
+                {balance.cashTransactions?.slice(0, 5).map((tx: any) => (
+                  <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                    <div>
+                      <p className="font-medium text-sm text-slate-900">{tx.description}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {format(new Date(tx.purchaseDate), 'd MMM', { locale: es })}
+                        {` • ${tx.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia'}`}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-sm text-slate-900">
+                      {formatCurrency(Number(tx.totalAmount))}
+                    </p>
+                  </div>
+                ))}
                 {balance.incomes.slice(0, 5).map((income: any) => (
                   <div key={income.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
                     <div>
@@ -178,7 +192,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 ))}
-                {balance.installments.length === 0 && balance.incomes.length === 0 && (
+                {balance.installments.length === 0 && (!balance.cashTransactions || balance.cashTransactions.length === 0) && balance.incomes.length === 0 && (
                   <div className="p-8 text-center bg-slate-50/50">
                     <p className="text-slate-400 text-sm">No hay actividad registrada en este periodo</p>
                   </div>
