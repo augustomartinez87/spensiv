@@ -300,9 +300,9 @@ export default function CardsPage() {
               <CardHeader className="pt-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5" />
-                      {card.name}
+                    <CardTitle className="flex items-center gap-2 text-base truncate">
+                      <CreditCard className="h-5 w-5 shrink-0" />
+                      <span className="truncate">{card.name}</span>
                     </CardTitle>
                     <CardDescription>{card.bank} - {getBrandName(card.brand)}</CardDescription>
                   </div>
