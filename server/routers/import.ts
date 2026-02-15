@@ -3,6 +3,15 @@ import { router, protectedProcedure } from '@/lib/trpc'
 import { createTransactionWithInstallments } from '@/lib/installment-engine'
 import { PaymentMethod } from '@/lib/installment-engine'
 
+const incomeItemSchema = z.object({
+    date: z.string(),
+    description: z.string(),
+    category: z.string(),
+    subcategory: z.string().optional(),
+    amount: z.number(),
+    impactMonth: z.string().optional(),
+})
+
 const importItemSchema = z.object({
     date: z.string(),
     description: z.string(),
@@ -111,6 +120,43 @@ export const importRouter = router({
                         expenseType: item.expenseType,
                         categoryId,
                         notes: `Importado: ${item.category} > ${item.subcategory || ''}`,
+                    })
+
+                    results.success++
+                } catch (error: any) {
+                    results.errors.push(`Error en "${item.description}": ${error.message}`)
+                }
+            }
+
+            return results
+        }),
+
+    bulkIncomes: protectedProcedure
+        .input(z.array(incomeItemSchema))
+        .mutation(async ({ ctx, input }) => {
+            const results = {
+                success: 0,
+                errors: [] as string[],
+            }
+
+            for (const item of input) {
+                try {
+                    // If impactMonth is provided, use first day of that month as date
+                    let incomeDate = new Date(item.date)
+                    if (item.impactMonth) {
+                        const [year, month] = item.impactMonth.split('-').map(Number)
+                        incomeDate = new Date(year, month - 1, 1)
+                    }
+
+                    await ctx.prisma.income.create({
+                        data: {
+                            userId: ctx.user.id,
+                            description: item.description,
+                            amount: item.amount,
+                            date: incomeDate,
+                            category: item.category,
+                            subcategory: item.subcategory,
+                        },
                     })
 
                     results.success++

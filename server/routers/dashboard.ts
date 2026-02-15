@@ -29,7 +29,7 @@ export const dashboardRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const startPeriod = input.startPeriod || new Date().toISOString().slice(0, 7)
+      const startPeriod = input.startPeriod || formatPeriod(new Date())
       return getCashFlowProjection(
         ctx.user.id,
         startPeriod,
@@ -208,7 +208,7 @@ export const dashboardRouter = router({
 
       for (let i = 0; i < months; i++) {
         const monthDate = addMonths(now, i)
-        const period = monthDate.toISOString().slice(0, 7)
+        const period = formatPeriod(monthDate)
 
         const installments = await ctx.prisma.installment.findMany({
           where: {

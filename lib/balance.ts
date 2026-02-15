@@ -81,10 +81,17 @@ export async function getMonthlyBalance(userId: string, period: string) {
         {} as Record<string, number>
     )
 
-    // Gastos por tipo
+    // Gastos por tipo (con traducción a español)
+    const expenseTypeLabels: Record<string, string> = {
+        structural: 'Estructural',
+        emotional_recurrent: 'Emocional - Recurrente',
+        emotional_impulsive: 'Emocional - Impulsivo',
+        sin_clasificar: 'Sin clasificar',
+    }
     const expensesByType = installments.reduce(
         (acc: Record<string, number>, inst: any) => {
-            const type = inst.transaction.expenseType || 'sin_clasificar'
+            const rawType = inst.transaction.expenseType || 'sin_clasificar'
+            const type = expenseTypeLabels[rawType] || rawType
             acc[type] = (acc[type] || 0) + Number(inst.amount)
             return acc
         },

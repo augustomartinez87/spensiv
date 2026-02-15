@@ -71,6 +71,63 @@ export function parseExcelPaste(text: string) {
 }
 
 /**
+ * Parser para ingresos desde Excel
+ * Formato esperado:
+ * Fecha | Descripción | Categoría | Subcategoría | Monto | Mes_Impacto
+ */
+export function parseIncomesPaste(text: string) {
+    const lines = text.trim().split('\n')
+    const results = []
+
+    for (const line of lines) {
+        let cols = line.split('\t')
+        if (cols.length < 5) {
+            cols = line.split(/\s{2,}/)
+        }
+
+        if (cols.length < 5) continue
+
+        const dateStr = cols[0].trim()
+        const description = cols[1].trim()
+        const category = cols[2].trim()
+        const subcategory = cols[3].trim() || undefined
+        const amountStr = cols[4].trim()
+        const impactMonth = cols[5]?.trim() || undefined // "2026-02" format optional
+
+        // Limpiar monto: "$ 609.000,00" -> 609000
+        const amount = parseFloat(
+            amountStr
+                .replace('$', '')
+                .replace(/\./g, '')
+                .replace(',', '.')
+                .trim()
+        )
+
+        // Mapear Fecha: "06/06/2025" -> Date
+        const [day, month, year] = dateStr.split('/').map(Number)
+        const date = new Date(year, month - 1, day).toISOString()
+
+        // Mapear categoría a valores del schema
+        let incomeCategory = 'other_income'
+        const catLower = category.toLowerCase()
+        if (catLower.includes('sueldo') || catLower.includes('salario') || catLower.includes('activo')) {
+            incomeCategory = 'active_income'
+        }
+
+        results.push({
+            date,
+            description,
+            category: incomeCategory,
+            subcategory,
+            amount,
+            impactMonth,
+        })
+    }
+
+    return results
+}
+
+/**
  * Generar CSV de ejemplo para el usuario
  */
 export function generateTemplateCSV() {

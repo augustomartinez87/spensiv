@@ -61,7 +61,22 @@ export default function DashboardPage() {
     )
   }
 
-  const nextPayment = upcomingPayments?.[0]
+  // Group upcoming payments by card to avoid duplicates
+  const groupedPayments = upcomingPayments?.reduce((acc, p) => {
+    const existing = acc.find(g => g.card.id === p.card.id)
+    if (existing) {
+      existing.amount += p.amount
+      if (new Date(p.dueDate) < new Date(existing.dueDate)) {
+        existing.dueDate = p.dueDate
+        existing.daysUntil = p.daysUntil
+      }
+    } else {
+      acc.push({ ...p })
+    }
+    return acc
+  }, [] as NonNullable<typeof upcomingPayments>)
+
+  const nextPayment = groupedPayments?.[0]
 
   return (
     <div className="space-y-8">
@@ -214,13 +229,13 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="px-2 pb-2">
               <div className="space-y-1">
-                {upcomingPayments?.map((p, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                {groupedPayments?.map((p) => (
+                  <div key={p.card.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
                     <span className="text-sm text-slate-600">{p.card.name}</span>
                     <span className="text-sm font-bold text-slate-900">{formatCurrency(p.amount)}</span>
                   </div>
                 ))}
-                {!upcomingPayments?.length && (
+                {!groupedPayments?.length && (
                   <p className="text-xs text-slate-400 text-center py-4 italic">Sin deudas activas</p>
                 )}
               </div>
