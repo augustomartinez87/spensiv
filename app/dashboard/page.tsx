@@ -14,6 +14,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Calendar, CreditCard, TrendingUp, AlertCircle } from 'lucide-react'
+import Link from 'next/link'
 
 export default function DashboardPage() {
   const now = new Date()
@@ -139,68 +140,12 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Recent List */}
-          <Card>
-            <CardHeader className="border-b bg-muted py-4">
-              <CardTitle className="text-base font-semibold">📋 Movimientos recientes</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border">
-                {balance.installments.slice(0, 5).map((inst) => (
-                  <div key={inst.id} className="flex items-center justify-between p-4 hover:bg-accent transition-colors">
-                    <div>
-                      <p className="font-medium text-sm text-foreground">
-                        {inst.transaction.description}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {format(new Date(inst.transaction.purchaseDate), 'd MMM', { locale: es })}
-                        {inst.transaction.installments > 1 &&
-                          ` • Cuota ${inst.installmentNumber}/${inst.transaction.installments}`
-                        }
-                        {inst.transaction.card && ` • ${inst.transaction.card.name}`}
-                      </p>
-                    </div>
-                    <p className="font-semibold text-sm text-foreground">
-                      {formatCurrency(Number(inst.amount))}
-                    </p>
-                  </div>
-                ))}
-                {balance.cashTransactions?.slice(0, 5).map((tx: any) => (
-                  <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-accent transition-colors">
-                    <div>
-                      <p className="font-medium text-sm text-foreground">{tx.description}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {format(new Date(tx.purchaseDate), 'd MMM', { locale: es })}
-                        {` • ${tx.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia'}`}
-                      </p>
-                    </div>
-                    <p className="font-semibold text-sm text-foreground">
-                      {formatCurrency(Number(tx.totalAmount))}
-                    </p>
-                  </div>
-                ))}
-                {balance.incomes.slice(0, 5).map((income: any) => (
-                  <div key={income.id} className="flex items-center justify-between p-4 hover:bg-accent transition-colors">
-                    <div>
-                      <p className="font-medium text-sm text-foreground">{income.description}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {format(new Date(income.date), 'd MMM', { locale: es })}
-                        {income.category === 'active_income' ? ' • Sueldo' : ' • Otro'}
-                      </p>
-                    </div>
-                    <p className="font-semibold text-sm text-green-600 dark:text-green-400">
-                      {formatCurrency(Number(income.amount))}
-                    </p>
-                  </div>
-                ))}
-                {balance.installments.length === 0 && (!balance.cashTransactions || balance.cashTransactions.length === 0) && balance.incomes.length === 0 && (
-                  <div className="p-8 text-center bg-muted">
-                    <p className="text-muted-foreground text-sm">No hay actividad registrada en este periodo</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Recent Movements */}
+          <RecentMovements
+            installments={balance.installments}
+            cashTransactions={balance.cashTransactions || []}
+            incomes={balance.incomes}
+          />
         </div>
 
         {/* Sidebar Info Section (1/3) */}
@@ -259,6 +204,155 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+interface UnifiedMovement {
+  id: string
+  date: Date
+  description: string
+  category: string
+  method: string
+  amount: number
+  type: 'expense' | 'income'
+}
+
+function RecentMovements({
+  installments,
+  cashTransactions,
+  incomes,
+}: {
+  installments: any[]
+  cashTransactions: any[]
+  incomes: any[]
+}) {
+  const movements: UnifiedMovement[] = [
+    ...installments.map((inst) => ({
+      id: `inst-${inst.id}`,
+      date: new Date(inst.transaction.purchaseDate),
+      description: inst.transaction.installments > 1
+        ? `${inst.transaction.description} (${inst.installmentNumber}/${inst.transaction.installments})`
+        : inst.transaction.description,
+      category: inst.transaction.category?.name || 'Sin categoría',
+      method: inst.transaction.card?.name || 'Tarjeta',
+      amount: Number(inst.amount),
+      type: 'expense' as const,
+    })),
+    ...cashTransactions.map((tx) => ({
+      id: `cash-${tx.id}`,
+      date: new Date(tx.purchaseDate),
+      description: tx.description,
+      category: tx.category?.name || 'Sin categoría',
+      method: tx.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia',
+      amount: Number(tx.totalAmount),
+      type: 'expense' as const,
+    })),
+    ...incomes.map((inc: any) => ({
+      id: `inc-${inc.id}`,
+      date: new Date(inc.date),
+      description: inc.description,
+      category: 'Ingresos',
+      method: inc.category === 'active_income' ? 'Sueldo' : 'Otro',
+      amount: Number(inc.amount),
+      type: 'income' as const,
+    })),
+  ]
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, 5)
+
+  return (
+    <Card>
+      <CardHeader className="border-b bg-muted py-4 flex flex-row items-center justify-between">
+        <CardTitle className="text-base font-semibold">📋 Movimientos recientes</CardTitle>
+        <Link
+          href="/dashboard/transactions"
+          className="text-sm text-primary hover:underline font-medium"
+        >
+          Ver todo
+        </Link>
+      </CardHeader>
+      <CardContent className="p-0">
+        {movements.length === 0 ? (
+          <div className="p-8 text-center bg-muted">
+            <p className="text-muted-foreground text-sm">No hay actividad registrada en este periodo</p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-xs text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left px-4 py-3 font-medium">Fecha</th>
+                    <th className="text-left px-4 py-3 font-medium">Descripción</th>
+                    <th className="text-left px-4 py-3 font-medium">Categoría</th>
+                    <th className="text-left px-4 py-3 font-medium">Método</th>
+                    <th className="text-right px-4 py-3 font-medium">Monto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {movements.map((m) => (
+                    <tr key={m.id} className="hover:bg-accent transition-colors">
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                        {format(m.date, 'd MMM, yyyy', { locale: es })}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-foreground">{m.description}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            'inline-block px-2 py-0.5 rounded-full text-xs font-medium',
+                            m.type === 'income'
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-muted text-muted-foreground'
+                          )}
+                        >
+                          {m.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{m.method}</td>
+                      <td
+                        className={cn(
+                          'px-4 py-3 text-right font-semibold whitespace-nowrap',
+                          m.type === 'income'
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-foreground'
+                        )}
+                      >
+                        {m.type === 'income' ? '+' : '-'}{formatCurrency(m.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Compact List */}
+            <div className="md:hidden divide-y divide-border">
+              {movements.map((m) => (
+                <div key={m.id} className="flex items-center justify-between p-4 hover:bg-accent transition-colors">
+                  <div>
+                    <p className="font-medium text-sm text-foreground">{m.description}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {format(m.date, 'd MMM', { locale: es })} • {m.method}
+                    </p>
+                  </div>
+                  <p
+                    className={cn(
+                      'font-semibold text-sm',
+                      m.type === 'income'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-foreground'
+                    )}
+                  >
+                    {m.type === 'income' ? '+' : '-'}{formatCurrency(m.amount)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

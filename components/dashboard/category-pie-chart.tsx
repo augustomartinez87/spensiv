@@ -1,7 +1,8 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { formatCurrency } from '@/lib/utils'
 
 interface CategoryData {
     name: string
@@ -53,6 +54,7 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                                     cx="50%"
                                     cy="50%"
                                     labelLine={false}
+                                    innerRadius={60}
                                     outerRadius={80}
                                     fill="#8884d8"
                                     dataKey="value"
@@ -62,7 +64,7 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                                     ))}
                                 </Pie>
                                 <Tooltip
-                                    formatter={(value: number) => `$${value.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
+                                    formatter={(value: number) => formatCurrency(value)}
                                     contentStyle={{
                                         backgroundColor: 'hsl(var(--card))',
                                         border: '1px solid hsl(var(--border))',
@@ -72,7 +74,24 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                                     itemStyle={{ color: 'hsl(var(--foreground))' }}
                                     labelStyle={{ color: 'hsl(var(--foreground))' }}
                                 />
-                                <Legend />
+                                <text
+                                    x="50%"
+                                    y="48%"
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    className="fill-foreground text-lg font-bold"
+                                >
+                                    {formatCurrency(total)}
+                                </text>
+                                <text
+                                    x="50%"
+                                    y="58%"
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    className="fill-muted-foreground text-xs"
+                                >
+                                    Total
+                                </text>
                             </PieChart>
                         </ResponsiveContainer>
 
@@ -80,20 +99,14 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                             {chartData.map((item, index) => {
                                 const percentage = ((item.value / total) * 100).toFixed(1)
                                 return (
-                                    <div key={index} className="flex items-center justify-between text-sm">
-                                        <div className="flex items-center gap-2">
-                                            <div
-                                                className="w-3 h-3 rounded-full"
-                                                style={{ backgroundColor: item.color }}
-                                            />
-                                            <span>{item.name}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-medium">
-                                                ${item.value.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                                            </span>
-                                            <span className="text-muted-foreground">({percentage}%)</span>
-                                        </div>
+                                    <div key={index} className="flex items-center gap-2 text-sm">
+                                        <div
+                                            className="w-3 h-3 rounded-full shrink-0"
+                                            style={{ backgroundColor: item.color }}
+                                        />
+                                        <span className="text-foreground">
+                                            {item.name} ({percentage}%)
+                                        </span>
                                     </div>
                                 )
                             })}
