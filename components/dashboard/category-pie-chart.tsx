@@ -23,8 +23,8 @@ const CATEGORY_COLORS: Record<string, string> = {
     'Gastos Fijos': '#1f6c9c',      // azul — estructural
     'Servicios': '#2a89bf',          // azul claro — necesario
     'Transporte': '#348bb5',         // azul medio — necesario
-    'Educacion': '#1f6c9c',          // azul — inversión
-    'Educación': '#1f6c9c',          // azul — inversión
+    'Educacion': '#7c3aed',          // violeta — inversión / conocimiento
+    'Educación': '#7c3aed',          // violeta — inversión / conocimiento
     'Salud': '#feb92e',              // amarillo — importante pero variable
     'Comida': '#e8a820',             // amarillo oscuro — necesario pero controlable
     'Compras': '#f0953a',            // naranja — cuidado

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { trpc } from '@/lib/trpc-client'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { MonthSelector } from '@/components/dashboard/month-selector'
@@ -121,17 +121,9 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState(
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   )
-  const [searchInput, setSearchInput] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
 
-  // Debounce para la búsqueda (300ms)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchQuery(searchInput)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [searchInput])
+
 
   const previousPeriod = getPreviousPeriod(period)
 
@@ -206,15 +198,6 @@ export default function DashboardPage() {
           <p className="text-muted-foreground mt-1">Tu motor de cashflow personal</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative hidden sm:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar movimientos..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-9 w-56"
-            />
-          </div>
           <IncomeForm />
           <TransactionForm />
         </div>
@@ -288,7 +271,6 @@ export default function DashboardPage() {
             installments={balance.installments}
             cashTransactions={balance.cashTransactions || []}
             incomes={balance.incomes}
-            searchQuery={searchQuery}
           />
         </div>
 
@@ -437,13 +419,21 @@ function RecentMovements({
   installments,
   cashTransactions,
   incomes,
-  searchQuery,
 }: {
   installments: any[]
   cashTransactions: any[]
   incomes: any[]
-  searchQuery: string
 }) {
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // Debounce para la búsqueda (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
   const movements: UnifiedMovement[] = [
     ...installments.map((inst) => ({
       id: `inst-${inst.id}`,
@@ -503,14 +493,25 @@ function RecentMovements({
 
   return (
     <Card>
-      <CardHeader className="border-b py-4 flex flex-row items-center justify-between">
-        <CardTitle className="text-base font-semibold">Movimientos recientes</CardTitle>
-        <Link
-          href="/dashboard/transactions"
-          className="text-sm text-primary hover:underline font-medium"
-        >
-          Ver todo
-        </Link>
+      <CardHeader className="border-b py-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-semibold">Movimientos recientes</CardTitle>
+          <Link
+            href="/dashboard/transactions"
+            className="text-sm text-primary hover:underline font-medium"
+          >
+            Ver todo
+          </Link>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por descripción, categoría, monto..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="pl-9 h-9 text-sm"
+          />
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         {display.length === 0 ? (
