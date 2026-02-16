@@ -10,10 +10,11 @@ import {
   CreditCard as CardsIcon,
   ListOrdered,
   Receipt,
-  User
+  Bell,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Button } from '@/components/ui/button'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -39,11 +40,21 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-64 bg-card border-r flex-col">
+      <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border dark:border-border flex-col">
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b">
-          <Link href="/dashboard" className="font-bold text-2xl flex items-center gap-2">
-            <span className="text-primary">💳</span> Spensiv
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-cyan-500/10 flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" className="text-cyan-500" />
+                <path d="M12 7v10M9 9.5h4.5a2 2 0 010 4H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-600 dark:text-cyan-400" />
+                <path d="M16 5l2-2M18 7l2-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-teal-500" />
+              </svg>
+            </div>
+            <div>
+              <span className="font-bold text-xl text-foreground">Spensiv</span>
+              <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Tu motor de cashflow</p>
+            </div>
           </Link>
         </div>
 
@@ -56,10 +67,10 @@ export default function DashboardLayout({
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    ? "bg-accent text-accent-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                 )}
               >
                 <item.icon className={cn("h-4 w-4", isActive ? "text-accent-foreground" : "text-muted-foreground")} />
@@ -69,21 +80,39 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        {/* Footer: ThemeToggle + UserButton */}
-        <div className="p-4 border-t flex items-center justify-between">
-          <ThemeToggle />
+        {/* Footer: UserButton only */}
+        <div className="p-4 border-t flex items-center justify-center">
           <UserButton afterSignOutUrl="/" />
         </div>
       </aside>
 
       {/* Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:ml-64">
+        {/* Desktop Header */}
+        <header className="hidden md:flex h-14 items-center justify-end px-8 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-30 gap-2">
+          <Button variant="ghost" size="icon" className="h-9 w-9 relative">
+            <Bell className="h-4 w-4" />
+            <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full" />
+          </Button>
+          <ThemeToggle />
+        </header>
+
         {/* Mobile Header */}
         <header className="md:hidden h-14 flex items-center justify-between px-4 border-b bg-card sticky top-0 z-30">
-          <Link href="/dashboard" className="font-bold text-lg flex items-center gap-2">
-            <span>💳</span> Spensiv
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-full bg-cyan-500/10 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" className="text-cyan-500" />
+                <path d="M12 7v10M9 9.5h4.5a2 2 0 010 4H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-600 dark:text-cyan-400" />
+              </svg>
+            </div>
+            <span className="font-bold text-lg">Spensiv</span>
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-9 w-9 relative">
+              <Bell className="h-4 w-4" />
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full" />
+            </Button>
             <ThemeToggle />
             <UserButton afterSignOutUrl="/" />
           </div>

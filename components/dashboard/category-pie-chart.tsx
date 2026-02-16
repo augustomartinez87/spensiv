@@ -1,8 +1,10 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
+import { MoreHorizontal } from 'lucide-react'
 
 interface CategoryData {
     name: string
@@ -36,9 +38,12 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
     const total = chartData.reduce((sum, item) => sum + item.value, 0)
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
+        <Card className="hover:shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between py-4">
+                <CardTitle className="text-base font-semibold">{title}</CardTitle>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
+                    <MoreHorizontal className="h-4 w-4" />
+                </Button>
             </CardHeader>
             <CardContent>
                 {chartData.length === 0 ? (
@@ -47,17 +52,19 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                     </div>
                 ) : (
                     <>
-                        <ResponsiveContainer width="100%" height={300}>
+                        <ResponsiveContainer width="100%" height={250}>
                             <PieChart>
                                 <Pie
                                     data={chartData}
                                     cx="50%"
                                     cy="50%"
                                     labelLine={false}
-                                    innerRadius={60}
-                                    outerRadius={80}
+                                    innerRadius={55}
+                                    outerRadius={75}
                                     fill="#8884d8"
                                     dataKey="value"
+                                    strokeWidth={2}
+                                    stroke="hsl(var(--card))"
                                 >
                                     {chartData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -68,8 +75,9 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                                     contentStyle={{
                                         backgroundColor: 'hsl(var(--card))',
                                         border: '1px solid hsl(var(--border))',
-                                        borderRadius: '8px',
+                                        borderRadius: '12px',
                                         color: 'hsl(var(--foreground))',
+                                        fontSize: '13px',
                                     }}
                                     itemStyle={{ color: 'hsl(var(--foreground))' }}
                                     labelStyle={{ color: 'hsl(var(--foreground))' }}
@@ -95,17 +103,20 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                             </PieChart>
                         </ResponsiveContainer>
 
-                        <div className="mt-4 space-y-2">
+                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
                             {chartData.map((item, index) => {
                                 const percentage = ((item.value / total) * 100).toFixed(1)
                                 return (
-                                    <div key={index} className="flex items-center gap-2 text-sm">
+                                    <div key={index} className="flex items-center gap-1.5 text-xs">
                                         <div
-                                            className="w-3 h-3 rounded-full shrink-0"
+                                            className="w-2.5 h-2.5 rounded-full shrink-0"
                                             style={{ backgroundColor: item.color }}
                                         />
-                                        <span className="text-foreground">
-                                            {item.name} ({percentage}%)
+                                        <span className="text-muted-foreground">
+                                            {item.name}
+                                        </span>
+                                        <span className="font-medium text-foreground">
+                                            {percentage}%
                                         </span>
                                     </div>
                                 )

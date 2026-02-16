@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Plus, CreditCard, Pencil, Trash2, CalendarDays, Settings } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import { BillingCycleEditor } from '@/components/cards/billing-cycle-editor'
 import { CardScheduleEditor } from '@/components/cards/card-schedule-editor'
 
@@ -47,6 +47,30 @@ const initialFormData: CardFormData = {
   closingDay: 1,
   dueDay: 1,
   creditLimit: undefined,
+}
+
+function getBankColor(bank: string): string {
+  const colors: Record<string, string> = {
+    'CIUDAD': 'bg-blue-600',
+    'GALICIA': 'bg-orange-500',
+    'SANTANDER': 'bg-red-600',
+    'BBVA': 'bg-blue-700',
+    'MACRO': 'bg-indigo-600',
+    'HSBC': 'bg-red-500',
+    'ICBC': 'bg-red-700',
+    'BRUBANK': 'bg-purple-600',
+    'UALA': 'bg-blue-500',
+    'MERCADOPAGO': 'bg-sky-500',
+  }
+  const key = bank.toUpperCase()
+  for (const [k, v] of Object.entries(colors)) {
+    if (key.includes(k)) return v
+  }
+  return 'bg-gray-500'
+}
+
+function getBankInitials(bank: string): string {
+  return bank.slice(0, 2).toUpperCase()
 }
 
 export default function CardsPage() {
@@ -131,19 +155,6 @@ export default function CardsPage() {
     deleteMutation.mutate(selectedCard)
   }
 
-  const getBrandColor = (brand: string) => {
-    switch (brand) {
-      case 'visa':
-        return 'bg-blue-500'
-      case 'mastercard':
-        return 'bg-orange-500'
-      case 'amex':
-        return 'bg-green-500'
-      default:
-        return 'bg-gray-500'
-    }
-  }
-
   const getBrandName = (brand: string) => {
     switch (brand) {
       case 'visa':
@@ -169,9 +180,9 @@ export default function CardsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Tarjetas</h1>
-          <p className="text-muted-foreground">
-            Administra tus tarjetas de crédito
+          <h1 className="text-3xl font-bold tracking-tight">Tarjetas</h1>
+          <p className="text-muted-foreground mt-1">
+            Administra tus tarjetas de credito
           </p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -185,7 +196,7 @@ export default function CardsPage() {
             <DialogHeader>
               <DialogTitle>Nueva tarjeta</DialogTitle>
               <DialogDescription>
-                Agrega una nueva tarjeta de crédito para trackear tus gastos
+                Agrega una nueva tarjeta de credito para trackear tus gastos
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -258,7 +269,7 @@ export default function CardsPage() {
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="creditLimit">Límite de crédito (opcional)</Label>
+                <Label htmlFor="creditLimit">Limite de credito (opcional)</Label>
                 <Input
                   id="creditLimit"
                   type="number"
@@ -297,64 +308,69 @@ export default function CardsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {cards?.map((card) => (
-            <Card key={card.id} className="relative overflow-hidden">
-              <div className={`absolute top-0 left-0 right-0 h-2 ${getBrandColor(card.brand)}`} />
-              <CardHeader className="pt-6">
+            <Card key={card.id} className="group relative hover:shadow-md">
+              <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 text-base truncate">
-                      <CreditCard className="h-5 w-5 shrink-0" />
-                      <span className="truncate">{card.name}</span>
-                    </CardTitle>
-                    <CardDescription>{card.bank} - {getBrandName(card.brand)}</CardDescription>
+                  <div className="flex items-center gap-3">
+                    <div className={cn('h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0', getBankColor(card.bank))}>
+                      {getBankInitials(card.bank)}
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{card.name}</CardTitle>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {getBrandName(card.brand)}
+                        </span>
+                        {card.last4 && (
+                          <span className="text-xs font-mono text-muted-foreground">**** {card.last4}</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-7 w-7"
                       onClick={() => {
                         setSelectedCard(card.id)
                         setIsScheduleOpen(true)
                       }}
                       title="Configurar Calendario"
                     >
-                      <Settings className="h-4 w-4 text-primary" />
+                      <Settings className="h-3.5 w-3.5 text-primary" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-7 w-7"
                       onClick={() => {
                         setSelectedCard(card.id)
                         setIsCyclesOpen(true)
                       }}
                       title="Ver Ciclos"
                     >
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                      <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(card)}>
-                      <Pencil className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(card)}>
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-7 w-7"
                       onClick={() => {
                         setSelectedCard(card.id)
                         setIsDeleteOpen(true)
                       }}
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  {card.last4 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Terminacion</span>
-                      <span className="font-mono">****{card.last4}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Cierre</span>
                     <span>Dia {card.closingDay}</span>
@@ -366,7 +382,7 @@ export default function CardsPage() {
                   {card.creditLimit && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Limite</span>
-                      <span>{formatCurrency(Number(card.creditLimit))}</span>
+                      <span className="font-semibold">{formatCurrency(Number(card.creditLimit))}</span>
                     </div>
                   )}
                 </div>
@@ -452,7 +468,7 @@ export default function CardsPage() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-creditLimit">Límite de crédito</Label>
+              <Label htmlFor="edit-creditLimit">Limite de credito</Label>
               <Input
                 id="edit-creditLimit"
                 type="number"
@@ -496,7 +512,7 @@ export default function CardsPage() {
       <Dialog open={isCyclesOpen} onOpenChange={setIsCyclesOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Ciclos de Facturación</DialogTitle>
+            <DialogTitle>Ciclos de Facturacion</DialogTitle>
             <DialogDescription>
               Ajusta las fechas reales de cierre y vencimiento para cada mes.
             </DialogDescription>
@@ -516,7 +532,7 @@ export default function CardsPage() {
           <DialogHeader>
             <DialogTitle>Calendario de Cierres</DialogTitle>
             <DialogDescription>
-              Configura los días de cierre y vencimiento para cada mes del año.
+              Configura los dias de cierre y vencimiento para cada mes del ano.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
