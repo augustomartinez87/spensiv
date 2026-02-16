@@ -28,16 +28,16 @@ interface ExpenseTypeChartProps {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-    'Estructural': '#3B82F6', // blue-500
-    'Estructural - Recurrente': '#3B82F6',
-    'Estructural - Impulsivo': '#3B82F6',
-    'Emocional - Recurrente': '#F59E0B', // amber-500
-    'Emocional Recurrente': '#F59E0B',
-    'Recurrente': '#F59E0B',
-    'Emocional - Impulsivo': '#EF4444', // red-500
-    'Emocional Impulsivo': '#EF4444',
-    'Impulsivo': '#EF4444',
-    'Sin clasificar': '#6B7280', // gray-500
+    'Estructural': '#1f6c9c',
+    'Estructural - Recurrente': '#1f6c9c',
+    'Estructural - Impulsivo': '#1f6c9c',
+    'Emocional - Recurrente': '#feb92e',
+    'Emocional Recurrente': '#feb92e',
+    'Recurrente': '#feb92e',
+    'Emocional - Impulsivo': '#e54352',
+    'Emocional Impulsivo': '#e54352',
+    'Impulsivo': '#e54352',
+    'Sin clasificar': '#6B7280',
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -100,7 +100,7 @@ export function ExpenseTypeChart({ data, title, previousData }: ExpenseTypeChart
         const prevVariable = prevNormalized
             .filter(d => d.name === 'Recurrente' || d.name === 'Impulsivo')
             .reduce((sum, d) => sum + d.value, 0)
-        
+
         if (prevVariable > 0) {
             variation = ((variableExpense - prevVariable) / prevVariable) * 100
         }
@@ -124,13 +124,13 @@ export function ExpenseTypeChart({ data, title, previousData }: ExpenseTypeChart
                         <ResponsiveContainer width="100%" height={200}>
                             <BarChart data={sortedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                                <XAxis 
-                                    dataKey="name" 
+                                <XAxis
+                                    dataKey="name"
                                     axisLine={false}
                                     tickLine={false}
                                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                                 />
-                                <YAxis 
+                                <YAxis
                                     axisLine={false}
                                     tickLine={false}
                                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}

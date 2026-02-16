@@ -17,22 +17,32 @@ interface CategoryPieChartProps {
     title: string
 }
 
-const COLORS = [
-    '#3B82F6', // blue
-    '#EF4444', // red
-    '#F59E0B', // amber
-    '#10B981', // green
-    '#8B5CF6', // purple
-    '#EC4899', // pink
-    '#6366F1', // indigo
-    '#14B8A6', // teal
+// Paleta semántica por categoría:
+// Azul (#1f6c9c) = estable/necesario, Amarillo (#feb92e) = cuidado, Rojo (#e54352) = indulgente/riesgo
+const CATEGORY_COLORS: Record<string, string> = {
+    'Gastos Fijos': '#1f6c9c',      // azul — estructural
+    'Servicios': '#2a89bf',          // azul claro — necesario
+    'Transporte': '#348bb5',         // azul medio — necesario
+    'Educacion': '#1f6c9c',          // azul — inversión
+    'Educación': '#1f6c9c',          // azul — inversión
+    'Salud': '#feb92e',              // amarillo — importante pero variable
+    'Comida': '#e8a820',             // amarillo oscuro — necesario pero controlable
+    'Compras': '#f0953a',            // naranja — cuidado
+    'Deudas': '#feb92e',             // amarillo — precaución
+    'Lujos': '#e54352',              // rojo — indulgente
+    'Ingresos': '#22c55e',           // verde — positivo
+}
+
+const FALLBACK_COLORS = [
+    '#1f6c9c', '#feb92e', '#e54352', '#2a89bf', '#e8a820',
+    '#f0953a', '#348bb5', '#d63944',
 ]
 
 export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
     const chartData: CategoryData[] = Object.entries(data).map(([name, value], index) => ({
         name,
         value,
-        color: COLORS[index % COLORS.length],
+        color: CATEGORY_COLORS[name] || FALLBACK_COLORS[index % FALLBACK_COLORS.length],
     }))
 
     const total = chartData.reduce((sum, item) => sum + item.value, 0)

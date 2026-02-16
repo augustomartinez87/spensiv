@@ -108,11 +108,11 @@ export default function TransactionsPage() {
   const getExpenseTypeColor = (type: string | null) => {
     switch (type) {
       case 'structural':
-        return 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+        return 'bg-[#1f6c9c]/15 text-[#1f6c9c] dark:text-[#4da8d4]'
       case 'emotional_recurrent':
-        return 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
+        return 'bg-[#feb92e]/15 text-[#c88f00] dark:text-[#feb92e]'
       case 'emotional_impulsive':
-        return 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
+        return 'bg-[#e54352]/15 text-[#e54352] dark:text-[#f07a85]'
       default:
         return 'bg-secondary text-muted-foreground'
     }
@@ -463,9 +463,9 @@ export default function TransactionsPage() {
                               variant="ghost"
                               size="sm"
                               className="text-red-600 hover:text-red-700"
-                              onClick={() => setTransactionToDelete({ 
-                                id: transaction.id, 
-                                description: transaction.description 
+                              onClick={() => setTransactionToDelete({
+                                id: transaction.id,
+                                description: transaction.description
                               })}
                             >
                               <Trash2 className="h-4 w-4 mr-1" />
@@ -474,8 +474,8 @@ export default function TransactionsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setTransactionToVoid({ 
-                                id: transaction.id, 
+                              onClick={() => setTransactionToVoid({
+                                id: transaction.id,
                                 description: transaction.description,
                                 amount: Number(transaction.totalAmount)
                               })}

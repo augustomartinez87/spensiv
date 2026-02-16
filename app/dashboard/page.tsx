@@ -106,13 +106,13 @@ function getCategoryBadgeColor(category: string): string {
 function getExpenseTypeDotColor(type: string | null | undefined): string {
   switch (type) {
     case 'structural':
-      return 'bg-blue-500'
+      return '#1f6c9c'
     case 'emotional_recurrent':
-      return 'bg-orange-500'
+      return '#feb92e'
     case 'emotional_impulsive':
-      return 'bg-red-500'
+      return '#e54352'
     default:
-      return 'bg-gray-400'
+      return '#9ca3af'
   }
 }
 
@@ -233,7 +233,7 @@ export default function DashboardPage() {
                 <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-popover border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-xs">
                   <p className="font-medium mb-1">¿Qué incluye?</p>
                   <p className="text-muted-foreground">
-                    Suma de todas las cuotas pendientes de pago de todas tus tarjetas, 
+                    Suma de todas las cuotas pendientes de pago de todas tus tarjetas,
                     incluyendo período actual y futuros.
                   </p>
                 </div>
@@ -309,8 +309,8 @@ export default function DashboardPage() {
             <CardContent className="px-3 pb-3">
               <div className="space-y-1">
                 {cardList.map((card) => (
-                  <div 
-                    key={card.id} 
+                  <div
+                    key={card.id}
                     onClick={() => setSelectedCardId(card.id)}
                     className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200 cursor-pointer group"
                   >
@@ -324,8 +324,8 @@ export default function DashboardPage() {
                     <div className="text-right">
                       <p className="text-sm font-bold text-foreground">{formatCurrency(card.totalBalance)}</p>
                       <p className="text-[10px] text-muted-foreground">
-                        {card.currentPeriodBalance > 0 && card.currentPeriodBalance !== card.totalBalance 
-                          ? `${formatCurrency(card.currentPeriodBalance)} este mes` 
+                        {card.currentPeriodBalance > 0 && card.currentPeriodBalance !== card.totalBalance
+                          ? `${formatCurrency(card.currentPeriodBalance)} este mes`
                           : 'Deuda total'}
                       </p>
                     </div>
@@ -485,18 +485,18 @@ function RecentMovements({
   // Filtro mejorado: busca por descripción, categoría, método y monto
   const filtered = searchQuery
     ? movements.filter(m => {
-        const query = searchQuery.toLowerCase().trim()
-        const amountStr = m.amount.toString()
-        const amountFormatted = formatCurrency(m.amount).toLowerCase()
-        
-        return (
-          m.description.toLowerCase().includes(query) ||
-          m.category.toLowerCase().includes(query) ||
-          m.method.toLowerCase().includes(query) ||
-          amountStr.includes(query) ||
-          amountFormatted.includes(query)
-        )
-      })
+      const query = searchQuery.toLowerCase().trim()
+      const amountStr = m.amount.toString()
+      const amountFormatted = formatCurrency(m.amount).toLowerCase()
+
+      return (
+        m.description.toLowerCase().includes(query) ||
+        m.category.toLowerCase().includes(query) ||
+        m.method.toLowerCase().includes(query) ||
+        amountStr.includes(query) ||
+        amountFormatted.includes(query)
+      )
+    })
     : movements
 
   const display = filtered.slice(0, 5)
@@ -570,14 +570,12 @@ function RecentMovements({
                               {m.category}
                             </span>
                             {m.type === 'expense' && m.expenseType && (
-                              <div 
-                                className={cn(
-                                  "w-2 h-2 rounded-full",
-                                  getExpenseTypeDotColor(m.expenseType)
-                                )}
-                                title={m.expenseType === 'structural' ? 'Estructural' : 
-                                       m.expenseType === 'emotional_recurrent' ? 'Emocional Recurrente' : 
-                                       'Emocional Impulsivo'}
+                              <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ backgroundColor: getExpenseTypeDotColor(m.expenseType) }}
+                                title={m.expenseType === 'structural' ? 'Estructural' :
+                                  m.expenseType === 'emotional_recurrent' ? 'Emocional Recurrente' :
+                                    'Emocional Impulsivo'}
                               />
                             )}
                           </div>
@@ -621,13 +619,14 @@ function RecentMovements({
                         </p>
                         {m.type === 'expense' && m.expenseType && (
                           <div className="flex items-center gap-1.5 mt-1">
-                            <div 
-                              className={cn("w-1.5 h-1.5 rounded-full", getExpenseTypeDotColor(m.expenseType))}
+                            <div
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: getExpenseTypeDotColor(m.expenseType) }}
                             />
                             <span className="text-[10px] text-muted-foreground">
-                              {m.expenseType === 'structural' ? 'Estructural' : 
-                               m.expenseType === 'emotional_recurrent' ? 'Emocional Recurrente' : 
-                               'Emocional Impulsivo'}
+                              {m.expenseType === 'structural' ? 'Estructural' :
+                                m.expenseType === 'emotional_recurrent' ? 'Emocional Recurrente' :
+                                  'Emocional Impulsivo'}
                             </span>
                           </div>
                         )}
