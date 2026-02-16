@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/hooks/use-toast'
 import { Plus } from 'lucide-react'
+import { formatDateToInput, parseInputDate } from '@/lib/utils'
 
 export function IncomeForm() {
     const [open, setOpen] = useState(false)
@@ -19,7 +20,7 @@ export function IncomeForm() {
     const [formData, setFormData] = useState({
         description: '',
         amount: '',
-        date: new Date().toISOString().split('T')[0],
+        date: formatDateToInput(new Date()),
         category: 'active_income' as 'active_income' | 'other_income',
         subcategory: '',
         isRecurring: false,
@@ -35,7 +36,7 @@ export function IncomeForm() {
             setFormData({
                 description: '',
                 amount: '',
-                date: new Date().toISOString().split('T')[0],
+                date: formatDateToInput(new Date()),
                 category: 'active_income',
                 subcategory: '',
                 isRecurring: false,
@@ -58,7 +59,7 @@ export function IncomeForm() {
         createMutation.mutate({
             description: formData.description,
             amount: parseFloat(formData.amount),
-            date: new Date(formData.date),
+            date: parseInputDate(formData.date),
             category: formData.category,
             subcategory: formData.subcategory || undefined,
             isRecurring: formData.isRecurring,
@@ -106,8 +107,8 @@ export function IncomeForm() {
                         <div className="space-y-2">
                             <Label htmlFor="date">Fecha</Label>
                             <DatePicker
-                                date={formData.date ? new Date(formData.date) : undefined}
-                                onSelect={(date) => setFormData({ ...formData, date: date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0] })}
+                                date={formData.date ? parseInputDate(formData.date) : undefined}
+                                onSelect={(date) => setFormData({ ...formData, date: date ? formatDateToInput(date) : formatDateToInput(new Date()) })}
                             />
                         </div>
                     </div>

@@ -26,6 +26,49 @@ export interface CreateTransactionInput {
 }
 
 /**
+ * Obtener los días de cierre y vencimiento para un mes/año específico
+ * Primero busca en CardClosingSchedule, si no existe usa los defaults de la tarjeta
+ */
+async function getClosingDaysForMonth(
+  cardId: string,
+  year: number,
+  month: number
+): Promise<{ closingDay: number; dueDay: number }> {
+  // Buscar schedule específico para este mes/año
+  const schedule = await prisma.cardClosingSchedule.findUnique({
+    where: {
+      cardId_year_month: {
+        cardId,
+        year,
+        month,
+      },
+    },
+  })
+
+  if (schedule) {
+    return {
+      closingDay: schedule.closingDay,
+      dueDay: schedule.dueDay,
+    }
+  }
+
+  // Si no hay schedule, usar defaults de la tarjeta
+  const card = await prisma.creditCard.findUnique({
+    where: { id: cardId },
+    select: { closingDay: true, dueDay: true },
+  })
+
+  if (!card) {
+    throw new Error('Card not found')
+  }
+
+  return {
+    closingDay: card.closingDay,
+    dueDay: card.dueDay,
+  }
+}
+
+/**
  * Calcular en qué mes impacta una compra según la fecha de cierre
  * 
  * REGLA (validada al 100%):
@@ -71,24 +114,20 @@ async function getOrCreateBillingCycle(
 
   if (cycle) return cycle
 
-  // Si no existe, crear uno nuevo
-  const card = await prisma.creditCard.findUnique({
-    where: { id: cardId },
-  })
-
-  if (!card) throw new Error('Card not found')
+  // Obtener días de cierre/vencimiento (schedule o defaults)
+  const year = impactDate.getFullYear()
+  const month = impactDate.getMonth() + 1 // Los meses en JS son 0-indexed, pero en DB son 1-12
+  
+  const { closingDay, dueDay } = await getClosingDaysForMonth(cardId, year, month)
 
   // Calcular fecha de cierre y vencimiento
-  const year = impactDate.getFullYear()
-  const month = impactDate.getMonth()
-
-  const closeDate = new Date(year, month, card.closingDay)
+  const closeDate = new Date(year, month - 1, closingDay)
 
   // Vencimiento es en el mes siguiente
-  let dueDate = new Date(year, month + 1, card.dueDay)
+  let dueDate = new Date(year, month, dueDay)
 
   // Si el día de vencimiento es antes del cierre, sumar un mes más
-  if (card.dueDay < card.closingDay) {
+  if (dueDay < closingDay) {
     dueDate.setMonth(dueDate.getMonth() + 1)
   }
 
@@ -176,10 +215,20 @@ export async function createTransactionWithInstallments(
     throw new Error('La tarjeta está inactiva')
   }
 
-  // 2. Calcular mes de impacto de la primera cuota
+  // 2. Obtener día de cierre para el mes de la compra (puede ser schedule o default)
+  const purchaseYear = input.purchaseDate.getFullYear()
+  const purchaseMonth = input.purchaseDate.getMonth() + 1 // 1-12
+  
+  const { closingDay } = await getClosingDaysForMonth(
+    input.cardId,
+    purchaseYear,
+    purchaseMonth
+  )
+
+  // 3. Calcular mes de impacto de la primera cuota
   const firstImpactDate = calculateImpactDate(
     input.purchaseDate,
-    card.closingDay
+    closingDay
   )
 
   // 3. Crear transacción

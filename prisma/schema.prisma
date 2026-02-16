@@ -78,9 +78,30 @@ model CreditCard {
   // Relations
   transactions  Transaction[]
   billingCycles BillingCycle[]
+  closingSchedules CardClosingSchedule[]
 
   @@index([userId])
   @@map("credit_cards")
+}
+
+model CardClosingSchedule {
+  id          String   @id @default(cuid())
+  cardId      String
+  card        CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  year        Int      // 2025, 2026, etc.
+  month       Int      // 1-12
+  
+  closingDay  Int      // Día específico de cierre (1-31)
+  dueDay      Int      // Día específico de vencimiento (1-31)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([cardId, year, month])
+  @@index([cardId])
+  @@index([cardId, year])
+  @@map("card_closing_schedules")
 }
 
 model BillingCycle {

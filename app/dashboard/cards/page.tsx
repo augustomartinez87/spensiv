@@ -22,9 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, CreditCard, Pencil, Trash2, CalendarDays } from 'lucide-react'
+import { Plus, CreditCard, Pencil, Trash2, CalendarDays, Settings } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { BillingCycleEditor } from '@/components/cards/billing-cycle-editor'
+import { CardScheduleEditor } from '@/components/cards/card-schedule-editor'
 
 type CardBrand = 'visa' | 'mastercard' | 'amex'
 
@@ -53,6 +54,7 @@ export default function CardsPage() {
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isCyclesOpen, setIsCyclesOpen] = useState(false)
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
   const [formData, setFormData] = useState<CardFormData>(initialFormData)
 
@@ -312,11 +314,22 @@ export default function CardsPage() {
                       size="icon"
                       onClick={() => {
                         setSelectedCard(card.id)
+                        setIsScheduleOpen(true)
+                      }}
+                      title="Configurar Calendario"
+                    >
+                      <Settings className="h-4 w-4 text-primary" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSelectedCard(card.id)
                         setIsCyclesOpen(true)
                       }}
-                      title="Ver Calendario"
+                      title="Ver Ciclos"
                     >
-                      <CalendarDays className="h-4 w-4 text-primary" />
+                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(card)}>
                       <Pencil className="h-4 w-4" />
@@ -494,6 +507,21 @@ export default function CardsPage() {
           <DialogFooter>
             <Button onClick={() => setIsCyclesOpen(false)}>Cerrar</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Editor Dialog */}
+      <Dialog open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Calendario de Cierres</DialogTitle>
+            <DialogDescription>
+              Configura los días de cierre y vencimiento para cada mes del año.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {selectedCard && <CardScheduleEditor cardId={selectedCard} />}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

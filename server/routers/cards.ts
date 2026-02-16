@@ -228,4 +228,145 @@ export const cardsRouter = router({
         },
       })
     }),
+
+  /**
+   * Obtener calendario de cierres para un año específico
+   */
+  getClosingSchedule: protectedProcedure
+    .input(
+      z.object({
+        cardId: z.string(),
+        year: z.number(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      // Verificar que la tarjeta pertenece al usuario
+      const card = await ctx.prisma.creditCard.findUnique({
+        where: { id: input.cardId },
+      })
+
+      if (!card || card.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Tarjeta no encontrada',
+        })
+      }
+
+      const schedules = await ctx.prisma.cardClosingSchedule.findMany({
+        where: {
+          cardId: input.cardId,
+          year: input.year,
+        },
+        orderBy: {
+          month: 'asc',
+        },
+      })
+
+      // Devolver los valores por defecto de la tarjeta si no hay schedule configurado
+      return {
+        cardId: input.cardId,
+        year: input.year,
+        defaultClosingDay: card.closingDay,
+        defaultDueDay: card.dueDay,
+        schedules: schedules.map(s => ({
+          month: s.month,
+          closingDay: s.closingDay,
+          dueDay: s.dueDay,
+        })),
+      }
+    }),
+
+  /**
+   * Guardar calendario de cierres para un año
+   */
+  saveClosingSchedule: protectedProcedure
+    .input(
+      z.object({
+        cardId: z.string(),
+        year: z.number(),
+        schedules: z.array(
+          z.object({
+            month: z.number().min(1).max(12),
+            closingDay: z.number().min(1).max(31),
+            dueDay: z.number().min(1).max(31),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verificar que la tarjeta pertenece al usuario
+      const card = await ctx.prisma.creditCard.findUnique({
+        where: { id: input.cardId },
+      })
+
+      if (!card || card.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Tarjeta no encontrada',
+        })
+      }
+
+      // Usar transacción para guardar todos los schedules
+      await ctx.prisma.$transaction(
+        input.schedules.map((schedule) =>
+          ctx.prisma.cardClosingSchedule.upsert({
+            where: {
+              cardId_year_month: {
+                cardId: input.cardId,
+                year: input.year,
+                month: schedule.month,
+              },
+            },
+            update: {
+              closingDay: schedule.closingDay,
+              dueDay: schedule.dueDay,
+            },
+            create: {
+              cardId: input.cardId,
+              year: input.year,
+              month: schedule.month,
+              closingDay: schedule.closingDay,
+              dueDay: schedule.dueDay,
+            },
+          })
+        )
+      )
+
+      return { success: true }
+    }),
+
+  /**
+   * Eliminar un schedule específico (vuelve a usar defaults)
+   */
+  deleteClosingSchedule: protectedProcedure
+    .input(
+      z.object({
+        cardId: z.string(),
+        year: z.number(),
+        month: z.number().min(1).max(12),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verificar que la tarjeta pertenece al usuario
+      const card = await ctx.prisma.creditCard.findUnique({
+        where: { id: input.cardId },
+      })
+
+      if (!card || card.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Tarjeta no encontrada',
+        })
+      }
+
+      await ctx.prisma.cardClosingSchedule.deleteMany({
+        where: {
+          cardId: input.cardId,
+          year: input.year,
+          month: input.month,
+        },
+      })
+
+      return { success: true }
+    }),
 })

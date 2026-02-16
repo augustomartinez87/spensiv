@@ -13,3 +13,22 @@ export function formatCurrency(amount: number): string {
     maximumFractionDigits: 2,
   }).format(amount)
 }
+
+/**
+ * Formatea una fecha local a string YYYY-MM-DD sin conversión UTC
+ * Soluciona el bug donde las fechas se desfasan por zonas horarias
+ */
+export function formatDateToInput(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Crea un objeto Date desde un string YYYY-MM-DD manteniendo hora local (00:00:00)
+ */
+export function parseInputDate(dateString: string): Date {
+  const [year, month, day] = dateString.split('-').map(Number)
+  return new Date(year, month - 1, day, 0, 0, 0, 0)
+}

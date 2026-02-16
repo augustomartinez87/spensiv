@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/hooks/use-toast'
 import { Plus } from 'lucide-react'
+import { formatDateToInput, parseInputDate } from '@/lib/utils'
 
 export function TransactionForm() {
     const [open, setOpen] = useState(false)
@@ -19,7 +20,7 @@ export function TransactionForm() {
     const [formData, setFormData] = useState({
         description: '',
         totalAmount: '',
-        purchaseDate: new Date().toISOString().split('T')[0],
+        purchaseDate: formatDateToInput(new Date()),
         paymentMethod: 'credit_card' as 'credit_card' | 'debit_card' | 'cash' | 'transfer',
         cardId: '',
         installments: '1',
@@ -37,7 +38,7 @@ export function TransactionForm() {
             setFormData({
                 description: '',
                 totalAmount: '',
-                purchaseDate: new Date().toISOString().split('T')[0],
+                purchaseDate: formatDateToInput(new Date()),
                 paymentMethod: 'credit_card',
                 cardId: '',
                 installments: '1',
@@ -61,7 +62,7 @@ export function TransactionForm() {
         createMutation.mutate({
             description: formData.description,
             totalAmount: parseFloat(formData.totalAmount),
-            purchaseDate: new Date(formData.purchaseDate),
+            purchaseDate: parseInputDate(formData.purchaseDate),
             paymentMethod: formData.paymentMethod,
             cardId: formData.paymentMethod === 'credit_card' ? formData.cardId : undefined,
             installments: parseInt(formData.installments),
@@ -112,8 +113,8 @@ export function TransactionForm() {
                         <div className="space-y-2">
                             <Label htmlFor="date">Fecha</Label>
                             <DatePicker
-                                date={formData.purchaseDate ? new Date(formData.purchaseDate) : undefined}
-                                onSelect={(date) => setFormData({ ...formData, purchaseDate: date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0] })}
+                                date={formData.purchaseDate ? parseInputDate(formData.purchaseDate) : undefined}
+                                onSelect={(date) => setFormData({ ...formData, purchaseDate: date ? formatDateToInput(date) : formatDateToInput(new Date()) })}
                             />
                         </div>
                     </div>

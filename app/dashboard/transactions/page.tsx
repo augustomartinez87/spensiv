@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select'
 import { Plus, ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard, Banknote, ArrowRightLeft, TrendingUp } from 'lucide-react'
 import { DatePicker } from '@/components/ui/date-picker'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDateToInput, parseInputDate } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -58,7 +58,7 @@ const initialFormData: TransactionFormData = {
   cardId: '',
   description: '',
   totalAmount: 0,
-  purchaseDate: new Date().toISOString().split('T')[0],
+  purchaseDate: formatDateToInput(new Date()),
   installments: 1,
   expenseType: undefined,
   notes: '',
@@ -67,7 +67,7 @@ const initialFormData: TransactionFormData = {
 const initialIncomeFormData: IncomeFormData = {
   description: '',
   amount: 0,
-  date: new Date().toISOString().split('T')[0],
+  date: formatDateToInput(new Date()),
   category: 'active_income',
   subcategory: '',
   isRecurring: false,
@@ -130,7 +130,7 @@ export default function TransactionsPage() {
       cardId: formData.paymentMethod === 'credit_card' ? formData.cardId : undefined,
       description: formData.description,
       totalAmount: formData.totalAmount,
-      purchaseDate: new Date(formData.purchaseDate),
+      purchaseDate: parseInputDate(formData.purchaseDate),
       installments: formData.paymentMethod === 'credit_card' ? formData.installments : 1,
       expenseType: formData.expenseType,
       notes: formData.notes || undefined,
@@ -141,7 +141,7 @@ export default function TransactionsPage() {
     createIncomeMutation.mutate({
       description: incomeFormData.description,
       amount: incomeFormData.amount,
-      date: new Date(incomeFormData.date),
+      date: parseInputDate(incomeFormData.date),
       category: incomeFormData.category,
       subcategory: incomeFormData.subcategory || undefined,
       isRecurring: incomeFormData.isRecurring,
@@ -384,8 +384,8 @@ export default function TransactionsPage() {
               <div className="grid gap-2">
                 <Label htmlFor="purchaseDate">Fecha de compra</Label>
                 <DatePicker
-                  date={formData.purchaseDate ? new Date(formData.purchaseDate) : undefined}
-                  onSelect={(date) => setFormData({ ...formData, purchaseDate: date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0] })}
+                  date={formData.purchaseDate ? parseInputDate(formData.purchaseDate) : undefined}
+                  onSelect={(date) => setFormData({ ...formData, purchaseDate: date ? formatDateToInput(date) : formatDateToInput(new Date()) })}
                 />
               </div>
 
@@ -469,8 +469,8 @@ export default function TransactionsPage() {
                   <div className="grid gap-2">
                     <Label htmlFor="income-date">Fecha</Label>
                     <DatePicker
-                      date={incomeFormData.date ? new Date(incomeFormData.date) : undefined}
-                      onSelect={(date) => setIncomeFormData({ ...incomeFormData, date: date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0] })}
+                      date={incomeFormData.date ? parseInputDate(incomeFormData.date) : undefined}
+                      onSelect={(date) => setIncomeFormData({ ...incomeFormData, date: date ? formatDateToInput(date) : formatDateToInput(new Date()) })}
                     />
                   </div>
                 </div>
