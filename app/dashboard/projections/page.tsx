@@ -71,29 +71,29 @@ export default function ProjectionsPage() {
                     <div className="h-[400px] w-full mt-4">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(228 10% 20%)" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                                 <XAxis
                                     dataKey="name"
                                     axisLine={false}
                                     tickLine={false}
-                                    tick={{ fill: 'hsl(228 5% 55%)', fontSize: 12 }}
+                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                                 />
                                 <YAxis
                                     axisLine={false}
                                     tickLine={false}
-                                    tick={{ fill: 'hsl(228 5% 55%)', fontSize: 12 }}
+                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                                     tickFormatter={(val) => `$${(val / 1000)}k`}
                                 />
                                 <Tooltip
-                                    cursor={{ fill: 'hsl(228 14% 14%)' }}
+                                    cursor={{ fill: 'hsl(var(--accent))' }}
                                     contentStyle={{
-                                        backgroundColor: 'hsl(228 14% 12%)',
-                                        border: '1px solid hsl(228 10% 20%)',
+                                        backgroundColor: 'hsl(var(--card))',
+                                        border: '1px solid hsl(var(--border))',
                                         borderRadius: '8px',
-                                        color: 'hsl(0 0% 95%)',
+                                        color: 'hsl(var(--foreground))',
                                     }}
-                                    itemStyle={{ color: 'hsl(0 0% 95%)' }}
-                                    labelStyle={{ color: 'hsl(0 0% 95%)' }}
+                                    itemStyle={{ color: 'hsl(var(--foreground))' }}
+                                    labelStyle={{ color: 'hsl(var(--foreground))' }}
                                     formatter={(val: number) => [formatCurrency(val), '']}
                                 />
                                 <Legend iconType="circle" />
@@ -126,17 +126,17 @@ export default function ProjectionsPage() {
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <Banknote className="h-4 w-4" /> Ingresos
                                     </div>
-                                    <span className="font-semibold text-green-400">{formatCurrency(p.totalIncome)}</span>
+                                    <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(p.totalIncome)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <CreditCard className="h-4 w-4" /> Tarjetas
                                     </div>
-                                    <span className="font-semibold text-blue-400">{formatCurrency(p.totalExpense)}</span>
+                                    <span className="font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(p.totalExpense)}</span>
                                 </div>
                                 <div className="pt-3 border-t flex justify-between items-center">
                                     <span className="text-sm font-bold text-foreground">Saldo Final</span>
-                                    <span className={cn("text-lg font-black", isDeficit ? "text-red-400" : "text-foreground")}>
+                                    <span className={cn("text-lg font-black", isDeficit ? "text-red-600 dark:text-red-400" : "text-foreground")}>
                                         {formatCurrency(p.totalIncome - p.totalExpense)}
                                     </span>
                                 </div>

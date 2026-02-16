@@ -184,7 +184,7 @@ toast({
                             <Card>
                                 <CardHeader>
                                     <div className="flex items-center gap-2">
-                                        <FileSpreadsheet className="h-5 w-5 text-green-400" />
+                                        <FileSpreadsheet className="h-5 w-5 text-green-600 dark:text-green-400" />
                                         <CardTitle className="text-lg">Instrucciones</CardTitle>
                                     </div>
                                 </CardHeader>
@@ -226,8 +226,8 @@ toast({
                             </Card>
 
                             <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex gap-3">
-                                <AlertCircle className="h-5 w-5 text-yellow-400 shrink-0" />
-                                <p className="text-xs text-yellow-400">
+                                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0" />
+                                <p className="text-xs text-yellow-600 dark:text-yellow-400">
                                     {activeTab === 'gastos' ? (
                                         <><strong>Importante:</strong> Si el medio de pago es "Credito", asegurate de que el nombre de la tarjeta coincida con una de tus tarjetas creadas en la seccion "Tarjetas".</>
                                     ) : (
@@ -243,7 +243,7 @@ toast({
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                             <div className="bg-green-500/15 p-4 rounded-full mb-6">
-                                <CheckCircle2 className="h-8 w-8 text-green-400" />
+                                <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
                             </div>
                             <h2 className="text-2xl font-bold text-foreground">Importacion Completada!</h2>
                             <p className="text-muted-foreground mt-2 mb-4">
@@ -252,8 +252,8 @@ toast({
 
                             {results.errors.length > 0 && (
                                 <div className="w-full max-w-md bg-red-500/10 p-4 rounded-lg text-left mb-8 max-h-[200px] overflow-y-auto">
-                                    <p className="text-xs font-bold text-red-400 mb-2">Errores encontrados ({results.errors.length}):</p>
-                                    <ul className="text-[11px] text-red-400 list-disc list-inside">
+                                    <p className="text-xs font-bold text-red-600 dark:text-red-400 mb-2">Errores encontrados ({results.errors.length}):</p>
+                                    <ul className="text-[11px] text-red-600 dark:text-red-400 list-disc list-inside">
                                         {results.errors.map((err, i) => (
                                             <li key={i}>{err}</li>
                                         ))}

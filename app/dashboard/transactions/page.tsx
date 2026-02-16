@@ -164,11 +164,11 @@ export default function TransactionsPage() {
   const getExpenseTypeColor = (type: string | null) => {
     switch (type) {
       case 'structural':
-        return 'bg-blue-500/15 text-blue-400'
+        return 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
       case 'emotional_recurrent':
-        return 'bg-purple-500/15 text-purple-400'
+        return 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
       case 'emotional_impulsive':
-        return 'bg-orange-500/15 text-orange-400'
+        return 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
       default:
         return 'bg-secondary text-muted-foreground'
     }
@@ -203,11 +203,11 @@ export default function TransactionsPage() {
   const getPaymentMethodColor = (method: string) => {
     switch (method) {
       case 'credit_card':
-        return 'bg-indigo-500/15 text-indigo-400'
+        return 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400'
       case 'cash':
-        return 'bg-green-500/15 text-green-400'
+        return 'bg-green-500/15 text-green-600 dark:text-green-400'
       case 'transfer':
-        return 'bg-cyan-500/15 text-cyan-400'
+        return 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400'
       default:
         return 'bg-secondary text-muted-foreground'
     }
@@ -227,9 +227,9 @@ export default function TransactionsPage() {
   const getIncomeCategoryColor = (category: string) => {
     switch (category) {
       case 'active_income':
-        return 'bg-green-500/15 text-green-400'
+        return 'bg-green-500/15 text-green-600 dark:text-green-400'
       case 'other_income':
-        return 'bg-blue-500/15 text-blue-400'
+        return 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
       default:
         return 'bg-secondary text-muted-foreground'
     }
@@ -588,7 +588,7 @@ export default function TransactionsPage() {
                             {transaction.description}
                           </CardTitle>
                           {transaction.isVoided && (
-                            <span className="text-xs bg-red-500/15 text-red-400 px-2 py-0.5 rounded">
+                            <span className="text-xs bg-red-500/15 text-red-600 dark:text-red-400 px-2 py-0.5 rounded">
                               ANULADO
                             </span>
                           )}
@@ -696,11 +696,11 @@ export default function TransactionsPage() {
                                   {formatCurrency(Number(installment.amount))}
                                 </span>
                                 {installment.isPaid ? (
-                                  <span className="text-xs bg-green-500/15 text-green-400 px-2 py-0.5 rounded">
+                                  <span className="text-xs bg-green-500/15 text-green-600 dark:text-green-400 px-2 py-0.5 rounded">
                                     Pagada
                                   </span>
                                 ) : (
-                                  <span className="text-xs bg-yellow-500/15 text-yellow-400 px-2 py-0.5 rounded">
+                                  <span className="text-xs bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 px-2 py-0.5 rounded">
                                     Pendiente
                                   </span>
                                 )}
@@ -744,7 +744,7 @@ export default function TransactionsPage() {
                             {income.description}
                           </CardTitle>
                           {income.isRecurring && (
-                            <span className="text-xs bg-blue-500/15 text-blue-400 px-2 py-0.5 rounded">
+                            <span className="text-xs bg-blue-500/15 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded">
                               RECURRENTE
                             </span>
                           )}
@@ -754,7 +754,7 @@ export default function TransactionsPage() {
                         </CardDescription>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold text-green-400">
+                        <div className="text-lg font-bold text-green-600 dark:text-green-400">
                           +{formatCurrency(Number(income.amount))}
                         </div>
                       </div>

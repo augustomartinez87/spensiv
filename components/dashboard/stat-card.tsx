@@ -26,11 +26,11 @@ export function StatCard({ title, value, count, type, currency = 'ARS' }: StatCa
 
     const colorClass = isBalance
         ? isPositive
-            ? 'text-green-400'
-            : 'text-red-400'
+            ? 'text-green-600 dark:text-green-400'
+            : 'text-red-600 dark:text-red-400'
         : type === 'income'
-            ? 'text-green-400'
-            : 'text-blue-400'
+            ? 'text-green-600 dark:text-green-400'
+            : 'text-blue-600 dark:text-blue-400'
 
     const bgClass = isBalance
         ? isPositive

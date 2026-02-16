@@ -188,7 +188,7 @@ export default function DashboardPage() {
                         {income.category === 'active_income' ? ' • Sueldo' : ' • Otro'}
                       </p>
                     </div>
-                    <p className="font-semibold text-sm text-green-400">
+                    <p className="font-semibold text-sm text-green-600 dark:text-green-400">
                       {formatCurrency(Number(income.amount))}
                     </p>
                   </div>
