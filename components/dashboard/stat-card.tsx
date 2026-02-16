@@ -49,6 +49,8 @@ export function StatCard({ title, value, count, type, previousValue }: StatCardP
         ? ((value - previousValue) / Math.abs(previousValue)) * 100
         : null
 
+    const hasPreviousData = previousValue !== undefined && previousValue !== 0
+
     return (
         <Card className="hover:shadow-md">
             <CardContent className="p-5">
@@ -56,18 +58,19 @@ export function StatCard({ title, value, count, type, previousValue }: StatCardP
                     <div className={cn('p-2.5 rounded-xl', iconBg)}>
                         <Icon className={cn('h-5 w-5', iconColor)} />
                     </div>
-                    {variation !== null ? (
+                    {hasPreviousData ? (
                         <span className={cn(
                             'text-xs font-semibold px-2 py-0.5 rounded-full',
-                            variation >= 0
+                            variation !== null && variation >= 0
                                 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                 : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                         )}>
-                            {variation >= 0 ? '+' : ''}{variation.toFixed(1)}%
+                            {variation !== null && variation >= 0 ? '+' : ''}{variation?.toFixed(1) || 0}%
                         </span>
                     ) : (
-                        <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                            N/A
+                        <span className="text-[10px] font-medium text-muted-foreground/70 bg-muted/50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                            Sin datos previos
                         </span>
                     )}
                 </div>

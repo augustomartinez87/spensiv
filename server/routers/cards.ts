@@ -179,6 +179,87 @@ export const cardsRouter = router({
     }),
 
   /**
+   * Obtener detalle completo de una tarjeta
+   */
+  getDetail: protectedProcedure
+    .input(z.string())
+    .query(async ({ ctx, input }) => {
+      const now = new Date()
+      const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+      const card = await ctx.prisma.creditCard.findUnique({
+        where: { id: input },
+        include: {
+          billingCycles: {
+            where: {
+              status: { in: ['open', 'closed'] },
+            },
+            include: {
+              installments: {
+                where: {
+                  isPaid: false,
+                  transaction: {
+                    isVoided: false,
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+
+      if (!card || card.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Tarjeta no encontrada',
+        })
+      }
+
+      // Calcular deuda total
+      const totalBalance = card.billingCycles.reduce((sum, cycle) => {
+        return sum + Number(cycle.totalAmount || 0)
+      }, 0)
+
+      // Calcular deuda del período actual
+      const currentPeriodBalance = card.billingCycles
+        .filter((cycle) => cycle.period === currentPeriod)
+        .reduce((sum, cycle) => sum + Number(cycle.totalAmount || 0), 0)
+
+      // Próximo vencimiento
+      const nextDueCycle = card.billingCycles
+        .filter((c) => c.status === 'open' || c.status === 'closed')
+        .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0]
+
+      // Calcular porcentaje del límite usado
+      const limitPercentage = card.creditLimit
+        ? (totalBalance / Number(card.creditLimit)) * 100
+        : null
+
+      // Obtener transacciones recientes de esta tarjeta
+      const recentTransactions = await ctx.prisma.transaction.findMany({
+        where: {
+          cardId: input,
+          userId: ctx.user.id,
+          isVoided: false,
+        },
+        orderBy: {
+          purchaseDate: 'desc',
+        },
+        take: 5,
+      })
+
+      return {
+        card,
+        totalBalance,
+        currentPeriodBalance,
+        nextDueDate: nextDueCycle?.dueDate || null,
+        nextDueAmount: nextDueCycle ? Number(nextDueCycle.totalAmount || 0) : 0,
+        limitPercentage,
+        recentTransactions,
+      }
+    }),
+
+  /**
    * Listar ciclos de facturación de una tarjeta
    */
   listBillingCycles: protectedProcedure

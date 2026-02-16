@@ -1,25 +1,81 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { FileUp, Download, CheckCircle2, AlertCircle, Loader2, Copy, FileSpreadsheet } from 'lucide-react'
+import { FileUp, Download, CheckCircle2, AlertCircle, Loader2, Copy, FileSpreadsheet, X, ArrowLeft } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { trpc } from '@/lib/trpc-client'
-import { parseExcelPaste, parseIncomesPaste, generateTemplateCSV } from '@/lib/importer'
+import { parseExcelPaste, parseIncomesPaste, generateTemplateCSV, validateTransactionData } from '@/lib/importer'
 import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
+import { format, parse } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 type ImportTab = 'gastos' | 'ingresos'
+type ValidationStatus = 'valid' | 'invalid' | 'warning'
+
+interface ParsedRow {
+  id: string
+  rawData: string[]
+  status: ValidationStatus
+  errors: string[]
+  parsed?: any
+}
 
 export default function ImportPage() {
     const [activeTab, setActiveTab] = useState<ImportTab>('gastos')
     const [pasteData, setPasteData] = useState('')
     const [isUploading, setIsUploading] = useState(false)
-    const [step, setStep] = useState<'upload' | 'success'>('upload')
+    const [step, setStep] = useState<'upload' | 'preview' | 'success'>('upload')
     const [results, setResults] = useState<{ success: number; errors: string[] } | null>(null)
+    const [parsedRows, setParsedRows] = useState<ParsedRow[]>([])
 
     const utils = trpc.useUtils()
+    const { data: cards } = trpc.cards.list.useQuery()
+
+    // Parsear datos automáticamente cuando se pega
+    useEffect(() => {
+        if (!pasteData.trim()) {
+            setParsedRows([])
+            return
+        }
+
+        const rows = pasteData.trim().split('\n')
+        const parsed: ParsedRow[] = rows.map((row, index) => {
+            const columns = row.split('\t')
+            const id = `row-${index}`
+
+            if (activeTab === 'gastos') {
+                const validation = validateTransactionData(columns, cards || [])
+                return {
+                    id,
+                    rawData: columns,
+                    status: validation.isValid ? 'valid' : 'invalid',
+                    errors: validation.errors,
+                    parsed: validation.data,
+                }
+            } else {
+                // Validación simplificada para ingresos
+                const isValid = columns.length >= 5 && !isNaN(parseFloat(columns[4]?.replace(/[^0-9.,]/g, '')))
+                return {
+                    id,
+                    rawData: columns,
+                    status: isValid ? 'valid' : 'invalid',
+                    errors: isValid ? [] : ['Monto inválido o datos incompletos'],
+                    parsed: isValid ? {
+                        description: columns[1],
+                        amount: parseFloat(columns[4]?.replace(/[^0-9.,]/g, '').replace(',', '.')),
+                    } : undefined,
+                }
+            }
+        })
+
+        setParsedRows(parsed)
+    }, [pasteData, activeTab, cards])
+
+    const validRows = parsedRows.filter(r => r.status === 'valid')
+    const invalidRows = parsedRows.filter(r => r.status === 'invalid')
 
     const importTransactionsMutation = trpc.import.bulkTransactions.useMutation({
         onSuccess: (data) => {
@@ -27,10 +83,10 @@ export default function ImportPage() {
             setStep('success')
             utils.transactions.list.invalidate()
             utils.dashboard.getMonthlyBalance.invalidate()
-toast({
-            title: "Importación finalizada!",
-            description: `Se procesaron ${data.success} movimientos correctamente.`,
-        })
+            toast({
+                title: "Importación finalizada!",
+                description: `Se procesaron ${data.success} movimientos correctamente.`,
+            })
         },
         onError: (error) => {
             toast({
@@ -46,7 +102,7 @@ toast({
             setResults(data)
             setStep('success')
             utils.dashboard.getMonthlyBalance.invalidate()
-toast({
+            toast({
                 title: "Importación finalizada!",
                 description: `Se procesaron ${data.success} ingresos correctamente.`,
             })
@@ -61,22 +117,17 @@ toast({
     })
 
     const handleImport = async () => {
-        if (!pasteData.trim()) return
+        if (validRows.length === 0) return
 
         setIsUploading(true)
         try {
             if (activeTab === 'gastos') {
-                const parsedData = parseExcelPaste(pasteData)
-                if (parsedData.length === 0) {
-                    throw new Error("No se encontraron datos validos para importar. Asegurate de copiar las columnas correctas desde Excel.")
-                }
-                await importTransactionsMutation.mutateAsync(parsedData as any)
+                const dataToImport = validRows.map(r => r.parsed).filter(Boolean)
+                await importTransactionsMutation.mutateAsync(dataToImport as any)
             } else {
                 const parsedData = parseIncomesPaste(pasteData)
-                if (parsedData.length === 0) {
-                    throw new Error("No se encontraron ingresos validos para importar. Asegurate de copiar las columnas correctas desde Excel.")
-                }
-                await importIncomesMutation.mutateAsync(parsedData as any)
+                const validData = parsedData.filter((row: any) => row && row.amount > 0)
+                await importIncomesMutation.mutateAsync(validData as any)
             }
         } catch (error: any) {
             toast({
@@ -105,6 +156,25 @@ toast({
     const handleTabChange = (tab: ImportTab) => {
         setActiveTab(tab)
         setPasteData('')
+        setParsedRows([])
+        setStep('upload')
+    }
+
+    const formatDate = (dateStr: string) => {
+        try {
+            const date = parse(dateStr, 'dd/MM/yyyy', new Date())
+            return format(date, 'dd/MM/yy')
+        } catch {
+            return dateStr
+        }
+    }
+
+    const formatAmount = (amountStr: string) => {
+        const num = parseFloat(amountStr?.replace(/[^0-9.,]/g, '').replace(',', '.'))
+        if (!isNaN(num)) {
+            return formatCurrency(num)
+        }
+        return amountStr
     }
 
     return (
@@ -140,7 +210,7 @@ toast({
                 </button>
             </div>
 
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-5xl mx-auto">
                 {step === 'upload' && (
                     <div className="grid gap-6 md:grid-cols-2">
                         {/* Paste Option */}
@@ -165,17 +235,41 @@ toast({
                                     value={pasteData}
                                     onChange={(e) => setPasteData(e.target.value)}
                                 />
-                                <Button
-                                    className="w-full h-11"
-                                    disabled={!pasteData.trim() || isUploading}
-                                    onClick={handleImport}
-                                >
-                                    {isUploading ? (
-                                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Procesando...</>
-                                    ) : (
-                                        activeTab === 'gastos' ? 'Importar gastos' : 'Importar ingresos'
-                                    )}
-                                </Button>
+                                {parsedRows.length > 0 && (
+                                    <div className="flex items-center gap-4 text-sm">
+                                        <span className="text-green-600 dark:text-green-400 font-medium">
+                                            {validRows.length} válidos
+                                        </span>
+                                        {invalidRows.length > 0 && (
+                                            <span className="text-red-600 dark:text-red-400 font-medium">
+                                                {invalidRows.length} con errores
+                                            </span>
+                                        )}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setPasteData('')}
+                                            className="ml-auto"
+                                        >
+                                            <X className="h-4 w-4 mr-1" /> Limpiar
+                                        </Button>
+                                    </div>
+                                )}
+                                {parsedRows.length > 0 ? (
+                                    <Button
+                                        className="w-full h-11"
+                                        onClick={() => setStep('preview')}
+                                    >
+                                        Ver preview ({validRows.length} válidos)
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="w-full h-11"
+                                        disabled
+                                    >
+                                        Pegá los datos para comenzar
+                                    </Button>
+                                )}
                             </CardContent>
                         </Card>
 
@@ -239,6 +333,99 @@ toast({
                     </div>
                 )}
 
+                {step === 'preview' && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <Button variant="outline" onClick={() => setStep('upload')}>
+                                <ArrowLeft className="h-4 w-4 mr-2" /> Volver
+                            </Button>
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                                    {validRows.length} válidos
+                                </span>
+                                {invalidRows.length > 0 && (
+                                    <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+                                        {invalidRows.length} con errores
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Preview de datos</CardTitle>
+                                <CardDescription>
+                                    Revisá los datos antes de importar. Las filas con errores se omitirán.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="border rounded-lg overflow-hidden">
+                                    <div className="max-h-[400px] overflow-auto">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-muted sticky top-0">
+                                                <tr>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Estado</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Fecha</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Descripción</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Monto</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Errores</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {parsedRows.map((row) => (
+                                                    <tr 
+                                                        key={row.id}
+                                                        className={cn(
+                                                            row.status === 'invalid' && "bg-red-50 dark:bg-red-950/20",
+                                                            row.status === 'valid' && "bg-green-50/50 dark:bg-green-950/10"
+                                                        )}
+                                                    >
+                                                        <td className="px-3 py-2">
+                                                            {row.status === 'valid' ? (
+                                                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                                            ) : (
+                                                                <AlertCircle className="h-4 w-4 text-red-600" />
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-muted-foreground">
+                                                            {formatDate(row.rawData[0])}
+                                                        </td>
+                                                        <td className="px-3 py-2 font-medium">
+                                                            {row.rawData[1]}
+                                                        </td>
+                                                        <td className="px-3 py-2 font-mono">
+                                                            {formatAmount(row.rawData[8] || row.rawData[4])}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-xs text-red-600">
+                                                            {row.errors.join(', ')}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 flex justify-end gap-3">
+                                    <Button variant="outline" onClick={() => setStep('upload')}>
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        onClick={handleImport}
+                                        disabled={validRows.length === 0 || isUploading}
+                                    >
+                                        {isUploading ? (
+                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
+                                        ) : (
+                                            <>Importar {validRows.length} movimientos</>
+                                        )}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
                 {step === 'success' && results && (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
@@ -262,7 +449,7 @@ toast({
                             )}
 
                             <div className="flex gap-3">
-                                <Button variant="outline" onClick={() => { setStep('upload'); setPasteData(''); }}>Importar mas</Button>
+                                <Button variant="outline" onClick={() => { setStep('upload'); setPasteData(''); setParsedRows([]); }}>Importar mas</Button>
                                 <Button onClick={() => window.location.href = '/dashboard'}>Ir al Dashboard</Button>
                             </div>
                         </CardContent>

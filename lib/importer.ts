@@ -136,3 +136,106 @@ export function generateTemplateCSV() {
 
     return [headers.join('\t'), example.join('\t')].join('\n')
 }
+
+/**
+ * Validar datos de una transacción
+ * Retorna objeto con estado de validación, errores y datos parseados
+ */
+export function validateTransactionData(cols: string[], cards: any[]) {
+    const errors: string[] = []
+
+    // Validar cantidad de columnas
+    if (cols.length < 9) {
+        errors.push('Faltan columnas')
+        return { isValid: false, errors, data: null }
+    }
+
+    const dateStr = cols[0].trim()
+    const description = cols[1].trim()
+    const category = cols[2].trim()
+    const subcategory = cols[3].trim()
+    const expenseTypeStr = cols[4].trim()
+    const paymentMethodStr = cols[5].trim()
+    const bank = cols[6].trim()
+    const cardName = cols[7].trim()
+    const amountStr = cols[8].trim()
+    const installmentsStr = cols[9]?.trim() || '1'
+
+    // Validar fecha
+    const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/
+    if (!dateRegex.test(dateStr)) {
+        errors.push('Fecha inválida (use DD/MM/AAAA)')
+    }
+
+    // Validar descripción
+    if (!description || description.length < 2) {
+        errors.push('Descripción muy corta')
+    }
+
+    // Validar monto
+    const amount = parseFloat(
+        amountStr
+            .replace('$', '')
+            .replace(/\./g, '')
+            .replace(',', '.')
+            .trim()
+    )
+    if (isNaN(amount) || amount <= 0) {
+        errors.push('Monto inválido')
+    }
+
+    // Validar cuotas
+    const installments = parseInt(installmentsStr) || 1
+    if (installments < 1 || installments > 60) {
+        errors.push('Cuotas inválidas (1-60)')
+    }
+
+    // Si es tarjeta de crédito, validar que exista
+    const isCredit = paymentMethodStr.toLowerCase().includes('crédito') || 
+                     paymentMethodStr.toLowerCase().includes('credito')
+    if (isCredit && cards.length > 0) {
+        const cardExists = cards.some((c: any) => 
+            c.name.toLowerCase().includes(cardName.toLowerCase()) ||
+            cardName.toLowerCase().includes(c.name.toLowerCase())
+        )
+        if (!cardExists && cardName) {
+            errors.push(`Tarjeta "${cardName}" no encontrada`)
+        }
+    }
+
+    // Si hay errores, retornar inválido
+    if (errors.length > 0) {
+        return { isValid: false, errors, data: null }
+    }
+
+    // Parsear datos válidos
+    const [day, month, year] = dateStr.split('/').map(Number)
+    const date = new Date(year, month - 1, day).toISOString()
+
+    let expenseType: 'structural' | 'emotional_recurrent' | 'emotional_impulsive' = 'structural'
+    if (expenseTypeStr.toLowerCase().includes('impulsivo')) expenseType = 'emotional_impulsive'
+    if (expenseTypeStr.toLowerCase().includes('recurrente')) expenseType = 'emotional_recurrent'
+
+    let paymentMethod: 'credit_card' | 'cash' | 'transfer' | 'debit_card' = 'cash'
+    if (paymentMethodStr.toLowerCase().includes('crédito')) paymentMethod = 'credit_card'
+    if (paymentMethodStr.toLowerCase().includes('transferencia')) paymentMethod = 'transfer'
+    if (paymentMethodStr.toLowerCase().includes('débito')) paymentMethod = 'debit_card'
+    if (paymentMethodStr.toLowerCase().includes('efectivo')) paymentMethod = 'cash'
+
+    return {
+        isValid: true,
+        errors: [],
+        data: {
+            date,
+            description,
+            category,
+            subcategory,
+            expenseType,
+            paymentMethod,
+            bank,
+            cardName,
+            amount,
+            installments,
+        }
+    }
+}

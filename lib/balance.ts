@@ -178,15 +178,27 @@ export async function getMonthlyBalance(userId: string, period: string) {
 
 /**
  * Obtener proyección de flujo de caja para los próximos N meses
+ * Incluye ingresos recurrentes proyectados
  */
 export async function getCashFlowProjection(
     userId: string,
     startPeriod: string,
     months: number = 6
 ) {
-    const [startYear, startMonth] = startPeriod.split('-').map(Number)
+    // Obtener ingresos recurrentes del usuario
+    const recurringIncomes = await prisma.income.findMany({
+        where: {
+            userId,
+            isRecurring: true,
+        },
+    })
 
-    // Generar los periodos primero
+    // Calcular el promedio de ingresos recurrentes
+    const avgRecurringIncome = recurringIncomes.length > 0
+        ? recurringIncomes.reduce((sum: number, inc: any) => sum + Number(inc.amount), 0) / recurringIncomes.length
+        : 0
+
+    // Generar los periodos
     const periods = Array.from({ length: months }, (_, i) => {
         const [year, month] = startPeriod.split('-').map(Number)
         const date = new Date(year, month - 1 + i, 1)
@@ -195,7 +207,28 @@ export async function getCashFlowProjection(
 
     // Ejecutar todas las consultas en paralelo
     const projections = await Promise.all(
-        periods.map(period => getMonthlyBalance(userId, period))
+        periods.map(async (period) => {
+            const balance = await getMonthlyBalance(userId, period)
+            
+            // Calcular ingresos recurrentes proyectados para este período
+            const projectedIncome = avgRecurringIncome
+            
+            // Calcular ingresos reales ya registrados para este período
+            const actualIncome = balance.totalIncome
+            
+            // Si hay ingresos reales, no proyectamos (ya están contabilizados)
+            // Si no hay ingresos reales, usamos la proyección
+            const hasActualIncome = actualIncome > 0
+            
+            return {
+                ...balance,
+                actualIncome,
+                projectedIncome: hasActualIncome ? 0 : projectedIncome,
+                totalIncomeWithProjection: hasActualIncome ? actualIncome : projectedIncome,
+                hasProjectedIncome: !hasActualIncome && projectedIncome > 0,
+                balanceWithProjection: (hasActualIncome ? actualIncome : projectedIncome) - balance.totalExpense,
+            }
+        })
     )
 
     return projections

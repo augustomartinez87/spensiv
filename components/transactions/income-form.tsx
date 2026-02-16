@@ -12,7 +12,19 @@ import { useToast } from '@/hooks/use-toast'
 import { Plus } from 'lucide-react'
 import { formatDateToInput, parseInputDate } from '@/lib/utils'
 
-export function IncomeForm() {
+interface IncomeFormProps {
+  variant?: 'default' | 'outline' | 'ghost'
+  size?: 'default' | 'sm' | 'lg' | 'icon'
+  className?: string
+  triggerText?: string
+}
+
+export function IncomeForm({ 
+  variant = 'outline', 
+  size = 'default',
+  className,
+  triggerText = 'Nuevo Ingreso'
+}: IncomeFormProps) {
     const [open, setOpen] = useState(false)
     const { toast } = useToast()
     const utils = trpc.useUtils()
@@ -69,9 +81,9 @@ export function IncomeForm() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant={variant} size={size} className={className}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Ingreso
+                    {triggerText}
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">

@@ -122,7 +122,8 @@ export const dashboardRouter = router({
   }),
 
   /**
-   * Deuda total
+   * Deuda total - Calcula la suma REAL de todas las cuotas pendientes de todas las tarjetas
+   * Incluye: cuotas pendientes del período actual + cuotas futuras pendientes
    */
   getTotalDebt: protectedProcedure.query(async ({ ctx }) => {
     const cards = await ctx.prisma.creditCard.findMany({
@@ -134,6 +135,13 @@ export const dashboardRouter = router({
         billingCycles: {
           where: {
             status: { in: ['open', 'closed'] },
+          },
+          include: {
+            installments: {
+              where: {
+                isPaid: false,
+              },
+            },
           },
         },
       },
@@ -154,6 +162,87 @@ export const dashboardRouter = router({
       cardCount: cards.length,
     }
   }),
+
+  /**
+   * Balances por tarjeta - Devuelve el balance real de cada tarjeta (todas las cuotas pendientes)
+   * y el balance del período actual (solo cuotas de este mes)
+   */
+  getCardBalances: protectedProcedure
+    .input(
+      z.object({
+        period: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const currentPeriod = input?.period || formatPeriod(new Date())
+
+      const cards = await ctx.prisma.creditCard.findMany({
+        where: {
+          userId: ctx.user.id,
+          isActive: true,
+        },
+        include: {
+          billingCycles: {
+            where: {
+              status: { in: ['open', 'closed'] },
+            },
+            include: {
+              installments: {
+                where: {
+                  isPaid: false,
+                  transaction: {
+                    isVoided: false,
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+
+      const cardBalances = cards.map((card) => {
+        // Balance total: todas las cuotas pendientes
+        const totalBalance = card.billingCycles.reduce(
+          (sum, cycle) => sum + Number(cycle.totalAmount || 0),
+          0
+        )
+
+        // Balance del período actual: solo cuotas de este mes
+        const currentPeriodBalance = card.billingCycles
+          .filter((cycle) => cycle.period === currentPeriod)
+          .reduce((sum, cycle) => sum + Number(cycle.totalAmount || 0), 0)
+
+        // Próximo vencimiento
+        const nextDueCycle = card.billingCycles
+          .filter((cycle) => cycle.status === 'open' || cycle.status === 'closed')
+          .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0]
+
+        return {
+          id: card.id,
+          name: card.name,
+          bank: card.bank,
+          brand: card.brand,
+          last4: card.last4,
+          creditLimit: card.creditLimit ? Number(card.creditLimit) : null,
+          closingDay: card.closingDay,
+          dueDay: card.dueDay,
+          totalBalance,
+          currentPeriodBalance,
+          nextDueDate: nextDueCycle?.dueDate || null,
+          nextDueAmount: nextDueCycle ? Number(nextDueCycle.totalAmount || 0) : 0,
+          cycleCount: card.billingCycles.length,
+        }
+      })
+
+      // Calcular deuda total real (suma de todos los balances)
+      const totalDebt = cardBalances.reduce((sum, card) => sum + card.totalBalance, 0)
+
+      return {
+        cards: cardBalances,
+        totalDebt,
+        cardCount: cards.length,
+      }
+    }),
 
   /**
    * Próximos vencimientos

@@ -3,203 +3,382 @@
 import { useState } from 'react'
 import { trpc } from '@/lib/trpc-client'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/hooks/use-toast'
-import { Plus } from 'lucide-react'
-import { formatDateToInput, parseInputDate } from '@/lib/utils'
+import { Plus, CreditCard, Banknote, ArrowRightLeft } from 'lucide-react'
+import { formatDateToInput, parseInputDate, formatCurrency, cn } from '@/lib/utils'
 
-export function TransactionForm() {
-    const [open, setOpen] = useState(false)
-    const { toast } = useToast()
-    const utils = trpc.useUtils()
+type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'transfer'
+type ExpenseType = 'structural' | 'emotional_recurrent' | 'emotional_impulsive'
 
-    const [formData, setFormData] = useState({
-        description: '',
-        totalAmount: '',
-        purchaseDate: formatDateToInput(new Date()),
-        paymentMethod: 'credit_card' as 'credit_card' | 'debit_card' | 'cash' | 'transfer',
-        cardId: '',
-        installments: '1',
-        expenseType: 'structural' as 'structural' | 'emotional_recurrent' | 'emotional_impulsive',
-    })
+interface TransactionFormData {
+  description: string
+  totalAmount: string
+  purchaseDate: string
+  paymentMethod: PaymentMethod
+  cardId: string
+  installments: string
+  categoryId: string
+  subcategory: string
+  expenseType: ExpenseType
+  notes: string
+}
 
-    const { data: cards } = trpc.cards.list.useQuery()
-    const createMutation = trpc.transactions.create.useMutation({
-        onSuccess: () => {
-            toast({
-                title: 'Gasto registrado',
-                description: 'El gasto se registró exitosamente',
-            })
-            setOpen(false)
-            setFormData({
-                description: '',
-                totalAmount: '',
-                purchaseDate: formatDateToInput(new Date()),
-                paymentMethod: 'credit_card',
-                cardId: '',
-                installments: '1',
-                expenseType: 'structural',
-            })
-            utils.dashboard.getMonthlyBalance.invalidate()
-            utils.transactions.list.invalidate()
-        },
-        onError: (error) => {
-            toast({
-                title: 'Error',
-                description: error.message,
-                variant: 'destructive',
-            })
-        },
-    })
+const initialFormData: TransactionFormData = {
+  description: '',
+  totalAmount: '',
+  purchaseDate: formatDateToInput(new Date()),
+  paymentMethod: 'credit_card',
+  cardId: '',
+  installments: '1',
+  categoryId: '',
+  subcategory: '',
+  expenseType: 'structural',
+  notes: '',
+}
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
+const expenseTypeOptions = [
+  { value: 'structural', label: 'Estructural', color: 'bg-blue-500', textColor: 'text-blue-600 dark:text-blue-400' },
+  { value: 'emotional_recurrent', label: 'Emocional Recurrente', color: 'bg-orange-500', textColor: 'text-orange-600 dark:text-orange-400' },
+  { value: 'emotional_impulsive', label: 'Emocional Impulsivo', color: 'bg-red-500', textColor: 'text-red-600 dark:text-red-400' },
+] as const
 
-        createMutation.mutate({
-            description: formData.description,
-            totalAmount: parseFloat(formData.totalAmount),
-            purchaseDate: parseInputDate(formData.purchaseDate),
-            paymentMethod: formData.paymentMethod,
-            cardId: formData.paymentMethod === 'credit_card' ? formData.cardId : undefined,
-            installments: parseInt(formData.installments),
-            expenseType: formData.expenseType,
-        })
+interface TransactionFormProps {
+  variant?: 'default' | 'outline' | 'ghost'
+  size?: 'default' | 'sm' | 'lg' | 'icon'
+  className?: string
+  triggerText?: string
+}
+
+export function TransactionForm({ 
+  variant = 'default', 
+  size = 'default',
+  className,
+  triggerText = 'Nuevo Gasto'
+}: TransactionFormProps) {
+  const [open, setOpen] = useState(false)
+  const { toast } = useToast()
+  const utils = trpc.useUtils()
+
+  const [formData, setFormData] = useState<TransactionFormData>(initialFormData)
+
+  const { data: cards } = trpc.cards.list.useQuery()
+  const { data: categories } = trpc.transactions.getCategories.useQuery()
+
+  const createMutation = trpc.transactions.create.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Gasto registrado',
+        description: 'El gasto se registró exitosamente',
+      })
+      setOpen(false)
+      setFormData(initialFormData)
+      utils.dashboard.getMonthlyBalance.invalidate()
+      utils.transactions.list.invalidate()
+      utils.dashboard.getCardBalances.invalidate()
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const amount = parseFloat(formData.totalAmount.replace(',', '.'))
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: 'Error',
+        description: 'El monto debe ser mayor a 0',
+        variant: 'destructive',
+      })
+      return
     }
 
-    const isCreditCard = formData.paymentMethod === 'credit_card'
+    if ((formData.paymentMethod === 'credit_card' || formData.paymentMethod === 'debit_card') && !formData.cardId) {
+      toast({
+        title: 'Error',
+        description: 'Seleccioná una tarjeta',
+        variant: 'destructive',
+      })
+      return
+    }
 
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Gasto
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Registrar Gasto</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Descripción</Label>
-                        <Input
-                            id="description"
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            placeholder="Ej: FIAMBRE CON SANTI"
-                            required
-                        />
-                    </div>
+    createMutation.mutate({
+      description: formData.description,
+      totalAmount: amount,
+      purchaseDate: parseInputDate(formData.purchaseDate),
+      paymentMethod: formData.paymentMethod,
+      cardId: (formData.paymentMethod === 'credit_card' || formData.paymentMethod === 'debit_card') ? formData.cardId : undefined,
+      installments: formData.paymentMethod === 'credit_card' ? parseInt(formData.installments) : 1,
+      categoryId: formData.categoryId || undefined,
+      expenseType: formData.expenseType,
+      notes: formData.notes || undefined,
+    })
+  }
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="amount">Monto</Label>
-                            <Input
-                                id="amount"
-                                type="number"
-                                step="0.01"
-                                value={formData.totalAmount}
-                                onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
-                                placeholder="7100.00"
-                                required
-                            />
-                        </div>
+  const isCardPayment = formData.paymentMethod === 'credit_card' || formData.paymentMethod === 'debit_card'
+  const isCreditCard = formData.paymentMethod === 'credit_card'
+  const monthlyInstallment = isCreditCard && formData.totalAmount && formData.installments
+    ? parseFloat(formData.totalAmount.replace(',', '.')) / parseInt(formData.installments || '1')
+    : 0
 
-                        <div className="space-y-2">
-                            <Label htmlFor="date">Fecha</Label>
-                            <DatePicker
-                                date={formData.purchaseDate ? parseInputDate(formData.purchaseDate) : undefined}
-                                onSelect={(date) => setFormData({ ...formData, purchaseDate: date ? formatDateToInput(date) : formatDateToInput(new Date()) })}
-                            />
-                        </div>
-                    </div>
+  const selectedExpenseType = expenseTypeOptions.find(t => t.value === formData.expenseType)
 
-                    <div className="space-y-2">
-                        <Label htmlFor="paymentMethod">Medio de pago</Label>
-                        <Select
-                            value={formData.paymentMethod}
-                            onValueChange={(value: any) => setFormData({ ...formData, paymentMethod: value })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="credit_card">Tarjeta de Crédito</SelectItem>
-                                <SelectItem value="debit_card">Tarjeta de Débito</SelectItem>
-                                <SelectItem value="cash">Efectivo</SelectItem>
-                                <SelectItem value="transfer">Transferencia</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant={variant} size={size} className={className}>
+          <Plus className="h-4 w-4 mr-2" />
+          {triggerText}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Registrar Gasto</DialogTitle>
+          <DialogDescription>
+            Registrá una nueva compra o gasto
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-5 pt-2">
+          {/* Medio de pago - Toggle de botones */}
+          <div className="space-y-2">
+            <Label>Medio de pago</Label>
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, paymentMethod: 'credit_card', cardId: '', installments: '1' })}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
+                  formData.paymentMethod === 'credit_card'
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border hover:border-primary/50 text-muted-foreground"
+                )}
+              >
+                <CreditCard className="h-5 w-5" />
+                <span className="text-xs font-medium">Crédito</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, paymentMethod: 'debit_card', cardId: '', installments: '1' })}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
+                  formData.paymentMethod === 'debit_card'
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border hover:border-primary/50 text-muted-foreground"
+                )}
+              >
+                <CreditCard className="h-5 w-5" />
+                <span className="text-xs font-medium">Débito</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, paymentMethod: 'cash', cardId: '', installments: '1' })}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
+                  formData.paymentMethod === 'cash'
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border hover:border-primary/50 text-muted-foreground"
+                )}
+              >
+                <Banknote className="h-5 w-5" />
+                <span className="text-xs font-medium">Efectivo</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, paymentMethod: 'transfer', cardId: '', installments: '1' })}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
+                  formData.paymentMethod === 'transfer'
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border hover:border-primary/50 text-muted-foreground"
+                )}
+              >
+                <ArrowRightLeft className="h-5 w-5" />
+                <span className="text-xs font-medium">Transferencia</span>
+              </button>
+            </div>
+          </div>
 
-                    {isCreditCard && (
-                        <>
-                            <div className="space-y-2">
-                                <Label htmlFor="card">Tarjeta</Label>
-                                <Select
-                                    value={formData.cardId}
-                                    onValueChange={(value) => setFormData({ ...formData, cardId: value })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar tarjeta" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {cards?.map((card) => (
-                                            <SelectItem key={card.id} value={card.id}>
-                                                {card.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+          {/* Tarjeta (solo si es tarjeta) */}
+          {isCardPayment && (
+            <div className="space-y-2">
+              <Label htmlFor="card">Tarjeta *</Label>
+              <Select
+                value={formData.cardId}
+                onValueChange={(value) => setFormData({ ...formData, cardId: value })}
+              >
+                <SelectTrigger id="card">
+                  <SelectValue placeholder="Seleccionar tarjeta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cards?.map((card) => (
+                    <SelectItem key={card.id} value={card.id}>
+                      {card.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!cards?.length && (
+                <p className="text-xs text-muted-foreground">
+                  No tenés tarjetas. <a href="/dashboard/cards" className="text-primary underline">Agregá una</a>
+                </p>
+              )}
+            </div>
+          )}
 
-                            <div className="space-y-2">
-                                <Label htmlFor="installments">Cuotas</Label>
-                                <Input
-                                    id="installments"
-                                    type="number"
-                                    min="1"
-                                    max="60"
-                                    value={formData.installments}
-                                    onChange={(e) => setFormData({ ...formData, installments: e.target.value })}
-                                    required
-                                />
-                            </div>
-                        </>
-                    )}
+          {/* Descripción */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Descripción *</Label>
+            <Input
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Ej: Supermercado Día"
+              required
+            />
+          </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="expenseType">Tipo de gasto</Label>
-                        <Select
-                            value={formData.expenseType}
-                            onValueChange={(value: any) => setFormData({ ...formData, expenseType: value })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="structural">🔵 Estructural</SelectItem>
-                                <SelectItem value="emotional_recurrent">🟡 Recurrente</SelectItem>
-                                <SelectItem value="emotional_impulsive">🔴 Impulsivo</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+          {/* Monto y Fecha */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Monto total *</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  id="amount"
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.totalAmount}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.,]/g, '')
+                    setFormData({ ...formData, totalAmount: value })
+                  }}
+                  placeholder="0,00"
+                  className="pl-7"
+                  required
+                />
+              </div>
+            </div>
 
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                            Cancelar
-                        </Button>
-                        <Button type="submit" disabled={createMutation.isPending}>
-                            {createMutation.isPending ? 'Guardando...' : 'Guardar'}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    )
+            <div className="space-y-2">
+              <Label htmlFor="date">Fecha *</Label>
+              <DatePicker
+                date={formData.purchaseDate ? parseInputDate(formData.purchaseDate) : undefined}
+                onSelect={(date) => setFormData({ ...formData, purchaseDate: date ? formatDateToInput(date) : formatDateToInput(new Date()) })}
+              />
+            </div>
+          </div>
+
+          {/* Cuotas (solo crédito) */}
+          {isCreditCard && (
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label htmlFor="installments">Cuotas</Label>
+                {monthlyInstallment > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {formatCurrency(monthlyInstallment)} / mes
+                  </span>
+                )}
+              </div>
+              <Input
+                id="installments"
+                type="number"
+                min="1"
+                max="60"
+                value={formData.installments}
+                onChange={(e) => setFormData({ ...formData, installments: e.target.value })}
+              />
+            </div>
+          )}
+
+          {/* Categoría */}
+          <div className="space-y-2">
+            <Label htmlFor="category">Categoría</Label>
+            <Select
+              value={formData.categoryId}
+              onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+            >
+              <SelectTrigger id="category">
+                <SelectValue placeholder="Seleccionar categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories?.map((category: { id: string; name: string }) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Subcategoría */}
+          <div className="space-y-2">
+            <Label htmlFor="subcategory">Subcategoría</Label>
+            <Input
+              id="subcategory"
+              value={formData.subcategory}
+              onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
+              placeholder="Ej: Transporte, Consumo, Servicios..."
+            />
+          </div>
+
+          {/* Tipo de gasto con indicadores de color */}
+          <div className="space-y-2">
+            <Label>Tipo de gasto</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {expenseTypeOptions.map((type) => (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, expenseType: type.value })}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center",
+                    formData.expenseType === type.value
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  )}
+                >
+                  <div className={cn("w-3 h-3 rounded-full", type.color)} />
+                  <span className={cn("text-xs font-medium", formData.expenseType === type.value ? type.textColor : "text-muted-foreground")}>
+                    {type.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notas */}
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notas (opcional)</Label>
+            <Textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Notas adicionales sobre el gasto..."
+              rows={2}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
 }

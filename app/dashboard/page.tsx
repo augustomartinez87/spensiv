@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { trpc } from '@/lib/trpc-client'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { MonthSelector } from '@/components/dashboard/month-selector'
 import { CategoryPieChart } from '@/components/dashboard/category-pie-chart'
+import { ExpenseTypeChart } from '@/components/dashboard/expense-type-chart'
+import { MonthlyProjection } from '@/components/dashboard/monthly-projection'
 import { TransactionForm } from '@/components/transactions/transaction-form'
 import { IncomeForm } from '@/components/transactions/income-form'
+import { CardDetailModal } from '@/components/cards/card-detail-modal'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -31,6 +34,7 @@ import {
   Wifi,
   DollarSign,
   ArrowRight,
+  HelpCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -99,21 +103,46 @@ function getCategoryBadgeColor(category: string): string {
   return map[category] || 'bg-muted text-muted-foreground'
 }
 
+function getExpenseTypeDotColor(type: string | null | undefined): string {
+  switch (type) {
+    case 'structural':
+      return 'bg-blue-500'
+    case 'emotional_recurrent':
+      return 'bg-orange-500'
+    case 'emotional_impulsive':
+      return 'bg-red-500'
+    default:
+      return 'bg-gray-400'
+  }
+}
+
 export default function DashboardPage() {
   const now = new Date()
   const [period, setPeriod] = useState(
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   )
+  const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+
+  // Debounce para la búsqueda (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   const previousPeriod = getPreviousPeriod(period)
 
   const { data: balance, isLoading: isLoadingBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period })
   const { data: prevBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period: previousPeriod })
-  const { data: totalDebt, isLoading: loadingDebt } = trpc.dashboard.getTotalDebt.useQuery()
+  const { data: cardBalances, isLoading: loadingCardBalances } = trpc.dashboard.getCardBalances.useQuery({ period })
   const { data: upcomingPayments, isLoading: loadingPayments } = trpc.dashboard.getUpcomingPayments.useQuery()
 
-  const isLoading = isLoadingBalance || loadingDebt || loadingPayments
+  const totalDebt = cardBalances?.totalDebt || 0
+
+  const isLoading = isLoadingBalance || loadingCardBalances || loadingPayments
 
   if (isLoading) {
     return (
@@ -165,6 +194,9 @@ export default function DashboardPage() {
 
   const nextPayments = groupedPayments?.slice(0, 3) || []
 
+  // Usar cardBalances para el widget de tarjetas
+  const cardList = cardBalances?.cards || []
+
   return (
     <div className="space-y-8">
       {/* Header with Title, Search, and Actions */}
@@ -178,8 +210,8 @@ export default function DashboardPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar movimientos..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="pl-9 w-56"
             />
           </div>
@@ -194,8 +226,20 @@ export default function DashboardPage() {
           <MonthSelector value={period} onChange={setPeriod} />
           <div className="hidden sm:block text-right">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Deuda Total</p>
-            <p className="text-lg font-bold text-foreground">{formatCurrency(totalDebt?.amount || 0)}</p>
-            <p className="text-[10px] text-muted-foreground">Suma de todas las tarjetas</p>
+            <div className="flex items-center gap-1 justify-end">
+              <p className="text-lg font-bold text-foreground">{formatCurrency(totalDebt)}</p>
+              <div className="group relative">
+                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-popover border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-xs">
+                  <p className="font-medium mb-1">¿Qué incluye?</p>
+                  <p className="text-muted-foreground">
+                    Suma de todas las cuotas pendientes de pago de todas tus tarjetas, 
+                    incluyendo período actual y futuros.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Total adeudado en tarjetas</p>
           </div>
         </div>
 
@@ -232,9 +276,10 @@ export default function DashboardPage() {
               data={balance.aggregations.expensesByCategory}
               title="Gastos por categoria"
             />
-            <CategoryPieChart
+            <ExpenseTypeChart
               data={balance.aggregations.expensesByType}
               title="Tipos de gasto"
+              previousData={prevBalance?.aggregations?.expensesByType}
             />
           </div>
 
@@ -263,23 +308,31 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="px-3 pb-3">
               <div className="space-y-1">
-                {groupedPayments?.map((p) => (
-                  <div key={p.card.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200">
-                    <div className={cn('h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0', getBankColor(p.card.bank || ''))}>
-                      {getBankInitials(p.card.bank || p.card.name)}
+                {cardList.map((card) => (
+                  <div 
+                    key={card.id} 
+                    onClick={() => setSelectedCardId(card.id)}
+                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200 cursor-pointer group"
+                  >
+                    <div className={cn('h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0', getBankColor(card.bank || ''))}>
+                      {getBankInitials(card.bank || card.name)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{p.card.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{(p.card as any).brand ? (p.card as any).brand.charAt(0).toUpperCase() + (p.card as any).brand.slice(1) : 'Tarjeta'}</p>
+                      <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{card.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : 'Tarjeta'}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-foreground">{formatCurrency(p.amount)}</p>
-                      <p className="text-[10px] text-muted-foreground">Balance</p>
+                      <p className="text-sm font-bold text-foreground">{formatCurrency(card.totalBalance)}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {card.currentPeriodBalance > 0 && card.currentPeriodBalance !== card.totalBalance 
+                          ? `${formatCurrency(card.currentPeriodBalance)} este mes` 
+                          : 'Deuda total'}
+                      </p>
                     </div>
                   </div>
                 ))}
-                {!groupedPayments?.length && (
-                  <p className="text-xs text-muted-foreground text-center py-4 italic">Sin deudas activas</p>
+                {cardList.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-4 italic">Sin tarjetas registradas</p>
                 )}
               </div>
             </CardContent>
@@ -299,10 +352,17 @@ export default function DashboardPage() {
                 <div className="space-y-2">
                   {nextPayments.map((p, i) => {
                     const dueDate = new Date(p.dueDate)
+                    const isOverdue = p.daysUntil < 0
                     return (
                       <div key={p.card.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200">
-                        <div className="flex flex-col items-center justify-center h-11 w-11 rounded-xl bg-muted shrink-0">
-                          <span className="text-[9px] font-bold text-red-500 uppercase leading-none">
+                        <div className={cn(
+                          "flex flex-col items-center justify-center h-11 w-11 rounded-xl shrink-0",
+                          isOverdue ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"
+                        )}>
+                          <span className={cn(
+                            "text-[9px] font-bold uppercase leading-none",
+                            isOverdue ? "text-red-600 dark:text-red-400" : "text-red-500"
+                          )}>
                             {format(dueDate, 'MMM', { locale: es })}
                           </span>
                           <span className="text-lg font-bold text-foreground leading-none">
@@ -312,10 +372,20 @@ export default function DashboardPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{p.card.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            En {p.daysUntil} {p.daysUntil === 1 ? 'dia' : 'dias'}
+                            {isOverdue ? (
+                              <span className="text-red-600 dark:text-red-400 font-medium">VENCIDO</span>
+                            ) : (
+                              <>En {p.daysUntil} {p.daysUntil === 1 ? 'día' : 'días'}</>
+                            )}
                           </p>
+                          <p className="text-[10px] text-muted-foreground/70">Pago total del cierre</p>
                         </div>
-                        <p className="text-sm font-bold text-foreground">{formatCurrency(p.amount)}</p>
+                        <div className="text-right">
+                          <p className={cn(
+                            "text-sm font-bold",
+                            isOverdue ? "text-red-600 dark:text-red-400" : "text-foreground"
+                          )}>{formatCurrency(p.amount)}</p>
+                        </div>
                       </div>
                     )
                   })}
@@ -332,20 +402,21 @@ export default function DashboardPage() {
           </Card>
 
           {/* Monthly Projection */}
-          <Card className="overflow-hidden bg-gradient-to-br from-emerald-900/80 to-emerald-700/60 dark:from-emerald-950 dark:to-emerald-800/50 border-emerald-700/30">
-            <CardContent className="p-5">
-              <p className="text-xs font-medium text-emerald-200/80 uppercase tracking-wider">Proyeccion Mensual</p>
-              <p className="text-[10px] text-emerald-300/60 mt-0.5">Estimado al cierre del mes</p>
-              <p className="text-3xl font-bold text-white mt-3 tracking-tight">
-                {formatCurrency(balance.balance)}
-              </p>
-              <p className="text-xs text-emerald-200/70 mt-2">
-                {balance.balance >= 0 ? 'Vas por buen camino' : 'Revisa tus gastos'}
-              </p>
-            </CardContent>
-          </Card>
+          <MonthlyProjection
+            balance={balance.balance}
+            totalIncome={balance.totalIncome}
+            totalExpense={balance.totalExpense}
+            cardBalances={cardBalances}
+          />
         </div>
       </div>
+
+      {/* Modal de detalle de tarjeta */}
+      <CardDetailModal
+        cardId={selectedCardId}
+        isOpen={!!selectedCardId}
+        onClose={() => setSelectedCardId(null)}
+      />
     </div>
   )
 }
@@ -355,6 +426,8 @@ interface UnifiedMovement {
   date: Date
   description: string
   category: string
+  subcategory?: string
+  expenseType?: string | null
   method: string
   amount: number
   type: 'expense' | 'income'
@@ -379,6 +452,8 @@ function RecentMovements({
         ? `${inst.transaction.description} (${inst.installmentNumber}/${inst.transaction.installments})`
         : inst.transaction.description,
       category: inst.transaction.category?.name || 'Sin categoria',
+      subcategory: inst.transaction.category?.subcategories?.[0]?.name,
+      expenseType: inst.transaction.expenseType,
       method: inst.transaction.card?.name || 'Tarjeta',
       amount: Number(inst.amount),
       type: 'expense' as const,
@@ -388,6 +463,8 @@ function RecentMovements({
       date: new Date(tx.purchaseDate),
       description: tx.description,
       category: tx.category?.name || 'Sin categoria',
+      subcategory: tx.category?.subcategories?.[0]?.name,
+      expenseType: tx.expenseType,
       method: tx.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia',
       amount: Number(tx.totalAmount),
       type: 'expense' as const,
@@ -397,6 +474,7 @@ function RecentMovements({
       date: new Date(inc.date),
       description: inc.description,
       category: 'Ingresos',
+      subcategory: inc.subcategory,
       method: inc.category === 'active_income' ? 'Sueldo' : 'Otro',
       amount: Number(inc.amount),
       type: 'income' as const,
@@ -404,12 +482,21 @@ function RecentMovements({
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
 
+  // Filtro mejorado: busca por descripción, categoría, método y monto
   const filtered = searchQuery
-    ? movements.filter(m =>
-        m.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.method.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? movements.filter(m => {
+        const query = searchQuery.toLowerCase().trim()
+        const amountStr = m.amount.toString()
+        const amountFormatted = formatCurrency(m.amount).toLowerCase()
+        
+        return (
+          m.description.toLowerCase().includes(query) ||
+          m.category.toLowerCase().includes(query) ||
+          m.method.toLowerCase().includes(query) ||
+          amountStr.includes(query) ||
+          amountFormatted.includes(query)
+        )
+      })
     : movements
 
   const display = filtered.slice(0, 5)
@@ -428,9 +515,20 @@ function RecentMovements({
       <CardContent className="p-0">
         {display.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-muted-foreground text-sm">
-              {searchQuery ? 'Sin resultados para tu busqueda' : 'No hay actividad registrada en este periodo'}
-            </p>
+            {searchQuery ? (
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-sm">
+                  No se encontraron movimientos
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  Probá buscando por descripción, categoría, método de pago o monto
+                </p>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                No hay actividad registrada en este periodo
+              </p>
+            )}
           </div>
         ) : (
           <>
@@ -454,15 +552,35 @@ function RecentMovements({
                         <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                           {format(m.date, 'd MMM, yyyy', { locale: es })}
                         </td>
-                        <td className="px-4 py-3 font-medium text-foreground">{m.description}</td>
                         <td className="px-4 py-3">
-                          <span className={cn(
-                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
-                            getCategoryBadgeColor(m.category)
-                          )}>
-                            <CatIcon className="h-3 w-3" />
-                            {m.category}
-                          </span>
+                          <div className="font-medium text-foreground">{m.description}</div>
+                          {m.subcategory && (
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {m.subcategory}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+                              getCategoryBadgeColor(m.category)
+                            )}>
+                              <CatIcon className="h-3 w-3" />
+                              {m.category}
+                            </span>
+                            {m.type === 'expense' && m.expenseType && (
+                              <div 
+                                className={cn(
+                                  "w-2 h-2 rounded-full",
+                                  getExpenseTypeDotColor(m.expenseType)
+                                )}
+                                title={m.expenseType === 'structural' ? 'Estructural' : 
+                                       m.expenseType === 'emotional_recurrent' ? 'Emocional Recurrente' : 
+                                       'Emocional Impulsivo'}
+                              />
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{m.method}</td>
                         <td
@@ -499,7 +617,20 @@ function RecentMovements({
                         <p className="font-medium text-sm text-foreground">{m.description}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {format(m.date, 'd MMM', { locale: es })} &middot; {m.method}
+                          {m.subcategory && ` · ${m.subcategory}`}
                         </p>
+                        {m.type === 'expense' && m.expenseType && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <div 
+                              className={cn("w-1.5 h-1.5 rounded-full", getExpenseTypeDotColor(m.expenseType))}
+                            />
+                            <span className="text-[10px] text-muted-foreground">
+                              {m.expenseType === 'structural' ? 'Estructural' : 
+                               m.expenseType === 'emotional_recurrent' ? 'Emocional Recurrente' : 
+                               'Emocional Impulsivo'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <p

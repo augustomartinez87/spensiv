@@ -90,9 +90,8 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:ml-64">
         {/* Desktop Header */}
         <header className="hidden md:flex h-14 items-center justify-end px-8 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-30 gap-2">
-          <Button variant="ghost" size="icon" className="h-9 w-9 relative">
+          <Button variant="ghost" size="icon" className="h-9 w-9">
             <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full" />
           </Button>
           <ThemeToggle />
         </header>
@@ -109,9 +108,8 @@ export default function DashboardLayout({
             <span className="font-bold text-lg">Spensiv</span>
           </Link>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-9 w-9 relative">
+            <Button variant="ghost" size="icon" className="h-9 w-9">
               <Bell className="h-4 w-4" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full" />
             </Button>
             <ThemeToggle />
             <UserButton afterSignOutUrl="/" />

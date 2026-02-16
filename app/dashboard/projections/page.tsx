@@ -16,7 +16,7 @@ import {
     Cell
 } from 'recharts'
 import { formatCurrency, cn } from '@/lib/utils'
-import { Calendar, TrendingUp, CreditCard, Banknote } from 'lucide-react'
+import { Calendar, TrendingUp, CreditCard, Banknote, Sparkles } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -46,8 +46,8 @@ export default function ProjectionsPage() {
             period: p.period,
             Total: p.totalExpense,
             Cuotas: p.installments.length,
-            Incomes: p.totalIncome,
-            Neto: p.totalIncome - p.totalExpense
+            Incomes: p.totalIncomeWithProjection,
+            Neto: p.balanceWithProjection
         }
     }) || []
 
@@ -108,7 +108,7 @@ export default function ProjectionsPage() {
             {/* Projections Table */}
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 {projection?.map((p, idx) => {
-                    const isDeficit = (p.totalIncome - p.totalExpense) < 0
+                    const isDeficit = p.balanceWithProjection < 0
                     const [year, month] = p.period.split('-')
                     const date = new Date(parseInt(year), parseInt(month) - 1)
                     return (
@@ -126,8 +126,24 @@ export default function ProjectionsPage() {
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <Banknote className="h-4 w-4" /> Ingresos
                                     </div>
-                                    <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(p.totalIncome)}</span>
+                                    <div className="flex items-center gap-2">
+                                        {p.hasProjectedIncome && (
+                                            <span className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                <Sparkles className="h-3 w-3" />
+                                                Proyectado
+                                            </span>
+                                        )}
+                                        <span className="font-semibold text-green-600 dark:text-green-400">
+                                            {formatCurrency(p.totalIncomeWithProjection)}
+                                        </span>
+                                    </div>
                                 </div>
+                                {p.hasProjectedIncome && p.actualIncome > 0 && (
+                                    <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                        <span>Registrado:</span>
+                                        <span>{formatCurrency(p.actualIncome)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <CreditCard className="h-4 w-4" /> Tarjetas
@@ -137,7 +153,7 @@ export default function ProjectionsPage() {
                                 <div className="pt-3 border-t flex justify-between items-center">
                                     <span className="text-sm font-bold text-foreground">Saldo Final</span>
                                     <span className={cn("text-lg font-black", isDeficit ? "text-red-600 dark:text-red-400" : "text-foreground")}>
-                                        {formatCurrency(p.totalIncome - p.totalExpense)}
+                                        {formatCurrency(p.balanceWithProjection)}
                                     </span>
                                 </div>
                             </CardContent>

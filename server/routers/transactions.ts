@@ -168,6 +168,96 @@ export const transactionsRouter = router({
     }),
 
   /**
+   * Actualizar transacción (solo datos básicos)
+   * No se pueden modificar: monto, cuotas, tarjeta, fecha
+   */
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        description: z.string().min(1).optional(),
+        categoryId: z.string().optional().nullable(),
+        expenseType: z
+          .enum(['structural', 'emotional_recurrent', 'emotional_impulsive'])
+          .optional()
+          .nullable(),
+        notes: z.string().optional().nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input
+
+      const transaction = await ctx.prisma.transaction.findUnique({
+        where: { id },
+      })
+
+      if (!transaction || transaction.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Transacción no encontrada',
+        })
+      }
+
+      return ctx.prisma.transaction.update({
+        where: { id },
+        data: {
+          description: data.description,
+          categoryId: data.categoryId,
+          expenseType: data.expenseType,
+          notes: data.notes,
+        },
+      })
+    }),
+
+  /**
+   * Eliminar transacción permanentemente
+   * A diferencia de "anular", esto borra el registro completamente
+   */
+  delete: protectedProcedure
+    .input(z.string())
+    .mutation(async ({ ctx, input }) => {
+      const transaction = await ctx.prisma.transaction.findUnique({
+        where: { id: input },
+        include: {
+          installmentsList: true,
+        },
+      })
+
+      if (!transaction || transaction.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Transacción no encontrada',
+        })
+      }
+
+      // Primero eliminar las cuotas asociadas
+      if (transaction.installmentsList.length > 0) {
+        await ctx.prisma.installment.deleteMany({
+          where: { transactionId: input },
+        })
+      }
+
+      // Luego eliminar la transacción
+      return ctx.prisma.transaction.delete({
+        where: { id: input },
+      })
+    }),
+
+  /**
+   * Obtener categorías del usuario
+   */
+  getCategories: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.category.findMany({
+      where: {
+        userId: ctx.user.id,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    })
+  }),
+
+  /**
    * Estadísticas de gastos
    */
   getStats: protectedProcedure

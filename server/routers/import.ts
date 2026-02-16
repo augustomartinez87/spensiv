@@ -119,7 +119,7 @@ export const importRouter = router({
                         installments: item.installments,
                         expenseType: item.expenseType,
                         categoryId,
-                        notes: `Importado: ${item.category} > ${item.subcategory || ''}`,
+                        notes: item.subcategory ? `${item.category} > ${item.subcategory}` : item.category,
                     })
 
                     results.success++
