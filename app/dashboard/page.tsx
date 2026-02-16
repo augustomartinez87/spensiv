@@ -1,15 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc-client'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { MonthSelector } from '@/components/dashboard/month-selector'
-import { CategoryPieChart } from '@/components/dashboard/category-pie-chart'
-import { ExpenseTypeChart } from '@/components/dashboard/expense-type-chart'
-import { MonthlyProjection } from '@/components/dashboard/monthly-projection'
-import { TransactionForm } from '@/components/transactions/transaction-form'
-import { IncomeForm } from '@/components/transactions/income-form'
-import { CardDetailModal } from '@/components/cards/card-detail-modal'
+
+const CategoryPieChart = dynamic(() => import('@/components/dashboard/category-pie-chart').then(m => m.CategoryPieChart), { ssr: false })
+const ExpenseTypeChart = dynamic(() => import('@/components/dashboard/expense-type-chart').then(m => m.ExpenseTypeChart), { ssr: false })
+const MonthlyProjection = dynamic(() => import('@/components/dashboard/monthly-projection').then(m => m.MonthlyProjection), { ssr: false })
+const TransactionForm = dynamic(() => import('@/components/transactions/transaction-form').then(m => m.TransactionForm), { ssr: false })
+const IncomeForm = dynamic(() => import('@/components/transactions/income-form').then(m => m.IncomeForm), { ssr: false })
+const CardDetailModal = dynamic(() => import('@/components/cards/card-detail-modal').then(m => m.CardDetailModal), { ssr: false })
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'

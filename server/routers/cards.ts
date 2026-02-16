@@ -187,26 +187,37 @@ export const cardsRouter = router({
       const now = new Date()
       const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-      const card = await ctx.prisma.creditCard.findUnique({
-        where: { id: input },
-        include: {
-          billingCycles: {
-            where: {
-              status: { in: ['open', 'closed'] },
-            },
-            include: {
-              installments: {
-                where: {
-                  isPaid: false,
-                  transaction: {
-                    isVoided: false,
-                  },
-                },
+      // Run both queries in parallel instead of sequentially
+      const [card, recentTransactions] = await Promise.all([
+        ctx.prisma.creditCard.findUnique({
+          where: { id: input },
+          include: {
+            billingCycles: {
+              where: {
+                status: { in: ['open', 'closed'] },
+              },
+              select: {
+                id: true,
+                period: true,
+                totalAmount: true,
+                dueDate: true,
+                status: true,
               },
             },
           },
-        },
-      })
+        }),
+        ctx.prisma.transaction.findMany({
+          where: {
+            cardId: input,
+            userId: ctx.user.id,
+            isVoided: false,
+          },
+          orderBy: {
+            purchaseDate: 'desc',
+          },
+          take: 5,
+        }),
+      ])
 
       if (!card || card.userId !== ctx.user.id) {
         throw new TRPCError({
@@ -234,19 +245,6 @@ export const cardsRouter = router({
       const limitPercentage = card.creditLimit
         ? (totalBalance / Number(card.creditLimit)) * 100
         : null
-
-      // Obtener transacciones recientes de esta tarjeta
-      const recentTransactions = await ctx.prisma.transaction.findMany({
-        where: {
-          cardId: input,
-          userId: ctx.user.id,
-          isVoided: false,
-        },
-        orderBy: {
-          purchaseDate: 'desc',
-        },
-        take: 5,
-      })
 
       return {
         card,

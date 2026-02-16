@@ -5,13 +5,18 @@ import { prisma } from './prisma'
 
 /**
  * Crear contexto para tRPC
+ * userCache memoizes user lookup per request so batched procedures
+ * only hit the DB once for auth instead of N times.
  */
 export const createTRPCContext = async () => {
   const { userId } = await auth()
 
+  const userCache = new Map<string, any>()
+
   return {
     prisma,
     userId,
+    userCache,
   }
 }
 
@@ -36,26 +41,32 @@ const isAuthed = t.middleware(async ({ ctx, next }) => {
     throw new TRPCError({ code: 'UNAUTHORIZED' })
   }
 
-  // Buscar o crear usuario
-  let user = await ctx.prisma.user.findUnique({
-    where: { clerkId: ctx.userId },
-  })
+  // Buscar o crear usuario (memoized per request for batched calls)
+  let user = ctx.userCache.get(ctx.userId)
 
   if (!user) {
-    // Auto-create user on first request
-    const clerkUser = await currentUser()
-    const email = clerkUser?.emailAddresses?.[0]?.emailAddress
+    user = await ctx.prisma.user.findUnique({
+      where: { clerkId: ctx.userId },
+    })
 
-    if (!email) {
-      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Email not found' })
+    if (!user) {
+      // Auto-create user on first request
+      const clerkUser = await currentUser()
+      const email = clerkUser?.emailAddresses?.[0]?.emailAddress
+
+      if (!email) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Email not found' })
+      }
+
+      user = await ctx.prisma.user.create({
+        data: {
+          clerkId: ctx.userId,
+          email,
+        },
+      })
     }
 
-    user = await ctx.prisma.user.create({
-      data: {
-        clerkId: ctx.userId,
-        email,
-      },
-    })
+    ctx.userCache.set(ctx.userId, user)
   }
 
   return next({

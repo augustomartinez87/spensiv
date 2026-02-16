@@ -126,6 +126,8 @@ model BillingCycle {
 
   @@unique([cardId, period])
   @@index([cardId, period])
+  @@index([cardId, status])
+  @@index([dueDate])
   @@map("billing_cycles")
 }
 
@@ -199,6 +201,7 @@ model Installment {
 
   @@index([transactionId])
   @@index([billingCycleId])
+  @@index([billingCycleId, isPaid])
   @@index([impactDate])
   @@map("installments")
 }

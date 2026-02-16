@@ -186,22 +186,20 @@ export const dashboardRouter = router({
             where: {
               status: { in: ['open', 'closed'] },
             },
-            include: {
-              installments: {
-                where: {
-                  isPaid: false,
-                  transaction: {
-                    isVoided: false,
-                  },
-                },
-              },
+            // Only select fields we need — no installments include
+            select: {
+              id: true,
+              period: true,
+              totalAmount: true,
+              dueDate: true,
+              status: true,
             },
           },
         },
       })
 
       const cardBalances = cards.map((card) => {
-        // Balance total: todas las cuotas pendientes
+        // Balance total: todas las cuotas pendientes (uses cached totalAmount)
         const totalBalance = card.billingCycles.reduce(
           (sum, cycle) => sum + Number(cycle.totalAmount || 0),
           0
@@ -293,32 +291,49 @@ export const dashboardRouter = router({
     .query(async ({ ctx, input }) => {
       const months = input?.months || 6
       const now = new Date()
-      const projection = []
 
-      for (let i = 0; i < months; i++) {
-        const monthDate = addMonths(now, i)
-        const period = formatPeriod(monthDate)
+      // Build all period strings upfront
+      const periods = Array.from({ length: months }, (_, i) =>
+        formatPeriod(addMonths(now, i))
+      )
 
-        const installments = await ctx.prisma.installment.findMany({
-          where: {
-            billingCycle: {
-              period,
-              card: {
-                userId: ctx.user.id,
-              },
-            },
-            transaction: {
-              isVoided: false,
+      // Single query for all periods instead of N+1 loop
+      const allInstallments = await ctx.prisma.installment.findMany({
+        where: {
+          billingCycle: {
+            period: { in: periods },
+            card: {
+              userId: ctx.user.id,
             },
           },
-          include: {
-            transaction: {
-              include: {
-                card: true,
-              },
+          transaction: {
+            isVoided: false,
+          },
+        },
+        include: {
+          transaction: {
+            include: {
+              card: true,
             },
           },
-        })
+          billingCycle: {
+            select: { period: true },
+          },
+        },
+      })
+
+      // Group by period in JS
+      const byPeriod = new Map<string, typeof allInstallments>()
+      for (const period of periods) {
+        byPeriod.set(period, [])
+      }
+      for (const inst of allInstallments) {
+        const period = inst.billingCycle.period
+        byPeriod.get(period)?.push(inst)
+      }
+
+      return periods.map((period) => {
+        const installments = byPeriod.get(period) || []
 
         const totalAmount = installments.reduce(
           (sum, inst) => sum + Number(inst.amount),
@@ -334,14 +349,12 @@ export const dashboardRouter = router({
           {} as Record<string, number>
         )
 
-        projection.push({
+        return {
           period,
           totalAmount,
           installmentCount: installments.length,
           byCard,
-        })
-      }
-
-      return projection
+        }
+      })
     }),
 })

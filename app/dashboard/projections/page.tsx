@@ -1,24 +1,19 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc-client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    Legend,
-    Cell
-} from 'recharts'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Calendar, TrendingUp, CreditCard, Banknote, Sparkles } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+
+const ProjectionChart = dynamic(
+    () => import('@/components/dashboard/projection-chart').then(m => m.ProjectionChart),
+    { ssr: false, loading: () => <div className="h-[400px] w-full animate-pulse bg-muted rounded-lg" /> }
+)
 
 export default function ProjectionsPage() {
     const { data: projection, isLoading } = trpc.dashboard.getBalanceProjection.useQuery({
@@ -69,38 +64,7 @@ export default function ProjectionsPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="h-[400px] w-full mt-4">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                                <XAxis
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                                />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                                    tickFormatter={(val) => `$${(val / 1000)}k`}
-                                />
-                                <Tooltip
-                                    cursor={{ fill: 'hsl(var(--accent))' }}
-                                    contentStyle={{
-                                        backgroundColor: 'hsl(var(--card))',
-                                        border: '1px solid hsl(var(--border))',
-                                        borderRadius: '8px',
-                                        color: 'hsl(var(--foreground))',
-                                    }}
-                                    itemStyle={{ color: 'hsl(var(--foreground))' }}
-                                    labelStyle={{ color: 'hsl(var(--foreground))' }}
-                                    formatter={(val: number) => [formatCurrency(val), '']}
-                                />
-                                <Legend iconType="circle" />
-                                <Bar dataKey="Total" name="Gasto Cuotas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="Incomes" name="Ingresos Estimados" fill="#10b981" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        <ProjectionChart data={chartData} />
                     </div>
                 </CardContent>
             </Card>
