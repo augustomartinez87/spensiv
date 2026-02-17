@@ -11,6 +11,7 @@ import {
   CreditCard as CardsIcon,
   ListOrdered,
   Receipt,
+  Calculator,
   Bell,
   PanelLeftClose,
   PanelLeftOpen,
@@ -25,6 +26,7 @@ const navigation = [
   { name: 'Tarjetas', href: '/dashboard/cards', icon: CardsIcon },
   { name: 'Movimientos', href: '/dashboard/transactions', icon: ListOrdered },
   { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
+  { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
   { name: 'Importar', href: '/dashboard/import', icon: FileUp },
 ]
 
