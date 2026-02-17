@@ -163,6 +163,53 @@ export function generateAmortizationTable(
   return table
 }
 
+/**
+ * Dado capital, plazo y cuota deseada, encuentra la tasa mensual implícita
+ * usando Newton-Raphson sobre la fórmula de cuota francesa.
+ * Retorna la TNA equivalente.
+ */
+export function reverseFromInstallment(
+  capital: number,
+  termMonths: number,
+  desiredInstallment: number,
+  maxIterations = 200,
+  tolerance = 1e-12,
+): { monthlyRate: number; tna: number } | null {
+  // f(r) = P * r * (1+r)^n / ((1+r)^n - 1) - C = 0
+  // We solve for r using Newton-Raphson
+  let r = 0.03 // initial guess 3% mensual
+
+  for (let i = 0; i < maxIterations; i++) {
+    const rp1 = 1 + r
+    const rp1n = Math.pow(rp1, termMonths)
+    const num = capital * r * rp1n
+    const den = rp1n - 1
+    const f = num / den - desiredInstallment
+
+    // Derivative: d/dr [P * r * (1+r)^n / ((1+r)^n - 1)]
+    // Using quotient rule
+    const dNum = capital * (rp1n + r * termMonths * Math.pow(rp1, termMonths - 1))
+    const dDen = termMonths * Math.pow(rp1, termMonths - 1)
+    const df = (dNum * den - num * dDen) / (den * den)
+
+    if (Math.abs(df) < 1e-15) break
+
+    const newR = r - f / df
+
+    if (Math.abs(newR - r) < tolerance) {
+      if (newR <= 0) return null
+      const tna = monthlyRateToTNA(newR)
+      return { monthlyRate: newR, tna }
+    }
+
+    r = newR
+    if (r <= 0) r = 0.001 // clamp to avoid negative rates
+  }
+
+  if (r <= 0) return null
+  return { monthlyRate: r, tna: monthlyRateToTNA(r) }
+}
+
 // ─── Bullet (Discount Accrual) ───────────────────────────────────────
 
 /**

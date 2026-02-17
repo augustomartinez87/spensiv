@@ -24,6 +24,7 @@ import {
   CheckCircle2,
   XCircle,
   Info,
+  Zap,
 } from 'lucide-react'
 import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
 
@@ -51,6 +52,7 @@ export default function SimulatorPage() {
   const [loanType, setLoanType] = useState<'bullet' | 'amortized'>('amortized')
   const [accrualType, setAccrualType] = useState<'linear' | 'exponential'>('exponential')
   const [customInstallment, setCustomInstallment] = useState('')
+  const [impliedTna, setImpliedTna] = useState<number | null>(null)
   const [startDate, setStartDate] = useState(formatDateToInput(new Date()))
 
   // Results
@@ -65,7 +67,36 @@ export default function SimulatorPage() {
     onSuccess: (data) => setCompareResult(data),
   })
 
+  const reverseMutation = trpc.loans.reverseFromInstallment.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        const tnaPercent = (data.tna * 100).toFixed(2)
+        setImpliedTna(data.tna)
+        setTnaTarget(tnaPercent)
+      } else {
+        setImpliedTna(null)
+      }
+    },
+  })
+
   const isLoading = simulateMutation.isPending || compareMutation.isPending
+
+  function handleInstallmentChange(value: string) {
+    setCustomInstallment(value)
+    setImpliedTna(null)
+
+    const installment = parseFloat(value)
+    const cap = parseFloat(capital)
+    const term = parseInt(termMonths)
+
+    if (installment > 0 && cap > 0 && term > 0 && installment > cap / term) {
+      reverseMutation.mutate({
+        capital: cap,
+        termMonths: term,
+        desiredInstallment: installment,
+      })
+    }
+  }
 
   function handleSimulate() {
     const baseInput = {
@@ -217,14 +248,23 @@ export default function SimulatorPage() {
 
             {viewMode === 'single' && loanType === 'amortized' && (
               <div className="space-y-2">
-                <Label htmlFor="customInstallment">Cuota Manual (opcional)</Label>
+                <Label htmlFor="customInstallment">Cuota Deseada (opcional)</Label>
                 <Input
                   id="customInstallment"
                   type="number"
                   value={customInstallment}
-                  onChange={(e) => setCustomInstallment(e.target.value)}
+                  onChange={(e) => handleInstallmentChange(e.target.value)}
                   placeholder="Dejar vacío para calcular"
                 />
+                {impliedTna !== null && (
+                  <p className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                    <Zap className="h-3 w-3" />
+                    TNA implícita: {(impliedTna * 100).toFixed(2)}% (aplicada arriba)
+                  </p>
+                )}
+                {reverseMutation.isPending && (
+                  <p className="text-xs text-muted-foreground">Calculando TNA...</p>
+                )}
               </div>
             )}
           </div>
