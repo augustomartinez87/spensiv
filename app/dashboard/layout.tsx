@@ -16,12 +16,13 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-  Sparkles,
+
   Users,
   PieChart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 type NavItem = { name: string; href: string; icon: typeof LayoutDashboard }
 type NavSection = { label: string; items: NavItem[] }
@@ -42,9 +43,9 @@ const navigation: NavSection[] = [
     ],
   },
   {
-    label: 'Prestamos',
+    label: 'Préstamos',
     items: [
-      { name: 'Prestamos', href: '/dashboard/loans', icon: Banknote },
+      { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
       { name: 'Personas', href: '/dashboard/persons', icon: Users },
       { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
       { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
@@ -55,7 +56,7 @@ const navigation: NavSection[] = [
 const mobileNav = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Movimientos', href: '/dashboard/transactions', icon: Receipt },
-  { name: 'Prestamos', href: '/dashboard/loans', icon: Banknote },
+  { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
   { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
 ]
 
@@ -141,24 +142,6 @@ export default function DashboardLayout({
           ))}
         </nav>
 
-        {/* Premium Plan Card */}
-        {!sidebarCollapsed && (
-          <div className="px-3 pb-3">
-            <div className="rounded-xl bg-gradient-to-br from-[#1F1F1F] to-[#171717] border border-white/[0.06] p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-4 w-4 text-amber-400" />
-                <span className="text-xs font-bold text-white uppercase tracking-wider">Premium Plan</span>
-              </div>
-              <p className="text-[11px] text-[hsl(var(--sidebar-foreground))] leading-relaxed mb-3">
-                Unlock advanced analytics and projection tools.
-              </p>
-              <button className="w-full py-2 rounded-lg bg-[#128DDA] hover:bg-[#056FE0] text-white text-xs font-semibold transition-colors">
-                Upgrade Now
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* User Profile Section */}
         <div className={cn(
           "border-t border-white/[0.06] transition-all duration-300",
@@ -194,7 +177,8 @@ export default function DashboardLayout({
           >
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
             <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
               <Bell className="h-4 w-4" />
             </Button>
@@ -213,6 +197,7 @@ export default function DashboardLayout({
             <span className="font-bold text-lg text-foreground">Spensiv</span>
           </Link>
           <div className="flex items-center gap-1">
+            <ThemeToggle />
             <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground">
               <Bell className="h-4 w-4" />
             </Button>

@@ -15,6 +15,8 @@ interface CategoryData {
 interface CategoryPieChartProps {
     data: Record<string, number>
     title: string
+    selectedCategory?: string | null
+    onCategoryClick?: (category: string | null) => void
 }
 
 // Paleta semántica por categoría:
@@ -38,7 +40,7 @@ const FALLBACK_COLORS = [
     '#f0953a', '#348bb5', '#d63944',
 ]
 
-export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
+export function CategoryPieChart({ data, title, selectedCategory, onCategoryClick }: CategoryPieChartProps) {
     const chartData: CategoryData[] = Object.entries(data).map(([name, value], index) => ({
         name,
         value,
@@ -75,9 +77,19 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                                     dataKey="value"
                                     strokeWidth={2}
                                     stroke="hsl(var(--card))"
+                                    style={{ cursor: onCategoryClick ? 'pointer' : undefined }}
+                                    onClick={(_, index) => {
+                                        if (!onCategoryClick) return
+                                        const clicked = chartData[index]?.name
+                                        onCategoryClick(selectedCategory === clicked ? null : clicked)
+                                    }}
                                 >
                                     {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={entry.color}
+                                            opacity={selectedCategory && selectedCategory !== entry.name ? 0.4 : 1}
+                                        />
                                     ))}
                                 </Pie>
                                 <Tooltip
@@ -116,8 +128,14 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
                             {chartData.map((item, index) => {
                                 const percentage = ((item.value / total) * 100).toFixed(1)
+                                const isSelected = !selectedCategory || selectedCategory === item.name
                                 return (
-                                    <div key={index} className="flex items-center gap-1.5 text-xs">
+                                    <button
+                                        key={index}
+                                        className="flex items-center gap-1.5 text-xs transition-opacity"
+                                        style={{ opacity: isSelected ? 1 : 0.4 }}
+                                        onClick={() => onCategoryClick?.(selectedCategory === item.name ? null : item.name)}
+                                    >
                                         <div
                                             className="w-2.5 h-2.5 rounded-full shrink-0"
                                             style={{ backgroundColor: item.color }}
@@ -128,7 +146,7 @@ export function CategoryPieChart({ data, title }: CategoryPieChartProps) {
                                         <span className="font-medium text-foreground">
                                             {percentage}%
                                         </span>
-                                    </div>
+                                    </button>
                                 )
                             })}
                         </div>

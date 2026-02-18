@@ -21,6 +21,12 @@ import {
   CartesianGrid,
 } from 'recharts'
 import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   Banknote,
   TrendingUp,
   AlertTriangle,
@@ -29,6 +35,7 @@ import {
   Shield,
   ShieldX,
   CircleDollarSign,
+  HelpCircle,
 } from 'lucide-react'
 
 const PIE_COLORS = [
@@ -40,7 +47,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string; dotColor: 
   bajo: { label: 'Bajo', color: 'text-green-600 dark:text-green-400', dotColor: 'bg-green-500' },
   medio: { label: 'Medio', color: 'text-yellow-600 dark:text-yellow-400', dotColor: 'bg-yellow-500' },
   alto: { label: 'Alto', color: 'text-orange-600 dark:text-orange-400', dotColor: 'bg-orange-500' },
-  critico: { label: 'Critico', color: 'text-red-600 dark:text-red-400', dotColor: 'bg-red-500' },
+  critico: { label: 'Crítico', color: 'text-red-600 dark:text-red-400', dotColor: 'bg-red-500' },
 }
 
 export default function PortfolioPage() {
@@ -68,18 +75,30 @@ export default function PortfolioPage() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Label htmlFor="fciRate" className="text-sm text-muted-foreground shrink-0">Tasa FCI (%)</Label>
-          <Input
-            id="fciRate"
-            type="number"
-            value={fciRate}
-            onChange={(e) => setFciRate(e.target.value)}
-            className="w-20 h-9"
-            step="1"
-            min="0"
-          />
-        </div>
+        <TooltipProvider>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 shrink-0">
+              <Label htmlFor="fciRate" className="text-sm text-muted-foreground">Tasa libre de riesgo (%)</Label>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[240px]">
+                  <p className="text-xs">Rendimiento de referencia sin riesgo (ej: FCI money market o plazo fijo). Se usa para calcular el valor esperado de la cartera.</p>
+                </TooltipContent>
+              </UITooltip>
+            </div>
+            <Input
+              id="fciRate"
+              type="number"
+              value={fciRate}
+              onChange={(e) => setFciRate(e.target.value)}
+              className="w-20 h-9"
+              step="1"
+              min="0"
+            />
+          </div>
+        </TooltipProvider>
       </div>
 
       {/* Stat cards */}
@@ -96,7 +115,7 @@ export default function PortfolioPage() {
             color="text-foreground"
           />
           <StatCard
-            label="Prestamos Activos"
+            label="Préstamos Activos"
             value={metrics.activeLoansCount.toString()}
             icon={CircleDollarSign}
             color="text-foreground"
@@ -122,7 +141,7 @@ export default function PortfolioPage() {
         {metrics && metrics.exposures.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Distribucion por deudor</CardTitle>
+              <CardTitle className="text-base">Distribución por deudor</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-64">

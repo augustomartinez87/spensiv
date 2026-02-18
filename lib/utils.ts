@@ -26,6 +26,26 @@ export function formatDateToInput(date: Date): string {
 }
 
 /**
+ * Calcula días hasta el próximo cierre de tarjeta
+ */
+export function getDaysUntilClosing(closingDay: number): number {
+  const now = new Date()
+  const today = now.getDate()
+  const currentMonth = now.getMonth()
+  const currentYear = now.getFullYear()
+
+  let closingDate: Date
+  if (today <= closingDay) {
+    closingDate = new Date(currentYear, currentMonth, closingDay)
+  } else {
+    closingDate = new Date(currentYear, currentMonth + 1, closingDay)
+  }
+
+  const diffTime = closingDate.getTime() - now.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+}
+
+/**
  * Crea un objeto Date desde un string YYYY-MM-DD manteniendo hora local (00:00:00)
  */
 export function parseInputDate(dateString: string): Date {

@@ -227,7 +227,23 @@ export const loansRouter = router({
       where: { userId: ctx.user.id },
       include: {
         person: {
-          select: { id: true, name: true, alias: true },
+          select: {
+            id: true,
+            name: true,
+            alias: true,
+            punctualityScore: true,
+            communicationScore: true,
+            debtAttitudeScore: true,
+            relationship: true,
+            incomeType: true,
+            tenureMonths: true,
+            estimatedIncome: true,
+            referrer: true,
+            livesAlone: true,
+            hasChildren: true,
+            recentJobChanges: true,
+            previousDebts: true,
+          },
         },
         loanInstallments: {
           orderBy: { number: 'asc' },

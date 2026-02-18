@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard, Banknote, ArrowRightLeft, TrendingUp, Pencil, Trash2 } from 'lucide-react'
+import { Plus, ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard, Banknote, ArrowRightLeft, TrendingUp, Pencil, Trash2, LayoutGrid, Table, Download } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -37,6 +37,8 @@ export default function TransactionsPage() {
     expenseType: '',
     notes: '',
   })
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
+  const [visibleCount, setVisibleCount] = useState(20)
 
   // Filtros
   const [filters, setFilters] = useState({
@@ -222,7 +224,33 @@ export default function TransactionsPage() {
     }
   })
 
+  const displayedTransactions = sortedTransactions?.slice(0, visibleCount)
+  const remainingCount = (sortedTransactions?.length || 0) - visibleCount
+
   const hasActiveFilters = filters.cardId || filters.categoryId || filters.expenseType || filters.searchQuery
+
+  function exportToCSV() {
+    if (!sortedTransactions || sortedTransactions.length === 0) return
+    const BOM = '\uFEFF'
+    const headers = ['Fecha', 'Descripción', 'Categoría', 'Tipo de Gasto', 'Método de Pago', 'Monto', 'Cuotas']
+    const rows = sortedTransactions.map((tx: any) => [
+      format(new Date(tx.purchaseDate), 'yyyy-MM-dd'),
+      `"${tx.description.replace(/"/g, '""')}"`,
+      tx.category?.name || '',
+      getExpenseTypeLabel(tx.expenseType),
+      getPaymentMethodLabel((tx as any).paymentMethod || 'credit_card'),
+      Number(tx.totalAmount).toFixed(2),
+      tx.installments || 1,
+    ])
+    const csv = BOM + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `movimientos-${format(new Date(), 'yyyy-MM-dd')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="space-y-6">
@@ -233,11 +261,41 @@ export default function TransactionsPage() {
             Registra y administra tus gastos e ingresos
           </p>
         </div>
-        {activeTab === 'gastos' ? (
-          <TransactionForm />
-        ) : (
-          <IncomeForm />
-        )}
+        <div className="flex items-center gap-2">
+          {activeTab === 'gastos' && sortedTransactions && sortedTransactions.length > 0 && (
+            <>
+              <div className="flex bg-muted rounded-lg p-0.5">
+                <Button
+                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setViewMode('cards')}
+                  title="Vista tarjetas"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setViewMode('table')}
+                  title="Vista tabla"
+                >
+                  <Table className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button variant="outline" size="sm" onClick={exportToCSV}>
+                <Download className="h-4 w-4 mr-1.5" />
+                CSV
+              </Button>
+            </>
+          )}
+          {activeTab === 'gastos' ? (
+            <TransactionForm />
+          ) : (
+            <IncomeForm />
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -347,12 +405,15 @@ export default function TransactionsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setFilters({
-                  cardId: '',
-                  categoryId: '',
-                  expenseType: '',
-                  searchQuery: '',
-                })}
+                onClick={() => {
+                  setFilters({
+                    cardId: '',
+                    categoryId: '',
+                    expenseType: '',
+                    searchQuery: '',
+                  })
+                  setVisibleCount(20)
+                }}
                 className="h-9"
               >
                 Limpiar filtros
@@ -383,9 +444,71 @@ export default function TransactionsPage() {
                 <TransactionForm triggerText="Nuevo gasto" />
               </CardContent>
             </Card>
+          ) : viewMode === 'table' ? (
+            <>
+              <Card>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-xs text-muted-foreground uppercase tracking-wider">
+                          <th className="text-left py-3 px-4 font-medium">Fecha</th>
+                          <th className="text-left py-3 px-4 font-medium">Descripción</th>
+                          <th className="text-left py-3 px-4 font-medium">Categoría</th>
+                          <th className="text-left py-3 px-4 font-medium">Tipo</th>
+                          <th className="text-left py-3 px-4 font-medium">Método</th>
+                          <th className="text-right py-3 px-4 font-medium">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {displayedTransactions?.map((transaction) => (
+                          <tr
+                            key={transaction.id}
+                            className={cn(
+                              "hover:bg-muted/50 transition-colors",
+                              transaction.isVoided && "opacity-50 line-through"
+                            )}
+                          >
+                            <td className="py-2.5 px-4 text-muted-foreground whitespace-nowrap">
+                              {format(new Date(transaction.purchaseDate), 'd MMM yy', { locale: es })}
+                            </td>
+                            <td className="py-2.5 px-4 font-medium text-foreground max-w-[200px] truncate">
+                              {transaction.description}
+                              {transaction.isVoided && <span className="ml-1 text-red-500 text-xs">ANULADO</span>}
+                            </td>
+                            <td className="py-2.5 px-4 text-muted-foreground">
+                              {transaction.category?.name || '-'}
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <span className={cn('text-xs px-1.5 py-0.5 rounded', getExpenseTypeColor(transaction.expenseType))}>
+                                {getExpenseTypeLabel(transaction.expenseType)}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 text-muted-foreground">
+                              {getPaymentMethodLabel((transaction as any).paymentMethod || 'credit_card')}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-semibold whitespace-nowrap">
+                              {formatCurrency(Number(transaction.totalAmount))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+              {remainingCount > 0 && (
+                <div className="flex justify-center">
+                  <Button variant="outline" onClick={() => setVisibleCount(v => v + 20)}>
+                    Ver más ({remainingCount} restantes)
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
+            <>
             <div className="space-y-4">
-              {sortedTransactions?.map((transaction) => (
+              {displayedTransactions?.map((transaction) => (
                 <Card
                   key={transaction.id}
                   className={transaction.isVoided ? 'opacity-60' : ''}
@@ -555,6 +678,14 @@ export default function TransactionsPage() {
                 </Card>
               ))}
             </div>
+            {remainingCount > 0 && (
+              <div className="flex justify-center">
+                <Button variant="outline" onClick={() => setVisibleCount(v => v + 20)}>
+                  Ver más ({remainingCount} restantes)
+                </Button>
+              </div>
+            )}
+            </>
           )}
         </>
       ) : (

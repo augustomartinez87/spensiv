@@ -30,32 +30,32 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    /* Sidebar — always dark navy */
-    --sidebar: 232 35% 9%;
-    --sidebar-foreground: 220 15% 75%;
-    --sidebar-active: 200 80% 55%;
+    /* Sidebar — always dark */
+    --sidebar: 0 0% 8%;
+    --sidebar-foreground: 0 0% 63%;
+    --sidebar-active: 205 85% 46%;
     --sidebar-active-foreground: 0 0% 100%;
   }
 
   .dark {
-    --background: 0 0% 9%;
-    --foreground: 0 1% 89%;
-    --card: 0 0% 12%;
-    --card-foreground: 0 1% 89%;
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 1% 89%;
+    --background: 0 0% 8%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 11.5%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 11.5%;
+    --popover-foreground: 0 0% 95%;
     --primary: 205 85% 46%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 300 0% 61%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 300 0% 61%;
-    --accent: 0 0% 15%;
-    --accent-foreground: 0 1% 89%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 63%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 63%;
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 95%;
     --destructive: 350 80% 55%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 23%;
-    --input: 0 0% 23%;
+    --border: 0 0% 18%;
+    --input: 0 0% 16%;
     --ring: 205 85% 46%;
     --chart-1: 205 85% 46%;
     --chart-2: 160 60% 50%;
@@ -64,8 +64,8 @@
     --chart-5: 340 75% 55%;
 
     /* Sidebar */
-    --sidebar: 0 0% 9%;
-    --sidebar-foreground: 300 0% 61%;
+    --sidebar: 0 0% 7%;
+    --sidebar-foreground: 0 0% 63%;
     --sidebar-active: 205 85% 46%;
     --sidebar-active-foreground: 0 0% 100%;
   }
@@ -79,4 +79,18 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Premium dark card shadows */
+.dark .card-elevated,
+.dark [data-slot="card"] {
+  border-color: transparent;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Accent glow on primary buttons */
+.dark .btn-glow {
+  box-shadow: 0 0 12px rgba(18, 141, 218, 0.35);
 }

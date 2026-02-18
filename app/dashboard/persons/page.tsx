@@ -61,7 +61,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: type
   bajo: { label: 'Riesgo Bajo', color: 'text-green-600 dark:text-green-400 bg-green-500/10', icon: ShieldCheck },
   medio: { label: 'Riesgo Medio', color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10', icon: Shield },
   alto: { label: 'Riesgo Alto', color: 'text-orange-600 dark:text-orange-400 bg-orange-500/10', icon: ShieldAlert },
-  critico: { label: 'Riesgo Critico', color: 'text-red-600 dark:text-red-400 bg-red-500/10', icon: ShieldX },
+  critico: { label: 'Riesgo Crítico', color: 'text-red-600 dark:text-red-400 bg-red-500/10', icon: ShieldX },
 }
 
 export default function PersonsPage() {
@@ -113,7 +113,7 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
           <Users className="h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-lg font-medium text-foreground">Sin personas</p>
           <p className="text-sm text-muted-foreground mt-1 mb-4">
-            Crea tu primer deudor para asignar prestamos
+            Crea tu primer deudor para asignar préstamos
           </p>
           <PersonFormDialog open={createOpen} onOpenChange={setCreateOpen} />
         </CardContent>
@@ -153,13 +153,13 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
                 </div>
                 <div className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-semibold', cat.color)}>
                   <Icon className="h-4 w-4" />
-                  {person.score}
+                  {person.score}<span className="text-xs font-normal opacity-70">/12</span>
                 </div>
               </div>
 
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
-                  {person.loanCount} prestamo{person.loanCount !== 1 ? 's' : ''} activo{person.loanCount !== 1 ? 's' : ''}
+                  {person.loanCount} préstamo{person.loanCount !== 1 ? 's' : ''} activo{person.loanCount !== 1 ? 's' : ''}
                 </span>
                 <span className="font-medium text-foreground">
                   {formatCurrency(person.totalCapital)}
@@ -168,7 +168,7 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
 
               <div className={cn('flex items-center gap-2 text-xs px-3 py-2 rounded-lg', cat.color)}>
                 <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span>{cat.label} · Spread minimo: {person.category === 'critico' ? 'BLOQUEADO' : `+${(person.minTnaSpread * 100).toFixed(0)}pp`}</span>
+                <span>{cat.label} · Spread mínimo: {person.category === 'critico' ? 'BLOQUEADO' : `+${(person.minTnaSpread * 100).toFixed(0)}pp`}</span>
               </div>
             </CardContent>
           </Card>
@@ -271,7 +271,7 @@ function PersonDetail({ personId, onBack }: { personId: string; onBack: () => vo
             </div>
             <div className="text-right space-y-1">
               <div className="text-xs text-muted-foreground">
-                Spread minimo: <span className="font-semibold">{person.category === 'critico' ? 'BLOQUEADO' : `+${(person.minTnaSpread * 100).toFixed(0)}pp`}</span>
+                Spread mínimo: <span className="font-semibold">{person.category === 'critico' ? 'BLOQUEADO' : `+${(person.minTnaSpread * 100).toFixed(0)}pp`}</span>
               </div>
               <div className="text-xs text-muted-foreground">
                 Prob. default: <span className="font-semibold">{(person.defaultProbability * 100).toFixed(0)}%</span>
@@ -284,11 +284,11 @@ function PersonDetail({ personId, onBack }: { personId: string; onBack: () => vo
       {/* Score breakdown */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
         <ScoreCard label="Puntualidad" value={person.punctualityScore} />
-        <ScoreCard label="Comunicacion" value={person.communicationScore} />
+        <ScoreCard label="Comunicación" value={person.communicationScore} />
         <ScoreCard label="Actitud deuda" value={person.debtAttitudeScore} />
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Antiguedad</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Antigüedad</p>
             <p className="text-xl font-bold mt-1">{person.tenureMonths ?? '-'}m</p>
           </CardContent>
         </Card>
@@ -322,7 +322,7 @@ function PersonDetail({ personId, onBack }: { personId: string; onBack: () => vo
         </CardHeader>
         <CardContent>
           {person.loans.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">Sin prestamos asignados</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">Sin préstamos asignados</p>
           ) : (
             <div className="space-y-2">
               {person.loans.map((loan) => {
@@ -523,7 +523,7 @@ function PaymentHistory({ loans }: { loans: any[] }) {
 
           {sorted.length > 20 && (
             <p className="text-xs text-muted-foreground text-center mt-2 pl-10">
-              +{sorted.length - 20} cuotas mas
+              +{sorted.length - 20} cuotas más
             </p>
           )}
         </div>
@@ -634,7 +634,7 @@ function PersonFormDialog({
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Identificación */}
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Identificacion</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Identificación</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="personName">Nombre *</Label>
@@ -647,7 +647,7 @@ function PersonFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Relacion</Label>
+              <Label>Relación</Label>
               <Select value={relationship} onValueChange={setRelationship}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -666,7 +666,7 @@ function PersonFormDialog({
 
         {/* Perfil económico */}
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Perfil economico</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Perfil económico</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Tipo de ingreso</Label>
@@ -686,7 +686,7 @@ function PersonFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="personTenure">Antiguedad (meses)</Label>
+              <Label htmlFor="personTenure">Antigüedad (meses)</Label>
               <Input id="personTenure" type="number" value={tenureMonths} onChange={(e) => setTenureMonths(e.target.value)} placeholder="24" min="0" />
             </div>
             <div className="space-y-1.5">
@@ -733,7 +733,7 @@ function PersonFormDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Comunicacion</Label>
+              <Label>Comunicación</Label>
               <Select value={communicationScore} onValueChange={setCommunicationScore}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>

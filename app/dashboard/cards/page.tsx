@@ -22,8 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, CreditCard, Pencil, Trash2, CalendarDays, Settings } from 'lucide-react'
-import { cn, formatCurrency } from '@/lib/utils'
+import { Plus, CreditCard, Pencil, Trash2, CalendarDays, Settings, AlertCircle } from 'lucide-react'
+import { cn, formatCurrency, getDaysUntilClosing } from '@/lib/utils'
 import { BillingCycleEditor } from '@/components/cards/billing-cycle-editor'
 import { CardScheduleEditor } from '@/components/cards/card-schedule-editor'
 
@@ -82,8 +82,12 @@ export default function CardsPage() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
   const [formData, setFormData] = useState<CardFormData>(initialFormData)
 
+  const now = new Date()
+  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
   const utils = trpc.useUtils()
   const { data: cards, isLoading } = trpc.cards.list.useQuery()
+  const { data: cardBalances } = trpc.dashboard.getCardBalances.useQuery({ period: currentPeriod })
 
   const createMutation = trpc.cards.create.useMutation({
     onSuccess: () => {
@@ -182,7 +186,7 @@ export default function CardsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tarjetas</h1>
           <p className="text-muted-foreground mt-1">
-            Administra tus tarjetas de credito
+            Administra tus tarjetas de crédito
           </p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -235,7 +239,7 @@ export default function CardsPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="last4">Ultimos 4 digitos (opcional)</Label>
+                <Label htmlFor="last4">Últimos 4 dígitos (opcional)</Label>
                 <Input
                   id="last4"
                   placeholder="1234"
@@ -246,7 +250,7 @@ export default function CardsPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="closingDay">Dia de cierre</Label>
+                  <Label htmlFor="closingDay">Día de cierre</Label>
                   <Input
                     id="closingDay"
                     type="number"
@@ -257,7 +261,7 @@ export default function CardsPage() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="dueDay">Dia de vencimiento</Label>
+                  <Label htmlFor="dueDay">Día de vencimiento</Label>
                   <Input
                     id="dueDay"
                     type="number"
@@ -269,7 +273,7 @@ export default function CardsPage() {
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="creditLimit">Limite de credito (opcional)</Label>
+                <Label htmlFor="creditLimit">Límite de crédito (opcional)</Label>
                 <Input
                   id="creditLimit"
                   type="number"
@@ -371,20 +375,61 @@ export default function CardsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
+                  {(() => {
+                    const daysUntil = getDaysUntilClosing(card.closingDay)
+                    if (daysUntil <= 3) {
+                      return (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 text-xs font-medium">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          Cierra en {daysUntil} {daysUntil === 1 ? 'día' : 'días'}
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Cierre</span>
-                    <span>Dia {card.closingDay}</span>
+                    <span>Día {card.closingDay}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Vencimiento</span>
-                    <span>Dia {card.dueDay}</span>
+                    <span>Día {card.dueDay}</span>
                   </div>
                   {card.creditLimit && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Limite</span>
+                      <span className="text-muted-foreground">Límite</span>
                       <span className="font-semibold">{formatCurrency(Number(card.creditLimit))}</span>
                     </div>
                   )}
+                  {card.creditLimit && (() => {
+                    const balance = cardBalances?.cards?.find((c: any) => c.id === card.id)
+                    if (!balance) return null
+                    const used = balance.totalBalance || 0
+                    const limit = Number(card.creditLimit)
+                    const utilization = limit > 0 ? (used / limit) * 100 : 0
+                    return (
+                      <div className="space-y-1 pt-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">Utilización</span>
+                          <span className={cn(
+                            'font-medium',
+                            utilization > 75 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'
+                          )}>
+                            {utilization.toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              'h-full rounded-full transition-all duration-500',
+                              utilization > 75 ? 'bg-orange-500' : 'bg-primary'
+                            )}
+                            style={{ width: `${Math.min(utilization, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -435,7 +480,7 @@ export default function CardsPage() {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-last4">Ultimos 4 digitos</Label>
+              <Label htmlFor="edit-last4">Últimos 4 dígitos</Label>
               <Input
                 id="edit-last4"
                 maxLength={4}
@@ -445,7 +490,7 @@ export default function CardsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="edit-closingDay">Dia de cierre</Label>
+                <Label htmlFor="edit-closingDay">Día de cierre</Label>
                 <Input
                   id="edit-closingDay"
                   type="number"
@@ -456,7 +501,7 @@ export default function CardsPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="edit-dueDay">Dia de vencimiento</Label>
+                <Label htmlFor="edit-dueDay">Día de vencimiento</Label>
                 <Input
                   id="edit-dueDay"
                   type="number"
@@ -468,7 +513,7 @@ export default function CardsPage() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-creditLimit">Limite de credito</Label>
+              <Label htmlFor="edit-creditLimit">Límite de crédito</Label>
               <Input
                 id="edit-creditLimit"
                 type="number"
@@ -512,7 +557,7 @@ export default function CardsPage() {
       <Dialog open={isCyclesOpen} onOpenChange={setIsCyclesOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Ciclos de Facturacion</DialogTitle>
+            <DialogTitle>Ciclos de Facturación</DialogTitle>
             <DialogDescription>
               Ajusta las fechas reales de cierre y vencimiento para cada mes.
             </DialogDescription>
@@ -532,7 +577,7 @@ export default function CardsPage() {
           <DialogHeader>
             <DialogTitle>Calendario de Cierres</DialogTitle>
             <DialogDescription>
-              Configura los dias de cierre y vencimiento para cada mes del ano.
+              Configura los días de cierre y vencimiento para cada mes del año.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">

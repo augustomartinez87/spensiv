@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc-client'
 import { formatCurrency, formatDateToInput, cn } from '@/lib/utils'
@@ -46,9 +46,11 @@ type ViewMode = 'single' | 'compare'
 export default function SimulatorPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('compare')
   const [activeTab, setActiveTab] = useState('results')
+  const resultsRef = useRef<HTMLDivElement>(null)
 
   // Form state
   const [capital, setCapital] = useState('1000000')
+  const [currency, setCurrency] = useState<'ARS' | 'USD'>('ARS')
   const [termMonths, setTermMonths] = useState('12')
   const [tnaTarget, setTnaTarget] = useState('55')
   const [hurdleRate, setHurdleRate] = useState('40')
@@ -67,11 +69,17 @@ export default function SimulatorPage() {
   const [compareResults, setCompareResults] = useState<SimulationResult[] | null>(null)
 
   const simulateMutation = trpc.loans.simulate.useMutation({
-    onSuccess: (data) => setSingleResult(data),
+    onSuccess: (data) => {
+      setSingleResult(data)
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    },
   })
 
   const compareTermsMutation = trpc.loans.compareTerms.useMutation({
-    onSuccess: (data) => setCompareResults(data),
+    onSuccess: (data) => {
+      setCompareResults(data)
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    },
   })
 
   const reverseMutation = trpc.loans.reverseFromInstallment.useMutation({
@@ -147,7 +155,7 @@ export default function SimulatorPage() {
   // Create Loan dialog state
   const [createLoanOpen, setCreateLoanOpen] = useState(false)
   const [createLoanDefaults, setCreateLoanDefaults] = useState<{
-    capital: string; tna: string; termMonths: string; startDate: string
+    capital: string; tna: string; termMonths: string; startDate: string; currency: 'ARS' | 'USD'
   } | null>(null)
   const [borrowerName, setBorrowerName] = useState('')
 
@@ -164,6 +172,7 @@ export default function SimulatorPage() {
       tna: (result.tnaTarget * 100).toFixed(2),
       termMonths: result.termMonths.toString(),
       startDate: startDate,
+      currency,
     })
     setCreateLoanOpen(true)
   }
@@ -174,6 +183,7 @@ export default function SimulatorPage() {
     createLoanMutation.mutate({
       borrowerName,
       capital: parseFloat(createLoanDefaults.capital),
+      currency: createLoanDefaults.currency,
       tna: parseFloat(createLoanDefaults.tna) / 100,
       termMonths: parseInt(createLoanDefaults.termMonths),
       startDate: createLoanDefaults.startDate,
@@ -185,9 +195,9 @@ export default function SimulatorPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Simulador de Credito</h1>
+        <h1 className="text-3xl font-bold text-foreground">Simulador de Crédito</h1>
         <p className="text-muted-foreground mt-1">
-          Simula prestamos amortizados y compara distintos plazos
+          Simulá préstamos amortizados y compara distintos plazos
         </p>
       </div>
 
@@ -196,7 +206,7 @@ export default function SimulatorPage() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Calculator className="h-5 w-5 text-primary" />
-            Parametros de Simulacion
+            Parámetros de Simulación
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -216,20 +226,32 @@ export default function SimulatorPage() {
               onClick={() => setViewMode('single')}
             >
               <Calculator className="h-4 w-4 mr-2" />
-              Simulacion Individual
+              Simulación Individual
             </Button>
           </div>
 
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="capital">Capital (ARS)</Label>
-              <Input
-                id="capital"
-                type="number"
-                value={capital}
-                onChange={(e) => setCapital(e.target.value)}
-                placeholder="1000000"
-              />
+              <Label htmlFor="capital">Capital ({currency})</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="capital"
+                  type="number"
+                  value={capital}
+                  onChange={(e) => setCapital(e.target.value)}
+                  placeholder="1000000"
+                  className="flex-1"
+                />
+                <Select value={currency} onValueChange={(v) => setCurrency(v as 'ARS' | 'USD')}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ARS">ARS</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {viewMode === 'single' && (
@@ -283,7 +305,7 @@ export default function SimulatorPage() {
 
             {viewMode === 'single' && (
               <div className="space-y-2">
-                <Label>Tipo de Prestamo</Label>
+                <Label>Tipo de Préstamo</Label>
                 <Select value={loanType} onValueChange={(v) => setLoanType(v as any)}>
                   <SelectTrigger>
                     <SelectValue />
@@ -319,12 +341,12 @@ export default function SimulatorPage() {
                   type="number"
                   value={customInstallment}
                   onChange={(e) => handleInstallmentChange(e.target.value)}
-                  placeholder="Dejar vacio para calcular"
+                  placeholder="Dejar vacío para calcular"
                 />
                 {impliedTna !== null && (
                   <p className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400">
                     <Zap className="h-3 w-3" />
-                    TNA implicita: {(impliedTna * 100).toFixed(2)}% (aplicada arriba)
+                    TNA implícita: {(impliedTna * 100).toFixed(2)}% (aplicada arriba)
                   </p>
                 )}
                 {reverseMutation.isPending && (
@@ -383,6 +405,7 @@ export default function SimulatorPage() {
 
       {/* Results */}
       {hasResults && (
+        <div ref={resultsRef}>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="results">Resultados</TabsTrigger>
@@ -408,13 +431,14 @@ export default function SimulatorPage() {
             )}
           </TabsContent>
         </Tabs>
+        </div>
       )}
 
       {/* Create Loan Dialog */}
       <Dialog open={createLoanOpen} onOpenChange={setCreateLoanOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Crear Prestamo desde Simulacion</DialogTitle>
+            <DialogTitle>Crear Préstamo desde Simulación</DialogTitle>
           </DialogHeader>
           <form onSubmit={submitCreateLoan} className="space-y-4">
             <div className="space-y-2">
@@ -452,10 +476,10 @@ export default function SimulatorPage() {
               <p className="text-sm text-red-500">{createLoanMutation.error.message}</p>
             )}
             {createLoanMutation.isSuccess && (
-              <p className="text-sm text-green-600 dark:text-green-400">Prestamo creado exitosamente</p>
+              <p className="text-sm text-green-600 dark:text-green-400">Préstamo creado exitosamente</p>
             )}
             <Button type="submit" className="w-full" disabled={createLoanMutation.isPending || createLoanMutation.isSuccess}>
-              {createLoanMutation.isPending ? 'Creando...' : createLoanMutation.isSuccess ? 'Creado' : 'Crear Prestamo'}
+              {createLoanMutation.isPending ? 'Creando...' : createLoanMutation.isSuccess ? 'Creado' : 'Crear Préstamo'}
             </Button>
           </form>
         </DialogContent>
@@ -572,7 +596,7 @@ function ResultCardContent({ result, title, onCreateLoan }: { result: Simulation
             onClick={() => onCreateLoan(result)}
           >
             <Banknote className="h-4 w-4 mr-2" />
-            Crear Prestamo con estos parametros
+            Crear Préstamo con estos parámetros
           </Button>
         )}
       </CardContent>
@@ -612,7 +636,7 @@ function AmortizationTable({ result, title }: { result: SimulationResult; title:
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">{title} - Tabla de Amortizacion</CardTitle>
+        <CardTitle className="text-lg">{title} - Tabla de Amortización</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

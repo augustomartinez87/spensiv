@@ -12,17 +12,16 @@ const MonthlyProjection = dynamic(() => import('@/components/dashboard/monthly-p
 const TransactionForm = dynamic(() => import('@/components/transactions/transaction-form').then(m => m.TransactionForm), { ssr: false })
 const IncomeForm = dynamic(() => import('@/components/transactions/income-form').then(m => m.IncomeForm), { ssr: false })
 const CardDetailModal = dynamic(() => import('@/components/cards/card-detail-modal').then(m => m.CardDetailModal), { ssr: false })
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { formatCurrency, cn } from '@/lib/utils'
+import { formatCurrency, cn, getDaysUntilClosing } from '@/lib/utils'
 import {
   Calendar,
   CreditCard,
-  TrendingUp,
   AlertCircle,
   Search,
   Plus,
@@ -36,7 +35,6 @@ import {
   Wifi,
   DollarSign,
   ArrowRight,
-  HelpCircle,
   Banknote,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -125,8 +123,7 @@ export default function DashboardPage() {
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   )
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
-
-
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   const previousPeriod = getPreviousPeriod(period)
 
@@ -150,14 +147,12 @@ export default function DashboardPage() {
             <Skeleton className="h-10 w-32" />
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-36" />)}
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-[400px]" />
-          <Skeleton className="h-[400px]" />
+          <Skeleton className="h-[300px]" />
+          <Skeleton className="h-[300px]" />
         </div>
       </div>
     )
@@ -168,7 +163,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-4" />
-          <p className="text-muted-foreground">No se pudo cargar el balance. Verifica tu conexion.</p>
+          <p className="text-muted-foreground">No se pudo cargar el balance. Verificá tu conexión.</p>
         </div>
       </div>
     )
@@ -188,217 +183,201 @@ export default function DashboardPage() {
     return acc
   }, [] as NonNullable<typeof upcomingPayments>)
 
-  const nextPayments = groupedPayments?.slice(0, 3) || []
-
-  // Usar cardBalances para el widget de tarjetas
+  const nextPayments = groupedPayments?.slice(0, 4) || []
   const cardList = cardBalances?.cards || []
 
   return (
-    <div className="space-y-8">
-      {/* Header with Title, Search, and Actions */}
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Tu motor de cashflow personal</p>
         </div>
         <div className="flex items-center gap-3">
+          <MonthSelector value={period} onChange={setPeriod} />
           <IncomeForm />
           <TransactionForm />
         </div>
       </div>
 
-      {/* Main Period Selector & Stats */}
-      <div className="bg-card p-6 rounded-xl border border-border shadow-sm space-y-6">
-        <div className="flex items-center justify-between">
-          <MonthSelector value={period} onChange={setPeriod} />
-          <div className="hidden sm:block text-right">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Deuda Total</p>
-            <div className="flex items-center gap-1 justify-end">
-              <p className="text-lg font-bold text-foreground">{formatCurrency(totalDebt)}</p>
-              <div className="group relative">
-                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-popover border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-xs">
-                  <p className="font-medium mb-1">¿Qué incluye?</p>
-                  <p className="text-muted-foreground">
-                    Suma de todas las cuotas pendientes de pago de todas tus tarjetas,
-                    incluyendo período actual y futuros.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <p className="text-[10px] text-muted-foreground">Total adeudado en tarjetas</p>
-          </div>
-        </div>
-
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-          <StatCard
-            title="Egresos del periodo"
-            value={balance.totalExpense}
-            count={balance.installments.length + (balance.cashTransactions?.length || 0)}
-            type="expense"
-            previousValue={prevBalance?.totalExpense}
-          />
-          <StatCard
-            title="Ingresos del periodo"
-            value={balance.totalIncome}
-            count={balance.incomes.length}
-            type="income"
-            previousValue={prevBalance?.totalIncome}
-          />
-          <StatCard
-            title="Balance neto"
-            value={balance.balance}
-            type="balance"
-            previousValue={prevBalance?.balance}
-          />
-        </div>
+      {/* === ROW 1: Key metrics === */}
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <StatCard
+          title="Egresos del periodo"
+          value={balance.totalExpense}
+          count={balance.installments.length + (balance.cashTransactions?.length || 0)}
+          type="expense"
+          previousValue={prevBalance?.totalExpense}
+        />
+        <StatCard
+          title="Ingresos del periodo"
+          value={balance.totalIncome}
+          count={balance.incomes.length}
+          type="income"
+          previousValue={prevBalance?.totalIncome}
+        />
+        <StatCard
+          title="Balance neto"
+          value={balance.balance}
+          type="balance"
+          previousValue={prevBalance?.balance}
+        />
+        <StatCard
+          title="Deuda total"
+          value={totalDebt}
+          type="expense"
+        />
       </div>
 
-      {/* Secondary Metrics & Charts */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-        {/* Charts Section (2/3) */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-            <CategoryPieChart
-              data={balance.aggregations.expensesByCategory}
-              title="Gastos por categoria"
-            />
-            <ExpenseTypeChart
-              data={balance.aggregations.expensesByType}
-              title="Tipos de gasto"
-              previousData={prevBalance?.aggregations?.expensesByType}
-            />
-          </div>
+      {/* === ROW 2: Projection + Upcoming payments === */}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        {/* Monthly Projection — highlighted */}
+        <MonthlyProjection
+          balance={balance.balance}
+          totalIncome={balance.totalIncome}
+          totalExpense={balance.totalExpense}
+          cardBalances={cardBalances}
+        />
 
-          {/* Recent Movements */}
-          <RecentMovements
-            installments={balance.installments}
-            cashTransactions={balance.cashTransactions || []}
-            incomes={balance.incomes}
-          />
-        </div>
-
-        {/* Sidebar Info Section (1/3) */}
-        <div className="space-y-6">
-          {/* Cards List */}
-          <Card>
-            <CardHeader className="py-4 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <CreditCard className="h-4 w-4" /> Tarjetas
-              </CardTitle>
-              <Link href="/dashboard/cards">
-                <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent className="px-3 pb-3">
-              <div className="space-y-1">
-                {cardList.map((card) => (
-                  <div
-                    key={card.id}
-                    onClick={() => setSelectedCardId(card.id)}
-                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200 cursor-pointer group"
-                  >
-                    <div className={cn('h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0', getBankColor(card.bank || ''))}>
-                      {getBankInitials(card.bank || card.name)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{card.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : 'Tarjeta'}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-foreground">{formatCurrency(card.totalBalance)}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {card.currentPeriodBalance > 0 && card.currentPeriodBalance !== card.totalBalance
-                          ? `${formatCurrency(card.currentPeriodBalance)} este mes`
-                          : 'Deuda total'}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                {cardList.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-4 italic">Sin tarjetas registradas</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Upcoming Payments */}
-          <Card>
-            <CardHeader className="py-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Calendar className="h-4 w-4" /> Proximos Vencimientos
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="px-3 pb-3">
-              {nextPayments.length > 0 ? (
-                <div className="space-y-2">
-                  {nextPayments.map((p, i) => {
-                    const dueDate = new Date(p.dueDate)
-                    const isOverdue = p.daysUntil < 0
-                    return (
-                      <div key={p.card.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200">
-                        <div className={cn(
-                          "flex flex-col items-center justify-center h-11 w-11 rounded-xl shrink-0",
-                          isOverdue ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"
+        {/* Upcoming Payments */}
+        <Card>
+          <CardHeader className="py-4">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Calendar className="h-4 w-4" /> Próximos Vencimientos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            {nextPayments.length > 0 ? (
+              <div className="space-y-2">
+                {nextPayments.map((p) => {
+                  const dueDate = new Date(p.dueDate)
+                  const isOverdue = p.daysUntil < 0
+                  return (
+                    <div key={p.card.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200">
+                      <div className={cn(
+                        "flex flex-col items-center justify-center h-11 w-11 rounded-xl shrink-0",
+                        isOverdue ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"
+                      )}>
+                        <span className={cn(
+                          "text-[9px] font-bold uppercase leading-none",
+                          isOverdue ? "text-red-600 dark:text-red-400" : "text-red-500"
                         )}>
-                          <span className={cn(
-                            "text-[9px] font-bold uppercase leading-none",
-                            isOverdue ? "text-red-600 dark:text-red-400" : "text-red-500"
-                          )}>
-                            {format(dueDate, 'MMM', { locale: es })}
-                          </span>
-                          <span className="text-lg font-bold text-foreground leading-none">
-                            {format(dueDate, 'd')}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{p.card.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {isOverdue ? (
-                              <span className="text-red-600 dark:text-red-400 font-medium">VENCIDO</span>
-                            ) : (
-                              <>En {p.daysUntil} {p.daysUntil === 1 ? 'día' : 'días'}</>
-                            )}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground/70">Pago total del cierre</p>
-                        </div>
-                        <div className="text-right">
-                          <p className={cn(
-                            "text-sm font-bold",
-                            isOverdue ? "text-red-600 dark:text-red-400" : "text-foreground"
-                          )}>{formatCurrency(p.amount)}</p>
-                        </div>
+                          {format(dueDate, 'MMM', { locale: es })}
+                        </span>
+                        <span className="text-lg font-bold text-foreground leading-none">
+                          {format(dueDate, 'd')}
+                        </span>
                       </div>
-                    )
-                  })}
-                  <Link href="/dashboard/projections" className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors pt-2">
-                    Ver Calendario <ArrowRight className="h-3 w-3" />
-                  </Link>
-                </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground text-sm italic">
-                  No hay vencimientos proximos
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{p.card.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {isOverdue ? (
+                            <span className="text-red-600 dark:text-red-400 font-medium">VENCIDO</span>
+                          ) : (
+                            <>En {p.daysUntil} {p.daysUntil === 1 ? 'día' : 'días'}</>
+                          )}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className={cn(
+                          "text-sm font-bold",
+                          isOverdue ? "text-red-600 dark:text-red-400" : "text-foreground"
+                        )}>{formatCurrency(p.amount)}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+                <Link href="/dashboard/projections" className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors pt-2">
+                  Ver Calendario <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground text-sm italic">
+                No hay vencimientos próximos
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-          {/* Loan Metrics */}
-          {loanMetrics && loanMetrics.activeLoansCount > 0 && (
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Banknote className="h-4 w-4" /> Prestamos Activos
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-3 pb-3 space-y-3">
+      {/* === ROW 3: Cards + Active Loans + Expense Types === */}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
+        {/* Cards */}
+        <Card>
+          <CardHeader className="py-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <CreditCard className="h-4 w-4" /> Tarjetas
+            </CardTitle>
+            <Link href="/dashboard/cards">
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            <div className="space-y-1">
+              {cardList.map((card) => (
+                <div
+                  key={card.id}
+                  onClick={() => setSelectedCardId(card.id)}
+                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200 cursor-pointer group"
+                >
+                  <div className={cn('h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0', getBankColor(card.bank || ''))}>
+                    {getBankInitials(card.bank || card.name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{card.name}</p>
+                      {(() => {
+                        const days = getDaysUntilClosing(card.closingDay)
+                        if (days <= 7) {
+                          return (
+                            <span className={cn(
+                              "text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0",
+                              days <= 3
+                                ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                                : "bg-muted text-muted-foreground"
+                            )}>
+                              {days}d
+                            </span>
+                          )
+                        }
+                        return null
+                      })()}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : 'Tarjeta'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-foreground">{formatCurrency(card.totalBalance)}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {card.currentPeriodBalance > 0 && card.currentPeriodBalance !== card.totalBalance
+                        ? `${formatCurrency(card.currentPeriodBalance)} este mes`
+                        : 'Deuda total'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {cardList.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4 italic">Sin tarjetas registradas</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Active Loans */}
+        <Card>
+          <CardHeader className="py-4">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Banknote className="h-4 w-4" /> Préstamos Activos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            {loanMetrics && loanMetrics.activeLoansCount > 0 ? (
+              <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-muted rounded-lg p-2.5">
-                    <p className="text-[10px] text-muted-foreground uppercase">Capital Prestado</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">Capital</p>
                     <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalCapitalActive)}</p>
                   </div>
                   <div className="bg-muted rounded-lg p-2.5">
@@ -406,9 +385,15 @@ export default function DashboardPage() {
                     <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalPending)}</p>
                   </div>
                 </div>
+                {loanMetrics.overdueCount > 0 && (
+                  <div className="bg-red-500/10 rounded-lg p-2.5">
+                    <p className="text-[10px] text-red-600 dark:text-red-400 uppercase font-medium">En mora</p>
+                    <p className="text-sm font-bold text-red-600 dark:text-red-400">{formatCurrency(loanMetrics.overdueAmount)}</p>
+                  </div>
+                )}
                 {loanMetrics.upcomingInstallments.length > 0 && (
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-medium">Proximas cuotas</p>
+                    <p className="text-xs text-muted-foreground font-medium">Próximas cuotas</p>
                     {loanMetrics.upcomingInstallments.slice(0, 3).map((inst) => (
                       <div key={inst.id} className="flex items-center justify-between text-xs py-1">
                         <span className="text-foreground font-medium truncate">{inst.borrowerName}</span>
@@ -423,23 +408,46 @@ export default function DashboardPage() {
                   </div>
                 )}
                 <Link href="/dashboard/loans" className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors pt-1">
-                  Ver Prestamos <ArrowRight className="h-3 w-3" />
+                  Ver Préstamos <ArrowRight className="h-3 w-3" />
                 </Link>
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground italic">Sin préstamos activos</p>
+                <Link href="/dashboard/loans" className="text-xs text-primary hover:text-primary/80 mt-2 inline-block">
+                  Crear préstamo
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Monthly Projection */}
-          <MonthlyProjection
-            balance={balance.balance}
-            totalIncome={balance.totalIncome}
-            totalExpense={balance.totalExpense}
-            cardBalances={cardBalances}
-          />
-        </div>
+        {/* Expense Types */}
+        <ExpenseTypeChart
+          data={balance.aggregations.expensesByType}
+          title="Tipos de gasto"
+          previousData={prevBalance?.aggregations?.expensesByType}
+        />
       </div>
 
-      {/* Modal de detalle de tarjeta */}
+      {/* === ROW 4: Category Pie + Recent Movements === */}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        <CategoryPieChart
+          data={balance.aggregations.expensesByCategory}
+          title="Gastos por categoría"
+          selectedCategory={selectedCategory}
+          onCategoryClick={setSelectedCategory}
+        />
+        <RecentMovements
+          installments={balance.installments}
+          cashTransactions={balance.cashTransactions || []}
+          incomes={balance.incomes}
+          selectedCategory={selectedCategory}
+          onClearCategory={() => setSelectedCategory(null)}
+        />
+      </div>
+
+      {/* Card Detail Modal */}
       <CardDetailModal
         cardId={selectedCardId}
         isOpen={!!selectedCardId}
@@ -465,21 +473,25 @@ function RecentMovements({
   installments,
   cashTransactions,
   incomes,
+  selectedCategory,
+  onClearCategory,
 }: {
   installments: any[]
   cashTransactions: any[]
   incomes: any[]
+  selectedCategory?: string | null
+  onClearCategory?: () => void
 }) {
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Debounce para la búsqueda (300ms)
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(searchInput)
     }, 300)
     return () => clearTimeout(timer)
   }, [searchInput])
+
   const movements: UnifiedMovement[] = [
     ...installments.map((inst) => ({
       id: `inst-${inst.id}`,
@@ -487,7 +499,7 @@ function RecentMovements({
       description: inst.transaction.installments > 1
         ? `${inst.transaction.description} (${inst.installmentNumber}/${inst.transaction.installments})`
         : inst.transaction.description,
-      category: inst.transaction.category?.name || 'Sin categoria',
+      category: inst.transaction.category?.name || 'Sin categoría',
       subcategory: inst.transaction.category?.subcategories?.[0]?.name,
       expenseType: inst.transaction.expenseType,
       method: inst.transaction.card?.name || 'Tarjeta',
@@ -498,7 +510,7 @@ function RecentMovements({
       id: `cash-${tx.id}`,
       date: new Date(tx.purchaseDate),
       description: tx.description,
-      category: tx.category?.name || 'Sin categoria',
+      category: tx.category?.name || 'Sin categoría',
       subcategory: tx.category?.subcategories?.[0]?.name,
       expenseType: tx.expenseType,
       method: tx.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia',
@@ -518,9 +530,12 @@ function RecentMovements({
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
 
-  // Filtro mejorado: busca por descripción, categoría, método y monto
+  const categoryFiltered = selectedCategory
+    ? movements.filter(m => m.category === selectedCategory)
+    : movements
+
   const filtered = searchQuery
-    ? movements.filter(m => {
+    ? categoryFiltered.filter(m => {
       const query = searchQuery.toLowerCase().trim()
       const amountStr = m.amount.toString()
       const amountFormatted = formatCurrency(m.amount).toLowerCase()
@@ -533,9 +548,9 @@ function RecentMovements({
         amountFormatted.includes(query)
       )
     })
-    : movements
+    : categoryFiltered
 
-  const display = filtered.slice(0, 5)
+  const display = filtered.slice(0, 10)
 
   return (
     <Card>
@@ -549,6 +564,19 @@ function RecentMovements({
             Ver todo
           </Link>
         </div>
+        {selectedCategory && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">
+              Filtrando por: {selectedCategory}
+            </span>
+            <button
+              onClick={onClearCategory}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Limpiar
+            </button>
+          </div>
+        )}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -585,9 +613,9 @@ function RecentMovements({
                 <thead>
                   <tr className="border-b text-xs text-muted-foreground uppercase tracking-wider">
                     <th className="text-left px-4 py-3 font-medium">Fecha</th>
-                    <th className="text-left px-4 py-3 font-medium">Descripcion</th>
-                    <th className="text-left px-4 py-3 font-medium">Categoria</th>
-                    <th className="text-left px-4 py-3 font-medium">Metodo</th>
+                    <th className="text-left px-4 py-3 font-medium">Descripción</th>
+                    <th className="text-left px-4 py-3 font-medium">Categoría</th>
+                    <th className="text-left px-4 py-3 font-medium">Método</th>
                     <th className="text-right px-4 py-3 font-medium">Monto</th>
                   </tr>
                 </thead>

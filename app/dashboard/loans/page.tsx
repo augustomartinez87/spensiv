@@ -86,8 +86,8 @@ function LoanListHeader({ view, onViewChange }: { view: 'list' | 'calendar'; onV
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground tracking-tight">Prestamos</h1>
-        <p className="text-muted-foreground mt-1">Gestiona tus prestamos personales</p>
+        <h1 className="text-3xl font-bold text-foreground tracking-tight">Préstamos</h1>
+        <p className="text-muted-foreground mt-1">Gestioná tus préstamos personales</p>
       </div>
       <div className="flex items-center gap-2">
         <div className="flex bg-muted rounded-lg p-0.5">
@@ -137,7 +137,7 @@ function LoansDashboardSummary() {
         <CardContent className="p-4">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Capital activo</p>
           <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalCapitalActive)}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{metrics.activeLoansCount} prestamo{metrics.activeLoansCount !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{metrics.activeLoansCount} préstamo{metrics.activeLoansCount !== 1 ? 's' : ''}</p>
         </CardContent>
       </Card>
       <Card>
@@ -190,7 +190,7 @@ function UpcomingInstallmentsGadget() {
   return (
     <Card className="h-fit sticky top-20">
       <CardContent className="p-4">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Proximas cuotas</p>
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Próximas cuotas</p>
         <div className="space-y-3">
           {metrics.upcomingInstallments.map((inst) => {
             const dueDate = new Date(inst.dueDate)
@@ -257,9 +257,9 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
           <Banknote className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-lg font-medium text-foreground">Sin prestamos</p>
+          <p className="text-lg font-medium text-foreground">Sin préstamos</p>
           <p className="text-sm text-muted-foreground mt-1 mb-4">
-            Crea tu primer prestamo o usa el simulador
+            Creá tu primer préstamo o usa el simulador
           </p>
           <CreateLoanDialog open={createOpen} onOpenChange={setCreateOpen} />
         </CardContent>
@@ -299,15 +299,32 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                   <p className="text-sm text-muted-foreground">
                     {formatCurrency(Number(loan.capital), cur)}
                     {isInterestOnly
-                      ? isZeroRate ? ' · Sin intereses' : ' · Solo interes'
+                      ? isZeroRate ? ' · Sin intereses' : ' · Solo interés'
                       : ` a ${loan.termMonths} meses`
                     }
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {loan.person && (() => {
+                    const result = calculatePersonScore(loan.person)
+                    if (result.score < 4) {
+                      return (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 gap-0.5">
+                          <ShieldX className="h-3 w-3" />
+                          Alto riesgo
+                        </Badge>
+                      )
+                    }
+                    return null
+                  })()}
+                  {Number(loan.tna) > 1.5 && (
+                    <Badge variant="destructive" className="text-[10px] px-1.5">
+                      TNA &gt;150%
+                    </Badge>
+                  )}
                   {isInterestOnly && (
                     <Badge variant="outline" className="text-[10px] px-1.5">
-                      {isZeroRate ? 'Sin intereses' : 'Solo interes'}
+                      {isZeroRate ? 'Sin intereses' : 'Solo interés'}
                     </Badge>
                   )}
                   {cur !== 'ARS' && (
@@ -352,8 +369,8 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                   <Infinity className="h-4 w-4 shrink-0" />
                   <span>
                     {isZeroRate
-                      ? `Prestamo sin intereses · ${formatCurrency(Number(loan.capital), cur)}`
-                      : `Interes mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                      ? `Préstamo sin intereses · ${formatCurrency(Number(loan.capital), cur)}`
+                      : `Interés mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
                     }
                   </span>
                 </div>
@@ -373,7 +390,7 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                     <Clock className="h-4 w-4 shrink-0" />
                   )}
                   <span>
-                    {isOverdue ? 'Vencida: ' : 'Proxima: '}
+                    {isOverdue ? 'Vencida: ' : 'Próxima: '}
                     {format(nextDue, "d 'de' MMM", { locale: es })} - {formatCurrency(loan.nextAmount, cur)}
                   </span>
                 </div>
@@ -485,7 +502,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   }
 
   if (!loan) {
-    return <p className="text-muted-foreground">Prestamo no encontrado</p>
+    return <p className="text-muted-foreground">Préstamo no encontrado</p>
   }
 
   const now = new Date()
@@ -532,7 +549,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                 <h1 className="text-2xl font-bold text-foreground">{loan.borrowerName}</h1>
                 {isInterestOnly && (
                   <Badge variant="outline" className="text-xs">
-                    {Number(loan.monthlyRate) === 0 ? 'Sin intereses' : 'Solo interes'}
+                    {Number(loan.monthlyRate) === 0 ? 'Sin intereses' : 'Solo interés'}
                   </Badge>
                 )}
                 {cur !== 'ARS' && (
@@ -543,7 +560,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                 {isInterestOnly
                   ? Number(loan.monthlyRate) === 0
                     ? `${formatCurrency(Number(loan.capital), cur)} · Sin intereses`
-                    : `${formatCurrency(Number(loan.capital), cur)} · Interes mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                    : `${formatCurrency(Number(loan.capital), cur)} · Interés mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
                   : `${formatCurrency(Number(loan.capital), cur)} - ${loan.termMonths} cuotas de ${formatCurrency(Number(loan.installmentAmount), cur)}`
                 }
                 {' · '}Inicio: {format(new Date(loan.startDate), "d MMM yyyy", { locale: es })}
@@ -650,7 +667,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         {isInterestOnly ? (
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Interes mensual</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Interés mensual</p>
               <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1">{formatCurrency(Number(loan.installmentAmount), cur)}</p>
             </CardContent>
           </Card>
@@ -682,12 +699,12 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
               disabled={generateMoreMutation.isPending}
             >
               <Plus className="h-4 w-4 mr-2" />
-              {generateMoreMutation.isPending ? 'Generando...' : 'Generar mas cuotas'}
+              {generateMoreMutation.isPending ? 'Generando...' : 'Generar más cuotas'}
             </Button>
           )}
           {confirmComplete ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Devolvio el capital?</span>
+              <span className="text-sm font-medium">Devolvió el capital?</span>
               <Button
                 size="sm"
                 onClick={() => completeMutation.mutate({ loanId })}
@@ -702,7 +719,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           ) : (
             <Button variant="outline" onClick={() => setConfirmComplete(true)}>
               <CheckCircle2 className="h-4 w-4 mr-2" />
-              Completar prestamo
+              Completar préstamo
             </Button>
           )}
         </div>
@@ -722,7 +739,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                   <th className="text-left py-2 px-3 font-medium">#</th>
                   <th className="text-left py-2 px-3 font-medium">Vencimiento</th>
                   <th className="text-right py-2 px-3 font-medium">Cuota</th>
-                  <th className="text-right py-2 px-3 font-medium">Interes</th>
+                  <th className="text-right py-2 px-3 font-medium">Interés</th>
                   <th className="text-right py-2 px-3 font-medium">Capital</th>
                   <th className="text-right py-2 px-3 font-medium">Saldo</th>
                   <th className="text-center py-2 px-3 font-medium">Estado</th>
@@ -973,7 +990,7 @@ function InstallmentCalendar({ onSelectLoan }: { onSelectLoan: (id: string) => v
                       </button>
                     ))}
                     {dayInsts.length > 2 && (
-                      <p className="text-[9px] text-muted-foreground text-center">+{dayInsts.length - 2} mas</p>
+                      <p className="text-[9px] text-muted-foreground text-center">+{dayInsts.length - 2} más</p>
                     )}
                   </div>
                 </div>
@@ -1178,12 +1195,12 @@ function CreateLoanDialog({
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
-          Nuevo Prestamo
+          Nuevo Préstamo
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Crear Prestamo</DialogTitle>
+          <DialogTitle>Crear Préstamo</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -1255,8 +1272,8 @@ function CreateLoanDialog({
                     {isCritical ? <ShieldX className="h-3.5 w-3.5" /> : <Shield className="h-3.5 w-3.5" />}
                     <span>
                       {isCritical
-                        ? 'Score critico — no se recomienda prestar'
-                        : `Riesgo ${sp.category} · Spread minimo: +${(sp.minTnaSpread * 100).toFixed(0)}pp`
+                        ? 'Score crítico — no se recomienda prestar'
+                        : `Riesgo ${sp.category} · Spread mínimo: +${(sp.minTnaSpread * 100).toFixed(0)}pp`
                       }
                     </span>
                   </div>
@@ -1306,14 +1323,14 @@ function CreateLoanDialog({
           {/* Loan type & currency */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Tipo de Prestamo</Label>
+              <Label>Tipo de Préstamo</Label>
               <Select value={loanType} onValueChange={(v) => setLoanType(v as any)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="amortized">Amortizado (cuotas fijas)</SelectItem>
-                  <SelectItem value="interest_only">Solo interes (sin plazo)</SelectItem>
+                  <SelectItem value="interest_only">Solo interés (sin plazo)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1419,7 +1436,7 @@ function CreateLoanDialog({
           {/* Interest-only preview */}
           {loanType === 'interest_only' && interestPreview !== null && interestPreview > 0 && (
             <div className="bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg px-3 py-2 text-sm">
-              Cuota mensual de interes: <strong>{formatCurrency(interestPreview, currency)}</strong>
+              Cuota mensual de interés: <strong>{formatCurrency(interestPreview, currency)}</strong>
             </div>
           )}
 
@@ -1439,7 +1456,7 @@ function CreateLoanDialog({
           )}
 
           <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-            {createMutation.isPending ? 'Creando...' : 'Crear Prestamo'}
+            {createMutation.isPending ? 'Creando...' : 'Crear Préstamo'}
           </Button>
         </form>
       </DialogContent>
