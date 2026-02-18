@@ -926,6 +926,8 @@ function CreateLoanDialog({
   const [customInstallment, setCustomInstallment] = useState('')
   const [impliedTna, setImpliedTna] = useState<number | null>(null)
   const [selectedPersonId, setSelectedPersonId] = useState<string>('')
+  const [fciRate, setFciRate] = useState('40')
+  const [suggestedTna, setSuggestedTna] = useState<number | null>(null)
 
   const { data: persons } = trpc.persons.list.useQuery()
 
@@ -1000,6 +1002,8 @@ function CreateLoanDialog({
       setCustomInstallment('')
       setImpliedTna(null)
       setSelectedPersonId('')
+      setSuggestedTna(null)
+      setFciRate('40')
     },
   })
 
@@ -1058,10 +1062,27 @@ function CreateLoanDialog({
             <div className="space-y-2">
               <Label>Persona (opcional)</Label>
               <Select value={selectedPersonId} onValueChange={(v) => {
-                setSelectedPersonId(v === '__none__' ? '' : v)
-                if (v !== '__none__') {
-                  const p = persons.find((p) => p.id === v)
-                  if (p && !borrowerName) setBorrowerName(p.name)
+                const id = v === '__none__' ? '' : v
+                setSelectedPersonId(id)
+                if (id) {
+                  const p = persons.find((p) => p.id === id)
+                  if (p) {
+                    if (!borrowerName) setBorrowerName(p.name)
+                    if (p.category !== 'critico') {
+                      const fci = parseFloat(fciRate || '0') / 100
+                      const suggested = (fci + p.minTnaSpread) * 100
+                      const suggestedRounded = Math.round(suggested * 10) / 10
+                      setSuggestedTna(suggestedRounded)
+                      setTna(suggestedRounded.toString())
+                      setCustomInstallment('')
+                      setImpliedTna(null)
+                      // Also suggest monthly rate for interest-only
+                      const monthlyFromTna = (Math.pow(1 + fci + p.minTnaSpread, 1 / 12) - 1) * 100
+                      setMonthlyRate(Math.round(monthlyFromTna * 10) / 10 + '')
+                    }
+                  }
+                } else {
+                  setSuggestedTna(null)
                 }
               }}>
                 <SelectTrigger>
@@ -1101,6 +1122,44 @@ function CreateLoanDialog({
                   </div>
                 )
               })()}
+            </div>
+          )}
+
+          {/* FCI rate - only show when person selected */}
+          {selectedPersonId && persons?.find((p) => p.id === selectedPersonId)?.category !== 'critico' && (
+            <div className="space-y-2">
+              <Label htmlFor="fciRate">Tasa FCI referencia (%)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="fciRate"
+                  type="number"
+                  value={fciRate}
+                  onChange={(e) => {
+                    setFciRate(e.target.value)
+                    const p = persons?.find((p) => p.id === selectedPersonId)
+                    if (p && p.category !== 'critico') {
+                      const fci = parseFloat(e.target.value || '0') / 100
+                      const suggested = (fci + p.minTnaSpread) * 100
+                      const suggestedRounded = Math.round(suggested * 10) / 10
+                      setSuggestedTna(suggestedRounded)
+                      setTna(suggestedRounded.toString())
+                      setCustomInstallment('')
+                      setImpliedTna(null)
+                      const monthlyFromTna = (Math.pow(1 + fci + p.minTnaSpread, 1 / 12) - 1) * 100
+                      setMonthlyRate(Math.round(monthlyFromTna * 10) / 10 + '')
+                    }
+                  }}
+                  className="w-24"
+                  step="1"
+                  min="0"
+                />
+                <span className="text-xs text-muted-foreground">
+                  FCI {fciRate}% + spread {(() => {
+                    const p = persons?.find((p) => p.id === selectedPersonId)
+                    return p ? `${(p.minTnaSpread * 100).toFixed(0)}pp` : ''
+                  })()} = <strong className="text-foreground">{suggestedTna?.toFixed(1)}% TNA</strong>
+                </span>
+              </div>
             </div>
           )}
 
@@ -1183,11 +1242,17 @@ function CreateLoanDialog({
                   id="loanTna"
                   type="number"
                   value={tna}
-                  onChange={(e) => { setTna(e.target.value); setImpliedTna(null); setCustomInstallment('') }}
+                  onChange={(e) => { setTna(e.target.value); setImpliedTna(null); setSuggestedTna(null); setCustomInstallment('') }}
                   placeholder="55"
                   step="0.5"
                   required
                 />
+                {suggestedTna !== null && impliedTna === null && parseFloat(tna) === suggestedTna && (
+                  <p className="text-xs flex items-center gap-1 text-green-600 dark:text-green-400">
+                    <Zap className="h-3 w-3" />
+                    Sugerida desde score ({fciRate}% + spread)
+                  </p>
+                )}
                 {impliedTna !== null && (
                   <p className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400">
                     <Zap className="h-3 w-3" />
