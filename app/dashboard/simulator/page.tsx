@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc-client'
 import { formatCurrency, formatDateToInput, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,6 +38,9 @@ import {
   BarChart3,
   Copy,
   Check,
+  ArrowRight,
+  Download,
+  CheckCircle,
 } from 'lucide-react'
 import type { SimulationResult } from '@/lib/loan-calculator'
 
@@ -411,64 +415,65 @@ export default function SimulatorPage() {
       {/* Results */}
       {hasResults && (
         <div ref={resultsRef}>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="results">Resultados</TabsTrigger>
-            <TabsTrigger value="table">Tabla de Flujos</TabsTrigger>
-          </TabsList>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="results">Resultados</TabsTrigger>
+              <TabsTrigger value="table">Tabla de Flujos</TabsTrigger>
+            </TabsList>
 
-          {/* ── Results Tab ── */}
-          <TabsContent value="results" className="space-y-6 mt-6">
-            {/* Sub-toggle: Mi análisis / Para compartir */}
-            <div className="flex gap-1 bg-muted rounded-lg p-0.5 w-fit">
-              <Button
-                variant={resultsView === 'analysis' ? 'default' : 'ghost'}
-                size="sm"
-                className="h-8 text-xs"
-                onClick={() => setResultsView('analysis')}
-              >
-                <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
-                Mi análisis
-              </Button>
-              <Button
-                variant={resultsView === 'share' ? 'default' : 'ghost'}
-                size="sm"
-                className="h-8 text-xs"
-                onClick={() => setResultsView('share')}
-              >
-                <Share2 className="h-3.5 w-3.5 mr-1.5" />
-                Para compartir
-              </Button>
-            </div>
+            {/* ── Results Tab ── */}
+            <TabsContent value="results" className="space-y-6 mt-6">
+              {/* Sub-toggle: Mi análisis / Para compartir */}
+              <div className="flex gap-1 bg-muted rounded-lg p-0.5 w-fit">
+                <Button
+                  variant={resultsView === 'analysis' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setResultsView('analysis')}
+                >
+                  <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                  Mi análisis
+                </Button>
+                <Button
+                  variant={resultsView === 'share' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setResultsView('share')}
+                >
+                  <Share2 className="h-3.5 w-3.5 mr-1.5" />
+                  Para compartir
+                </Button>
+              </div>
 
-            {resultsView === 'analysis' && (
-              <>
-                {compareResults && <CompareTermsResultCards results={compareResults} onCreateLoan={handleCreateLoan} />}
-                {singleResult && <SingleResultCards result={singleResult} onCreateLoan={handleCreateLoan} />}
-              </>
-            )}
+              {resultsView === 'analysis' && (
+                <>
+                  {compareResults && <CompareTermsResultCards results={compareResults} onCreateLoan={handleCreateLoan} />}
+                  {singleResult && <SingleResultCards result={singleResult} onCreateLoan={handleCreateLoan} />}
+                </>
+              )}
 
-            {resultsView === 'share' && (
-              <>
-                {compareResults && <ShareableResultCards results={compareResults} currency={currency} />}
-                {singleResult && <ShareableResultCards results={[singleResult]} currency={currency} />}
-              </>
-            )}
-          </TabsContent>
+              {resultsView === 'share' && (
+                <ShareableSimulationView
+                  results={compareResults || (singleResult ? [singleResult] : [])}
+                  currency={currency}
+                  onCreateLoan={handleCreateLoan}
+                />
+              )}
+            </TabsContent>
 
-          {/* ── Table Tab ── */}
-          <TabsContent value="table" className="space-y-6 mt-6">
-            {compareResults && compareResults.map((r) => (
-              <AmortizationTable key={r.termMonths} result={r} title={`${r.termMonths} meses`} />
-            ))}
-            {singleResult && singleResult.loanType === 'amortized' && (
-              <AmortizationTable result={singleResult} title="Amortizado (Cuotas)" />
-            )}
-            {singleResult && singleResult.loanType === 'bullet' && (
-              <BulletTable result={singleResult} title="Bullet (Descuento)" />
-            )}
-          </TabsContent>
-        </Tabs>
+            {/* ── Table Tab ── */}
+            <TabsContent value="table" className="space-y-6 mt-6">
+              {compareResults && compareResults.map((r) => (
+                <AmortizationTable key={r.termMonths} result={r} title={`${r.termMonths} meses`} />
+              ))}
+              {singleResult && singleResult.loanType === 'amortized' && (
+                <AmortizationTable result={singleResult} title="Amortizado (Cuotas)" />
+              )}
+              {singleResult && singleResult.loanType === 'bullet' && (
+                <BulletTable result={singleResult} title="Bullet (Descuento)" />
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       )}
 
@@ -710,125 +715,315 @@ function AmortizationTable({ result, title }: { result: SimulationResult; title:
   )
 }
 
-// ─── Shareable View ──────────────────────────────────────────────────
+// ─── Shareable Simulation View ───────────────────────────────────────
 
-function ShareableResultCards({ results, currency }: { results: SimulationResult[]; currency: string }) {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+interface InstallmentPlanCardProps {
+  termMonths: number
+  installmentAmount: number
+  currency: string
+  isRecommended: boolean
+  isSelected: boolean
+  onSelect: () => void
+}
 
-  function generateWhatsAppText(result: SimulationResult): string {
-    if (result.loanType === 'bullet') {
-      return [
-        `💰 *Propuesta de Préstamo*`,
-        ``,
-        `Monto: ${formatCurrency(result.capital, currency)}`,
-        `Plazo: ${result.termMonths} meses`,
-        `Devolvés: ${formatCurrency(result.nominalValue!, currency)}`,
-        ``,
-        `En ${result.termMonths} meses devolvés ${formatCurrency(result.nominalValue!, currency)}`,
-      ].join('\n')
-    }
+function InstallmentPlanCard({
+  termMonths,
+  installmentAmount,
+  currency,
+  isRecommended,
+  isSelected,
+  onSelect,
+}: InstallmentPlanCardProps) {
+  return (
+    <div className="relative">
+      {isRecommended && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+          <Badge className="text-[10px] px-2.5 py-0.5 shadow-sm">
+            Recomendado
+          </Badge>
+        </div>
+      )}
+      <Card
+        className={cn(
+          "cursor-pointer transition-all duration-200 hover:border-primary/50",
+          isSelected
+            ? "border-primary ring-2 ring-primary/20 bg-primary/[0.03]"
+            : "hover:shadow-md",
+          isRecommended && !isSelected && "border-primary/30"
+        )}
+        onClick={onSelect}
+      >
+        <CardContent className="p-5 text-center space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {termMonths} cuotas
+          </p>
+          <p className="text-2xl font-black text-foreground">
+            {formatCurrency(installmentAmount, currency)}
+          </p>
+          <p className="text-xs text-muted-foreground">por mes</p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
-    const installment = result.installmentAmount!
-    const total = result.totalPaid!
-    const monthlyPct = (result.monthlyRate * 100).toFixed(1)
+function ShareableSimulationView({
+  results,
+  currency,
+  onCreateLoan,
+}: {
+  results: SimulationResult[]
+  currency: string
+  onCreateLoan?: (result: SimulationResult) => void
+}) {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [imageGenerated, setImageGenerated] = useState(false)
+  const shareRef = useRef<HTMLDivElement>(null)
 
-    return [
-      `💰 *Propuesta de Préstamo*`,
+  if (results.length === 0) return null
+
+  const capital = results[0].capital
+  const maxTermIndex = results.reduce((maxI, r, i, arr) =>
+    r.termMonths > arr[maxI].termMonths ? i : maxI, 0
+  )
+  const selectedResult = selectedIndex !== null ? results[selectedIndex] : null
+
+  // ─── Clipboard copy ────────────────────────────────────────────────
+  const handleCopyText = useCallback(async () => {
+    const lines = [
+      `💰 *Simulación de préstamo*`,
       ``,
-      `Monto: ${formatCurrency(result.capital, currency)}`,
-      `Cuotas: ${result.termMonths} de ${formatCurrency(installment, currency)}`,
-      `Total a devolver: ${formatCurrency(total, currency)}`,
-      `Tasa: ${monthlyPct}% mensual`,
+      `Monto: ${formatCurrency(capital, currency)}`,
       ``,
-      `En ${result.termMonths} meses pagás ${formatCurrency(total, currency)} en ${result.termMonths} cuotas de ${formatCurrency(installment, currency)}`,
-    ].join('\n')
-  }
+      ...results.map(r => {
+        const amt = r.installmentAmount || r.nominalValue || 0
+        return r.loanType === 'amortized'
+          ? `${r.termMonths} cuotas de ${formatCurrency(amt, currency)}`
+          : `${r.termMonths} meses → ${formatCurrency(amt, currency)}`
+      }),
+      ``,
+      `Elegí la opción que mejor se adapte a vos.`,
+    ]
+    await navigator.clipboard.writeText(lines.join('\n'))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+  }, [results, capital, currency])
 
-  async function handleCopy(index: number, result: SimulationResult) {
-    const text = generateWhatsAppText(result)
-    await navigator.clipboard.writeText(text)
-    setCopiedIndex(index)
-    setTimeout(() => setCopiedIndex(null), 2000)
-  }
+  // ─── Canvas image generation ───────────────────────────────────────
+  const handleGenerateImage = useCallback(async () => {
+    const W = 800
+    const H = 1000
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = H
+    const ctx = canvas.getContext('2d')!
+
+    // Background gradient
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, H)
+    bgGrad.addColorStop(0, '#0a0a0a')
+    bgGrad.addColorStop(1, '#141414')
+    ctx.fillStyle = bgGrad
+    ctx.fillRect(0, 0, W, H)
+
+    // Subtle accent line at top
+    const accentGrad = ctx.createLinearGradient(0, 0, W, 0)
+    accentGrad.addColorStop(0, 'transparent')
+    accentGrad.addColorStop(0.3, '#128dda')
+    accentGrad.addColorStop(0.7, '#128dda')
+    accentGrad.addColorStop(1, 'transparent')
+    ctx.fillStyle = accentGrad
+    ctx.fillRect(0, 0, W, 3)
+
+    // Title
+    ctx.fillStyle = '#999'
+    ctx.font = '600 14px Inter, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('SIMULACIÓN DE PRÉSTAMO', W / 2, 80)
+
+    // Amount
+    ctx.fillStyle = '#f5f5f5'
+    ctx.font = '800 42px Inter, system-ui, sans-serif'
+    ctx.fillText(`Monto: ${formatCurrency(capital, currency)}`, W / 2, 140)
+
+    // Subtitle
+    ctx.fillStyle = '#888'
+    ctx.font = '400 16px Inter, system-ui, sans-serif'
+    ctx.fillText('Elegí el plan que mejor se adapte a tu presupuesto', W / 2, 180)
+
+    // Cards
+    const cardW = 160
+    const cardH = 160
+    const gap = 20
+    const totalW = results.length * cardW + (results.length - 1) * gap
+    const startX = (W - totalW) / 2
+    const cardY = 240
+
+    results.forEach((r, i) => {
+      const x = startX + i * (cardW + gap)
+      const isRec = i === maxTermIndex
+
+      // Card bg
+      ctx.fillStyle = isRec ? '#1a2a3a' : '#1d1d1d'
+      ctx.beginPath()
+      ctx.roundRect(x, cardY, cardW, cardH, 12)
+      ctx.fill()
+
+      // Card border
+      ctx.strokeStyle = isRec ? '#128dda' : '#2a2a2a'
+      ctx.lineWidth = isRec ? 2 : 1
+      ctx.beginPath()
+      ctx.roundRect(x, cardY, cardW, cardH, 12)
+      ctx.stroke()
+
+      // Recommended badge
+      if (isRec) {
+        const badgeW = 100
+        const badgeH = 22
+        const badgeX = x + (cardW - badgeW) / 2
+        const badgeY = cardY - 11
+        ctx.fillStyle = '#128dda'
+        ctx.beginPath()
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 11)
+        ctx.fill()
+        ctx.fillStyle = '#fff'
+        ctx.font = '600 10px Inter, system-ui, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('RECOMENDADO', badgeX + badgeW / 2, badgeY + 15)
+      }
+
+      // Term label
+      ctx.fillStyle = '#999'
+      ctx.font = '600 12px Inter, system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(`${r.termMonths} CUOTAS`, x + cardW / 2, cardY + 45)
+
+      // Amount
+      ctx.fillStyle = '#f5f5f5'
+      ctx.font = '800 22px Inter, system-ui, sans-serif'
+      const amt = r.installmentAmount || r.nominalValue || 0
+      ctx.fillText(formatCurrency(amt, currency), x + cardW / 2, cardY + 90)
+
+      // Per month
+      ctx.fillStyle = '#666'
+      ctx.font = '400 12px Inter, system-ui, sans-serif'
+      ctx.fillText('por mes', x + cardW / 2, cardY + 115)
+    })
+
+    // Footer text
+    ctx.fillStyle = '#555'
+    ctx.font = '400 13px Inter, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('Cuotas fijas · Sin costos ocultos', W / 2, H - 60)
+
+    // Download
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `simulacion-prestamo-${formatCurrency(capital, currency).replace(/[^0-9]/g, '')}.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      setImageGenerated(true)
+      setTimeout(() => setImageGenerated(false), 2500)
+    }, 'image/png')
+  }, [results, capital, currency, maxTermIndex])
 
   return (
-    <div className={cn(
-      "grid gap-6 grid-cols-1",
-      results.length === 2 && "lg:grid-cols-2",
-      results.length >= 3 && "lg:grid-cols-3",
-    )}>
-      {results.map((result, index) => {
-        const isAmortized = result.loanType === 'amortized'
-        const installment = result.installmentAmount || 0
-        const total = result.totalPaid || result.nominalValue || 0
-        const monthlyPct = (result.monthlyRate * 100).toFixed(1)
-        const isCopied = copiedIndex === index
+    <div ref={shareRef} className="space-y-8">
+      {/* ── Header ── */}
+      <div className="text-center space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+          Resultados de simulación
+        </p>
+        <h2 className="text-3xl sm:text-4xl font-black text-foreground">
+          Monto del préstamo: {formatCurrency(capital, currency)}
+        </h2>
+        <p className="text-muted-foreground text-sm sm:text-base">
+          Elegí el plan de cuotas que mejor se adapte a tu presupuesto.
+        </p>
+      </div>
 
-        return (
-          <Card key={result.termMonths} className="overflow-hidden">
-            <div className="bg-gradient-to-br from-primary/5 to-primary/10 px-6 py-5 border-b border-border/50">
-              <p className="text-sm text-muted-foreground">Préstamo</p>
-              <p className="text-3xl font-black text-foreground mt-1">
-                {formatCurrency(result.capital, currency)}
-              </p>
-            </div>
-            <CardContent className="p-6 space-y-4">
-              {isAmortized ? (
-                <>
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-sm text-muted-foreground">Cuotas</span>
-                    <span className="text-lg font-bold">{result.termMonths} de {formatCurrency(installment, currency)}</span>
-                  </div>
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-sm text-muted-foreground">Total a devolver</span>
-                    <span className="text-lg font-bold">{formatCurrency(total, currency)}</span>
-                  </div>
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-sm text-muted-foreground">Tasa mensual</span>
-                    <span className="text-lg font-bold">{monthlyPct}%</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-sm text-muted-foreground">Plazo</span>
-                    <span className="text-lg font-bold">{result.termMonths} meses</span>
-                  </div>
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-sm text-muted-foreground">Devolvés</span>
-                    <span className="text-lg font-bold">{formatCurrency(result.nominalValue!, currency)}</span>
-                  </div>
-                </>
-              )}
+      {/* ── Plan Cards Grid ── */}
+      <div className={cn(
+        "grid gap-4",
+        results.length <= 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 lg:grid-cols-4",
+      )}>
+        {results.map((result, index) => {
+          const amt = result.installmentAmount || result.nominalValue || 0
+          return (
+            <InstallmentPlanCard
+              key={result.termMonths}
+              termMonths={result.termMonths}
+              installmentAmount={amt}
+              currency={currency}
+              isRecommended={index === maxTermIndex}
+              isSelected={selectedIndex === index}
+              onSelect={() => setSelectedIndex(index)}
+            />
+          )
+        })}
+      </div>
 
-              <div className="bg-muted/50 rounded-lg px-4 py-3 text-sm text-muted-foreground">
-                {isAmortized
-                  ? `En ${result.termMonths} meses pagás ${formatCurrency(total, currency)} en ${result.termMonths} cuotas de ${formatCurrency(installment, currency)}`
-                  : `En ${result.termMonths} meses devolvés ${formatCurrency(result.nominalValue!, currency)}`
-                }
+      {/* ── Selection Summary ── */}
+      {selectedResult && (
+        <Card className="border-primary/20 bg-primary/[0.03]">
+          <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <CheckCircle className="h-5 w-5 text-primary" />
               </div>
-
+              <div>
+                <p className="font-bold text-foreground">
+                  Plan seleccionado: {selectedResult.termMonths} cuotas de{' '}
+                  {formatCurrency(selectedResult.installmentAmount || selectedResult.nominalValue || 0, currency)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Cuotas fijas · Sin costos ocultos
+                </p>
+              </div>
+            </div>
+            {onCreateLoan && selectedResult.loanType === 'amortized' && (
               <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => handleCopy(index, result)}
+                onClick={() => onCreateLoan(selectedResult)}
+                className="w-full sm:w-auto shrink-0"
               >
-                {isCopied ? (
-                  <>
-                    <Check className="h-4 w-4 mr-2 text-green-600" />
-                    Copiado
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copiar para WhatsApp
-                  </>
-                )}
+                Continuar con este plan
+                <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
-            </CardContent>
-          </Card>
-        )
-      })}
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Share Actions ── */}
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <Button
+          variant="outline"
+          onClick={handleCopyText}
+          className="gap-2"
+        >
+          {copied ? (
+            <><Check className="h-4 w-4 text-green-600" /> Resumen copiado</>
+          ) : (
+            <><Copy className="h-4 w-4" /> Copiar resumen</>
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleGenerateImage}
+          className="gap-2"
+        >
+          {imageGenerated ? (
+            <><Check className="h-4 w-4 text-green-600" /> Imagen descargada</>
+          ) : (
+            <><Download className="h-4 w-4" /> Compartir simulación</>
+          )}
+        </Button>
+      </div>
     </div>
   )
 }
