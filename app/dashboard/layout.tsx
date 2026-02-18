@@ -7,7 +7,6 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   TrendingUp,
-  FileUp,
   CreditCard as CardsIcon,
   ListOrdered,
   Receipt,
@@ -24,22 +23,40 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Tarjetas', href: '/dashboard/cards', icon: CardsIcon },
-  { name: 'Movimientos', href: '/dashboard/transactions', icon: ListOrdered },
-  { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
-  { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
-  { name: 'Prestamos', href: '/dashboard/loans', icon: Banknote },
-  { name: 'Personas', href: '/dashboard/persons', icon: Users },
-  { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
-  { name: 'Importar', href: '/dashboard/import', icon: FileUp },
+type NavItem = { name: string; href: string; icon: typeof LayoutDashboard }
+type NavSection = { label: string; items: NavItem[] }
+
+const navigation: NavSection[] = [
+  {
+    label: 'General',
+    items: [
+      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'Finanzas',
+    items: [
+      { name: 'Tarjetas', href: '/dashboard/cards', icon: CardsIcon },
+      { name: 'Movimientos', href: '/dashboard/transactions', icon: ListOrdered },
+      { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
+    ],
+  },
+  {
+    label: 'Prestamos',
+    items: [
+      { name: 'Prestamos', href: '/dashboard/loans', icon: Banknote },
+      { name: 'Personas', href: '/dashboard/persons', icon: Users },
+      { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
+      { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
+    ],
+  },
 ]
 
 const mobileNav = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Movimientos', href: '/dashboard/transactions', icon: Receipt },
-  { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
+  { name: 'Prestamos', href: '/dashboard/loans', icon: Banknote },
+  { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
 ]
 
 export default function DashboardLayout({
@@ -81,34 +98,47 @@ export default function DashboardLayout({
         </div>
 
         {/* Nav Links */}
-        <nav className={cn("flex-1 py-4 space-y-0.5 overflow-y-auto transition-all duration-300", sidebarCollapsed ? "px-2" : "px-3")}>
-          {navigation.map((item) => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                title={sidebarCollapsed ? item.name : undefined}
-                className={cn(
-                  "flex items-center gap-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative",
-                  sidebarCollapsed ? "px-0 justify-center" : "px-3",
-                  isActive
-                    ? "text-white bg-white/[0.08]"
-                    : "text-[hsl(var(--sidebar-foreground))] hover:text-white hover:bg-white/[0.04]"
-                )}
-              >
-                {/* Active indicator bar */}
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[hsl(var(--sidebar-active))]" />
-                )}
-                <item.icon className={cn(
-                  "h-[18px] w-[18px] shrink-0",
-                  isActive ? "text-[hsl(var(--sidebar-active))]" : "text-[hsl(var(--sidebar-foreground))]"
-                )} />
-                {!sidebarCollapsed && item.name}
-              </Link>
-            )
-          })}
+        <nav className={cn("flex-1 py-4 overflow-y-auto transition-all duration-300", sidebarCollapsed ? "px-2" : "px-3")}>
+          {navigation.map((section, sectionIdx) => (
+            <div key={section.label} className={cn(sectionIdx > 0 && "mt-5")}>
+              {!sidebarCollapsed && (
+                <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-[hsl(var(--sidebar-foreground))]/50">
+                  {section.label}
+                </p>
+              )}
+              {sidebarCollapsed && sectionIdx > 0 && (
+                <div className="mx-auto mb-2 w-6 border-t border-white/[0.08]" />
+              )}
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const isActive = pathname === item.href
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      title={sidebarCollapsed ? item.name : undefined}
+                      className={cn(
+                        "flex items-center gap-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative",
+                        sidebarCollapsed ? "px-0 justify-center" : "px-3",
+                        isActive
+                          ? "text-white bg-white/[0.08]"
+                          : "text-[hsl(var(--sidebar-foreground))] hover:text-white hover:bg-white/[0.04]"
+                      )}
+                    >
+                      {isActive && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[hsl(var(--sidebar-active))]" />
+                      )}
+                      <item.icon className={cn(
+                        "h-[18px] w-[18px] shrink-0",
+                        isActive ? "text-[hsl(var(--sidebar-active))]" : "text-[hsl(var(--sidebar-foreground))]"
+                      )} />
+                      {!sidebarCollapsed && item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* Premium Plan Card */}
