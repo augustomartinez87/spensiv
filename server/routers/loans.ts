@@ -15,21 +15,23 @@ const simulateInput = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 })
 
-const compareInput = z.object({
+const compareTermsInput = z.object({
   capital: z.number().positive(),
-  termMonths: z.number().int().min(1).max(360),
   tnaTarget: z.number().min(0.001),
   hurdleRate: z.number().min(0),
   accrualType: z.enum(['linear', 'exponential']).default('exponential'),
-  customInstallment: z.number().positive().optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  terms: z.array(z.number().int().min(1).max(360)).min(1).max(4),
 })
 
 const createLoanInput = z.object({
   borrowerName: z.string().min(1, 'El nombre del deudor es requerido'),
   capital: z.number().positive(),
-  tna: z.number().positive(), // decimal, e.g. 0.55
-  termMonths: z.number().int().min(1).max(360),
+  currency: z.enum(['ARS', 'USD', 'EUR']).default('ARS'),
+  loanType: z.enum(['amortized', 'interest_only']).default('amortized'),
+  tna: z.number().positive().optional(), // for amortized
+  monthlyInterestRate: z.number().positive().optional(), // for interest_only (e.g. 0.10 = 10%)
+  termMonths: z.number().int().min(1).max(360).optional(), // required for amortized
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 })
 
@@ -40,10 +42,20 @@ export const loansRouter = router({
       return simulateLoan(input)
     }),
 
-  compare: protectedProcedure
-    .input(compareInput)
-    .mutation(({ input }): ComparisonResult => {
-      return compareLoanTypes(input)
+  compareTerms: protectedProcedure
+    .input(compareTermsInput)
+    .mutation(({ input }): SimulationResult[] => {
+      return input.terms.map((term) =>
+        simulateLoan({
+          capital: input.capital,
+          termMonths: term,
+          tnaTarget: input.tnaTarget,
+          hurdleRate: input.hurdleRate,
+          loanType: 'amortized',
+          accrualType: input.accrualType,
+          startDate: input.startDate,
+        })
+      )
     }),
 
   reverseFromInstallment: protectedProcedure
@@ -63,6 +75,55 @@ export const loansRouter = router({
   create: protectedProcedure
     .input(createLoanInput)
     .mutation(async ({ ctx, input }) => {
+      const startDate = new Date(input.startDate + 'T00:00:00')
+
+      if (input.loanType === 'interest_only') {
+        // Interest-only: no fixed term, monthly interest payments
+        const rate = input.monthlyInterestRate
+        if (!rate) throw new Error('La tasa mensual es requerida para prestamos interest-only')
+
+        const monthlyInterest = input.capital * rate
+        // Convert monthly rate to TNA for storage: TNA = (1 + r_m)^12 - 1
+        const tna = Math.pow(1 + rate, 12) - 1
+
+        // Generate 12 initial interest-only installments
+        const installments = Array.from({ length: 12 }, (_, i) => ({
+          number: i + 1,
+          dueDate: addMonths(startDate, i + 1),
+          amount: monthlyInterest,
+          interest: monthlyInterest,
+          principal: 0,
+          balance: input.capital,
+        }))
+
+        const loan = await ctx.prisma.loan.create({
+          data: {
+            userId: ctx.user.id,
+            borrowerName: input.borrowerName,
+            capital: input.capital,
+            currency: input.currency,
+            loanType: 'interest_only',
+            tna,
+            termMonths: null,
+            monthlyRate: rate,
+            installmentAmount: monthlyInterest,
+            totalAmount: null,
+            startDate,
+            status: 'active',
+            loanInstallments: { create: installments },
+          },
+          include: {
+            loanInstallments: { orderBy: { number: 'asc' } },
+          },
+        })
+
+        return loan
+      }
+
+      // Amortized loan (existing logic)
+      if (!input.termMonths) throw new Error('El plazo es requerido para prestamos amortizados')
+      if (!input.tna) throw new Error('La TNA es requerida para prestamos amortizados')
+
       const monthlyRate = tnaToMonthlyRate(input.tna)
       const installmentAmount = frenchInstallment(input.capital, monthlyRate, input.termMonths)
       const totalAmount = installmentAmount * input.termMonths
@@ -75,13 +136,13 @@ export const loansRouter = router({
         input.startDate,
       )
 
-      const startDate = new Date(input.startDate + 'T00:00:00')
-
       const loan = await ctx.prisma.loan.create({
         data: {
           userId: ctx.user.id,
           borrowerName: input.borrowerName,
           capital: input.capital,
+          currency: input.currency,
+          loanType: 'amortized',
           tna: input.tna,
           termMonths: input.termMonths,
           monthlyRate,
@@ -106,6 +167,55 @@ export const loansRouter = router({
       })
 
       return loan
+    }),
+
+  generateMoreInstallments: protectedProcedure
+    .input(z.object({ loanId: z.string(), count: z.number().int().min(1).max(24).default(12) }))
+    .mutation(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.loanId, userId: ctx.user.id, loanType: 'interest_only' },
+        include: {
+          loanInstallments: { orderBy: { number: 'desc' }, take: 1 },
+        },
+      })
+
+      if (!loan) throw new Error('Prestamo interest-only no encontrado')
+
+      const lastInstallment = loan.loanInstallments[0]
+      if (!lastInstallment) throw new Error('No hay cuotas existentes')
+
+      const monthlyInterest = Number(loan.installmentAmount)
+      const startNumber = lastInstallment.number + 1
+      const lastDueDate = new Date(lastInstallment.dueDate)
+
+      const newInstallments = Array.from({ length: input.count }, (_, i) => ({
+        loanId: loan.id,
+        number: startNumber + i,
+        dueDate: addMonths(lastDueDate, i + 1),
+        amount: monthlyInterest,
+        interest: monthlyInterest,
+        principal: 0,
+        balance: Number(loan.capital),
+      }))
+
+      await ctx.prisma.loanInstallment.createMany({ data: newInstallments })
+
+      return { added: input.count, fromNumber: startNumber }
+    }),
+
+  completeLoan: protectedProcedure
+    .input(z.object({ loanId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.loanId, userId: ctx.user.id, status: 'active' },
+      })
+
+      if (!loan) throw new Error('Prestamo no encontrado')
+
+      return ctx.prisma.loan.update({
+        where: { id: input.loanId },
+        data: { status: 'completed' },
+      })
     }),
 
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -140,6 +250,47 @@ export const loansRouter = router({
       }
     })
   }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      borrowerName: z.string().min(1).optional(),
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.id, userId: ctx.user.id },
+        include: { loanInstallments: { orderBy: { number: 'asc' } } },
+      })
+
+      if (!loan) {
+        throw new Error('Préstamo no encontrado')
+      }
+
+      const updates: Record<string, any> = {}
+      if (input.borrowerName) updates.borrowerName = input.borrowerName
+      if (input.startDate) updates.startDate = new Date(input.startDate + 'T00:00:00')
+
+      const updated = await ctx.prisma.loan.update({
+        where: { id: input.id },
+        data: updates,
+      })
+
+      // If start date changed, recalculate all installment due dates
+      if (input.startDate) {
+        const newStart = new Date(input.startDate + 'T00:00:00')
+        await Promise.all(
+          loan.loanInstallments.map((inst) =>
+            ctx.prisma.loanInstallment.update({
+              where: { id: inst.id },
+              data: { dueDate: addMonths(newStart, inst.number) },
+            })
+          )
+        )
+      }
+
+      return updated
+    }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
@@ -193,16 +344,19 @@ export const loansRouter = router({
         data: { isPaid: true, paidAt: new Date() },
       })
 
-      // Check if all installments are paid → mark loan as completed
-      const remaining = await ctx.prisma.loanInstallment.count({
-        where: { loanId: installment.loanId, isPaid: false },
-      })
-
-      if (remaining === 0) {
-        await ctx.prisma.loan.update({
-          where: { id: installment.loanId },
-          data: { status: 'completed' },
+      // For amortized loans: check if all installments are paid → mark loan as completed
+      const loan = await ctx.prisma.loan.findUnique({ where: { id: installment.loanId } })
+      if (loan?.loanType === 'amortized') {
+        const remaining = await ctx.prisma.loanInstallment.count({
+          where: { loanId: installment.loanId, isPaid: false },
         })
+
+        if (remaining === 0) {
+          await ctx.prisma.loan.update({
+            where: { id: installment.loanId },
+            data: { status: 'completed' },
+          })
+        }
       }
 
       return updated
@@ -237,8 +391,6 @@ export const loansRouter = router({
     }),
 
   getDashboardMetrics: protectedProcedure.query(async ({ ctx }) => {
-    const now = new Date()
-
     const activeLoans = await ctx.prisma.loan.findMany({
       where: { userId: ctx.user.id, status: 'active' },
       include: {
@@ -274,6 +426,7 @@ export const loansRouter = router({
           amount: Number(i.amount),
           borrowerName: loan.borrowerName,
           loanId: loan.id,
+          currency: loan.currency,
         }))
       )
       .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())

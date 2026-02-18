@@ -413,7 +413,7 @@ export default function DashboardPage() {
                       <div key={inst.id} className="flex items-center justify-between text-xs py-1">
                         <span className="text-foreground font-medium truncate">{inst.borrowerName}</span>
                         <div className="text-right shrink-0 ml-2">
-                          <span className="font-bold">{formatCurrency(inst.amount)}</span>
+                          <span className="font-bold">{formatCurrency(inst.amount, inst.currency)}</span>
                           <span className="text-muted-foreground ml-1.5">
                             {format(new Date(inst.dueDate), 'd MMM', { locale: es })}
                           </span>

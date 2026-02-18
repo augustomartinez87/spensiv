@@ -10,6 +10,13 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -33,6 +40,10 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  Pencil,
+  Check,
+  X,
+  Infinity,
 } from 'lucide-react'
 
 export default function LoansPage() {
@@ -129,7 +140,9 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
         const now = new Date()
         const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
         const isOverdue = nextDue && nextDue < now
-        const progress = loan.totalCount > 0 ? (loan.paidCount / loan.totalCount) * 100 : 0
+        const isInterestOnly = loan.loanType === 'interest_only'
+        const progress = !isInterestOnly && loan.totalCount > 0 ? (loan.paidCount / loan.totalCount) * 100 : 0
+        const cur = loan.currency
 
         return (
           <Card
@@ -142,34 +155,62 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                 <div>
                   <h3 className="font-bold text-lg text-foreground">{loan.borrowerName}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {formatCurrency(Number(loan.capital))} a {loan.termMonths} meses
+                    {formatCurrency(Number(loan.capital), cur)}
+                    {isInterestOnly
+                      ? ' · Solo interes'
+                      : ` a ${loan.termMonths} meses`
+                    }
                   </p>
                 </div>
-                <Badge variant={
-                  loan.status === 'active' ? 'default' :
-                  loan.status === 'completed' ? 'secondary' : 'destructive'
-                }>
-                  {loan.status === 'active' ? 'Activo' :
-                   loan.status === 'completed' ? 'Completado' : 'Moroso'}
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  {isInterestOnly && (
+                    <Badge variant="outline" className="text-[10px] px-1.5">
+                      Solo interes
+                    </Badge>
+                  )}
+                  {cur !== 'ARS' && (
+                    <Badge variant="outline" className="text-[10px] px-1.5">
+                      {cur}
+                    </Badge>
+                  )}
+                  <Badge variant={
+                    loan.status === 'active' ? 'default' :
+                    loan.status === 'completed' ? 'secondary' : 'destructive'
+                  }>
+                    {loan.status === 'active' ? 'Activo' :
+                     loan.status === 'completed' ? 'Completado' : 'Moroso'}
+                  </Badge>
+                </div>
               </div>
 
-              {/* Progress bar */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Cuotas pagadas</span>
-                  <span className="font-medium text-foreground">{loan.paidCount}/{loan.totalCount}</span>
+              {/* Progress bar - only for amortized */}
+              {!isInterestOnly && (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Cuotas pagadas</span>
+                    <span className="font-medium text-foreground">{loan.paidCount}/{loan.totalCount}</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-500"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary rounded-full transition-all duration-500"
-                    style={{ width: `${progress}%` }}
-                  />
+              )}
+
+              {/* Interest-only info */}
+              {isInterestOnly && loan.status === 'active' && (
+                <div className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <Infinity className="h-4 w-4 shrink-0" />
+                  <span>
+                    Interes mensual: {formatCurrency(Number(loan.installmentAmount), cur)}
+                  </span>
                 </div>
-              </div>
+              )}
 
               {/* Next due */}
-              {nextDue && loan.status === 'active' && (
+              {nextDue && loan.status === 'active' && !isInterestOnly && (
                 <div className={cn(
                   "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
                   isOverdue
@@ -183,13 +224,18 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                   )}
                   <span>
                     {isOverdue ? 'Vencida: ' : 'Proxima: '}
-                    {format(nextDue, "d 'de' MMM", { locale: es })} - {formatCurrency(loan.nextAmount)}
+                    {format(nextDue, "d 'de' MMM", { locale: es })} - {formatCurrency(loan.nextAmount, cur)}
                   </span>
                 </div>
               )}
 
               <div className="flex justify-between text-xs text-muted-foreground pt-1">
-                <span>Cuota: {formatCurrency(Number(loan.installmentAmount))}</span>
+                <span>
+                  {isInterestOnly
+                    ? `Tasa mensual: ${(Number(loan.monthlyRate) * 100).toFixed(1)}%`
+                    : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                  }
+                </span>
                 <span>TNA: {(Number(loan.tna) * 100).toFixed(1)}%</span>
               </div>
             </CardContent>
@@ -206,6 +252,10 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   const utils = trpc.useUtils()
   const { data: loan, isLoading } = trpc.loans.getById.useQuery({ id: loanId })
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmComplete, setConfirmComplete] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editStartDate, setEditStartDate] = useState('')
 
   const deleteMutation = trpc.loans.delete.useMutation({
     onSuccess: () => {
@@ -214,6 +264,47 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
       onBack()
     },
   })
+
+  const updateMutation = trpc.loans.update.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.list.invalidate()
+      utils.loans.getDashboardMetrics.invalidate()
+      setEditing(false)
+    },
+  })
+
+  const completeMutation = trpc.loans.completeLoan.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.list.invalidate()
+      utils.loans.getDashboardMetrics.invalidate()
+      setConfirmComplete(false)
+    },
+  })
+
+  const generateMoreMutation = trpc.loans.generateMoreInstallments.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.list.invalidate()
+    },
+  })
+
+  function startEditing() {
+    if (!loan) return
+    setEditName(loan.borrowerName)
+    setEditStartDate(formatDateToInput(new Date(loan.startDate)))
+    setEditing(true)
+  }
+
+  function saveEdit() {
+    if (!loan) return
+    const changes: { id: string; borrowerName?: string; startDate?: string } = { id: loanId }
+    if (editName !== loan.borrowerName) changes.borrowerName = editName
+    const currentStart = formatDateToInput(new Date(loan.startDate))
+    if (editStartDate !== currentStart) changes.startDate = editStartDate
+    updateMutation.mutate(changes)
+  }
 
   const markPaid = trpc.loans.markInstallmentPaid.useMutation({
     onSuccess: () => {
@@ -245,6 +336,8 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   }
 
   const now = new Date()
+  const isInterestOnly = loan.loanType === 'interest_only'
+  const cur = loan.currency
   const paid = loan.loanInstallments.filter((i) => i.isPaid).length
   const total = loan.loanInstallments.length
   const totalCollected = loan.loanInstallments
@@ -253,6 +346,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   const totalPending = loan.loanInstallments
     .filter((i) => !i.isPaid)
     .reduce((sum, i) => sum + Number(i.amount), 0)
+  const unpaidCount = loan.loanInstallments.filter((i) => !i.isPaid).length
 
   return (
     <div className="space-y-6">
@@ -261,62 +355,157 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">{loan.borrowerName}</h1>
-            <p className="text-sm text-muted-foreground">
-              {formatCurrency(Number(loan.capital))} - {loan.termMonths} cuotas de {formatCurrency(Number(loan.installmentAmount))}
-            </p>
-          </div>
+          {editing ? (
+            <div className="space-y-2">
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="text-lg font-bold h-9"
+                autoFocus
+              />
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground shrink-0">Fecha inicio:</Label>
+                <Input
+                  type="date"
+                  value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                  className="h-8 text-sm w-auto"
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-foreground">{loan.borrowerName}</h1>
+                {isInterestOnly && (
+                  <Badge variant="outline" className="text-xs">Solo interes</Badge>
+                )}
+                {cur !== 'ARS' && (
+                  <Badge variant="outline" className="text-xs">{cur}</Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {isInterestOnly
+                  ? `${formatCurrency(Number(loan.capital), cur)} · Interes mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                  : `${formatCurrency(Number(loan.capital), cur)} - ${loan.termMonths} cuotas de ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                }
+                {' · '}Inicio: {format(new Date(loan.startDate), "d MMM yyyy", { locale: es })}
+              </p>
+            </div>
+          )}
         </div>
-        {confirmDelete ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-red-500 font-medium">Eliminar?</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => deleteMutation.mutate({ id: loanId })}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? 'Eliminando...' : 'Si, eliminar'}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
-              Cancelar
-            </Button>
-          </div>
-        ) : (
-          <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} className="text-muted-foreground hover:text-red-500">
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          {editing ? (
+            <>
+              <Button variant="ghost" size="icon" onClick={saveEdit} disabled={updateMutation.isPending} className="text-green-600 hover:text-green-700">
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setEditing(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </>
+          ) : confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-red-500 font-medium">Eliminar?</span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => deleteMutation.mutate({ id: loanId })}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Eliminando...' : 'Si, eliminar'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Button variant="ghost" size="icon" onClick={startEditing} className="text-muted-foreground hover:text-foreground">
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} className="text-muted-foreground hover:text-red-500">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+      <div className={cn("grid gap-4", isInterestOnly ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-4")}>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Capital</p>
-            <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(Number(loan.capital))}</p>
+            <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(Number(loan.capital), cur)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Cobrado</p>
-            <p className="text-xl font-bold text-green-600 dark:text-green-400 mt-1">{formatCurrency(totalCollected)}</p>
+            <p className="text-xl font-bold text-green-600 dark:text-green-400 mt-1">{formatCurrency(totalCollected, cur)}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Pendiente</p>
-            <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(totalPending)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Cuotas</p>
-            <p className="text-xl font-bold text-foreground mt-1">{paid}/{total}</p>
-          </CardContent>
-        </Card>
+        {isInterestOnly ? (
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Interes mensual</p>
+              <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1">{formatCurrency(Number(loan.installmentAmount), cur)}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Pendiente</p>
+                <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(totalPending, cur)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Cuotas</p>
+                <p className="text-xl font-bold text-foreground mt-1">{paid}/{total}</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
+
+      {/* Interest-only action buttons */}
+      {isInterestOnly && loan.status === 'active' && (
+        <div className="flex flex-wrap gap-2">
+          {unpaidCount <= 3 && (
+            <Button
+              variant="outline"
+              onClick={() => generateMoreMutation.mutate({ loanId })}
+              disabled={generateMoreMutation.isPending}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {generateMoreMutation.isPending ? 'Generando...' : 'Generar mas cuotas'}
+            </Button>
+          )}
+          {confirmComplete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Devolvio el capital?</span>
+              <Button
+                size="sm"
+                onClick={() => completeMutation.mutate({ loanId })}
+                disabled={completeMutation.isPending}
+              >
+                {completeMutation.isPending ? 'Completando...' : 'Si, completar'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConfirmComplete(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" onClick={() => setConfirmComplete(true)}>
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Completar prestamo
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Installments table */}
       <Card>
@@ -361,10 +550,10 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                       )}>
                         {format(dueDate, "d MMM yyyy", { locale: es })}
                       </td>
-                      <td className="py-2.5 px-3 text-right">{formatCurrency(Number(inst.amount))}</td>
-                      <td className="py-2.5 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(Number(inst.interest))}</td>
-                      <td className="py-2.5 px-3 text-right">{formatCurrency(Number(inst.principal))}</td>
-                      <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(Number(inst.balance))}</td>
+                      <td className="py-2.5 px-3 text-right">{formatCurrency(Number(inst.amount), cur)}</td>
+                      <td className="py-2.5 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(Number(inst.interest), cur)}</td>
+                      <td className="py-2.5 px-3 text-right">{formatCurrency(Number(inst.principal), cur)}</td>
+                      <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(Number(inst.balance), cur)}</td>
                       <td className="py-2.5 px-3 text-center">
                         {inst.isPaid ? (
                           <button
@@ -427,7 +616,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between">
                       <p className="text-sm font-medium">Cuota {inst.number}</p>
-                      <p className="text-sm font-bold">{formatCurrency(Number(inst.amount))}</p>
+                      <p className="text-sm font-bold">{formatCurrency(Number(inst.amount), cur)}</p>
                     </div>
                     <p className={cn(
                       "text-xs mt-0.5",
@@ -469,6 +658,7 @@ function InstallmentCalendar({ onSelectLoan }: { onSelectLoan: (id: string) => v
           amount: Number(i.amount),
           borrowerName: loan.borrowerName,
           loanId: loan.id,
+          currency: loan.currency,
         }))
     )
 
@@ -574,11 +764,11 @@ function InstallmentCalendar({ onSelectLoan }: { onSelectLoan: (id: string) => v
                             ? "bg-red-500/15 text-red-600 dark:text-red-400"
                             : "bg-primary/10 text-primary"
                         )}
-                        title={`${inst.borrowerName} - ${formatCurrency(inst.amount)}`}
+                        title={`${inst.borrowerName} - ${formatCurrency(inst.amount, inst.currency)}`}
                       >
                         <span className={cn("inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle", borrowerColors.get(inst.borrowerName))} />
                         <span className="hidden md:inline">{inst.borrowerName} </span>
-                        {formatCurrency(inst.amount)}
+                        {formatCurrency(inst.amount, inst.currency)}
                       </button>
                     ))}
                     {dayInsts.length > 2 && (
@@ -634,7 +824,7 @@ function InstallmentCalendar({ onSelectLoan }: { onSelectLoan: (id: string) => v
                         </p>
                       </div>
                       <p className="text-sm font-bold text-foreground shrink-0">
-                        {formatCurrency(inst.amount)}
+                        {formatCurrency(inst.amount, inst.currency)}
                       </p>
                     </button>
                   )
@@ -666,7 +856,10 @@ function CreateLoanDialog({
   const utils = trpc.useUtils()
   const [borrowerName, setBorrowerName] = useState('')
   const [capital, setCapital] = useState(defaultValues?.capital || '')
+  const [currency, setCurrency] = useState<'ARS' | 'USD' | 'EUR'>('ARS')
+  const [loanType, setLoanType] = useState<'amortized' | 'interest_only'>('amortized')
   const [tna, setTna] = useState(defaultValues?.tna || '')
+  const [monthlyRate, setMonthlyRate] = useState('')
   const [termMonths, setTermMonths] = useState(defaultValues?.termMonths || '')
   const [startDate, setStartDate] = useState(defaultValues?.startDate || formatDateToInput(new Date()))
   const [customInstallment, setCustomInstallment] = useState('')
@@ -723,6 +916,11 @@ function CreateLoanDialog({
     }
   }
 
+  // Preview for interest-only
+  const interestPreview = loanType === 'interest_only' && capital && monthlyRate
+    ? parseFloat(capital) * (parseFloat(monthlyRate) / 100)
+    : null
+
   const createMutation = trpc.loans.create.useMutation({
     onSuccess: () => {
       utils.loans.list.invalidate()
@@ -730,7 +928,10 @@ function CreateLoanDialog({
       onOpenChange(false)
       setBorrowerName('')
       setCapital('')
+      setCurrency('ARS')
+      setLoanType('amortized')
       setTna('')
+      setMonthlyRate('')
       setTermMonths('')
       setCustomInstallment('')
       setImpliedTna(null)
@@ -739,13 +940,26 @@ function CreateLoanDialog({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    createMutation.mutate({
-      borrowerName,
-      capital: parseFloat(capital),
-      tna: parseFloat(tna) / 100,
-      termMonths: parseInt(termMonths),
-      startDate,
-    })
+    if (loanType === 'interest_only') {
+      createMutation.mutate({
+        borrowerName,
+        capital: parseFloat(capital),
+        currency,
+        loanType: 'interest_only',
+        monthlyInterestRate: parseFloat(monthlyRate) / 100,
+        startDate,
+      })
+    } else {
+      createMutation.mutate({
+        borrowerName,
+        capital: parseFloat(capital),
+        currency,
+        loanType: 'amortized',
+        tna: parseFloat(tna) / 100,
+        termMonths: parseInt(termMonths),
+        startDate,
+      })
+    }
   }
 
   return (
@@ -771,9 +985,39 @@ function CreateLoanDialog({
               required
             />
           </div>
+
+          {/* Loan type & currency */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="loanCapital">Capital (ARS)</Label>
+              <Label>Tipo de Prestamo</Label>
+              <Select value={loanType} onValueChange={(v) => setLoanType(v as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="amortized">Amortizado (cuotas fijas)</SelectItem>
+                  <SelectItem value="interest_only">Solo interes (sin plazo)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Moneda</Label>
+              <Select value={currency} onValueChange={(v) => setCurrency(v as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ARS">ARS (Pesos)</SelectItem>
+                  <SelectItem value="USD">USD (Dolares)</SelectItem>
+                  <SelectItem value="EUR">EUR (Euros)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="loanCapital">Capital ({currency})</Label>
               <Input
                 id="loanCapital"
                 type="number"
@@ -783,53 +1027,79 @@ function CreateLoanDialog({
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="loanTerm">Plazo (meses)</Label>
-              <Input
-                id="loanTerm"
-                type="number"
-                value={termMonths}
-                onChange={(e) => handleTermChange(e.target.value)}
-                placeholder="12"
-                min="1"
-                max="360"
-                required
-              />
-            </div>
+            {loanType === 'amortized' ? (
+              <div className="space-y-2">
+                <Label htmlFor="loanTerm">Plazo (meses)</Label>
+                <Input
+                  id="loanTerm"
+                  type="number"
+                  value={termMonths}
+                  onChange={(e) => handleTermChange(e.target.value)}
+                  placeholder="12"
+                  min="1"
+                  max="360"
+                  required
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="loanMonthlyRate">Tasa Mensual (%)</Label>
+                <Input
+                  id="loanMonthlyRate"
+                  type="number"
+                  value={monthlyRate}
+                  onChange={(e) => setMonthlyRate(e.target.value)}
+                  placeholder="10"
+                  step="0.5"
+                  required
+                />
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="loanTna">TNA (%)</Label>
-              <Input
-                id="loanTna"
-                type="number"
-                value={tna}
-                onChange={(e) => { setTna(e.target.value); setImpliedTna(null); setCustomInstallment('') }}
-                placeholder="55"
-                step="0.5"
-                required
-              />
-              {impliedTna !== null && (
-                <p className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                  <Zap className="h-3 w-3" />
-                  Calculada desde la cuota
-                </p>
-              )}
+
+          {loanType === 'amortized' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="loanTna">TNA (%)</Label>
+                <Input
+                  id="loanTna"
+                  type="number"
+                  value={tna}
+                  onChange={(e) => { setTna(e.target.value); setImpliedTna(null); setCustomInstallment('') }}
+                  placeholder="55"
+                  step="0.5"
+                  required
+                />
+                {impliedTna !== null && (
+                  <p className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                    <Zap className="h-3 w-3" />
+                    Calculada desde la cuota
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="loanInstallment">Cuota Deseada (opcional)</Label>
+                <Input
+                  id="loanInstallment"
+                  type="number"
+                  value={customInstallment}
+                  onChange={(e) => handleInstallmentChange(e.target.value)}
+                  placeholder="Calcular TNA desde cuota"
+                />
+                {reverseMutation.isPending && (
+                  <p className="text-xs text-muted-foreground">Calculando TNA...</p>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="loanInstallment">Cuota Deseada (opcional)</Label>
-              <Input
-                id="loanInstallment"
-                type="number"
-                value={customInstallment}
-                onChange={(e) => handleInstallmentChange(e.target.value)}
-                placeholder="Calcular TNA desde cuota"
-              />
-              {reverseMutation.isPending && (
-                <p className="text-xs text-muted-foreground">Calculando TNA...</p>
-              )}
+          )}
+
+          {/* Interest-only preview */}
+          {loanType === 'interest_only' && interestPreview !== null && interestPreview > 0 && (
+            <div className="bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg px-3 py-2 text-sm">
+              Cuota mensual de interes: <strong>{formatCurrency(interestPreview, currency)}</strong>
             </div>
-          </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="loanStartDate">Fecha de Inicio</Label>
             <Input
@@ -853,4 +1123,3 @@ function CreateLoanDialog({
     </Dialog>
   )
 }
-

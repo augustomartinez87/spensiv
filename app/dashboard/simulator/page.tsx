@@ -32,13 +32,9 @@ import {
   Info,
   Zap,
   Banknote,
+  X,
 } from 'lucide-react'
-import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
-
-const ComparisonChart = dynamic(
-  () => import('@/components/simulator/comparison-chart').then(m => m.ComparisonChart),
-  { ssr: false, loading: () => <div className="h-[350px] w-full animate-pulse bg-muted rounded-lg" /> }
-)
+import type { SimulationResult } from '@/lib/loan-calculator'
 
 const AccrualChart = dynamic(
   () => import('@/components/simulator/accrual-chart').then(m => m.AccrualChart),
@@ -62,16 +58,20 @@ export default function SimulatorPage() {
   const [impliedTna, setImpliedTna] = useState<number | null>(null)
   const [startDate, setStartDate] = useState(formatDateToInput(new Date()))
 
+  // Compare terms state
+  const [compareTermsInput, setCompareTermsInput] = useState('')
+  const [compareTerms, setCompareTerms] = useState<number[]>([3, 6, 12])
+
   // Results
   const [singleResult, setSingleResult] = useState<SimulationResult | null>(null)
-  const [compareResult, setCompareResult] = useState<ComparisonResult | null>(null)
+  const [compareResults, setCompareResults] = useState<SimulationResult[] | null>(null)
 
   const simulateMutation = trpc.loans.simulate.useMutation({
     onSuccess: (data) => setSingleResult(data),
   })
 
-  const compareMutation = trpc.loans.compare.useMutation({
-    onSuccess: (data) => setCompareResult(data),
+  const compareTermsMutation = trpc.loans.compareTerms.useMutation({
+    onSuccess: (data) => setCompareResults(data),
   })
 
   const reverseMutation = trpc.loans.reverseFromInstallment.useMutation({
@@ -86,7 +86,7 @@ export default function SimulatorPage() {
     },
   })
 
-  const isLoading = simulateMutation.isPending || compareMutation.isPending
+  const isLoading = simulateMutation.isPending || compareTermsMutation.isPending
 
   function handleInstallmentChange(value: string) {
     setCustomInstallment(value)
@@ -105,23 +105,41 @@ export default function SimulatorPage() {
     }
   }
 
+  function addCompareTerm() {
+    const term = parseInt(compareTermsInput)
+    if (term > 0 && term <= 360 && !compareTerms.includes(term) && compareTerms.length < 4) {
+      setCompareTerms([...compareTerms, term].sort((a, b) => a - b))
+      setCompareTermsInput('')
+    }
+  }
+
+  function removeCompareTerm(term: number) {
+    setCompareTerms(compareTerms.filter((t) => t !== term))
+  }
+
   function handleSimulate() {
     const baseInput = {
       capital: parseFloat(capital),
-      termMonths: parseInt(termMonths),
       tnaTarget: parseFloat(tnaTarget) / 100,
       hurdleRate: parseFloat(hurdleRate) / 100,
       accrualType: accrualType as 'linear' | 'exponential',
       startDate,
-      ...(customInstallment ? { customInstallment: parseFloat(customInstallment) } : {}),
     }
 
     if (viewMode === 'compare') {
-      compareMutation.mutate(baseInput)
+      compareTermsMutation.mutate({
+        ...baseInput,
+        terms: compareTerms,
+      })
       setSingleResult(null)
     } else {
-      simulateMutation.mutate({ ...baseInput, loanType })
-      setCompareResult(null)
+      simulateMutation.mutate({
+        ...baseInput,
+        termMonths: parseInt(termMonths),
+        loanType,
+        ...(customInstallment ? { customInstallment: parseFloat(customInstallment) } : {}),
+      })
+      setCompareResults(null)
     }
     setActiveTab('results')
   }
@@ -162,14 +180,14 @@ export default function SimulatorPage() {
     })
   }
 
-  const hasResults = singleResult || compareResult
+  const hasResults = singleResult || compareResults
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Simulador de Crédito</h1>
+        <h1 className="text-3xl font-bold text-foreground">Simulador de Credito</h1>
         <p className="text-muted-foreground mt-1">
-          Compará rendimiento por descuento (bullet) vs préstamo amortizado (cuotas)
+          Simula prestamos amortizados y compara distintos plazos
         </p>
       </div>
 
@@ -178,7 +196,7 @@ export default function SimulatorPage() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Calculator className="h-5 w-5 text-primary" />
-            Parámetros de Simulación
+            Parametros de Simulacion
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -190,7 +208,7 @@ export default function SimulatorPage() {
               onClick={() => setViewMode('compare')}
             >
               <ArrowRightLeft className="h-4 w-4 mr-2" />
-              Comparar Ambos
+              Comparar Plazos
             </Button>
             <Button
               variant={viewMode === 'single' ? 'default' : 'outline'}
@@ -198,7 +216,7 @@ export default function SimulatorPage() {
               onClick={() => setViewMode('single')}
             >
               <Calculator className="h-4 w-4 mr-2" />
-              Simulación Individual
+              Simulacion Individual
             </Button>
           </div>
 
@@ -214,18 +232,20 @@ export default function SimulatorPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="termMonths">Plazo (meses)</Label>
-              <Input
-                id="termMonths"
-                type="number"
-                value={termMonths}
-                onChange={(e) => setTermMonths(e.target.value)}
-                placeholder="12"
-                min="1"
-                max="360"
-              />
-            </div>
+            {viewMode === 'single' && (
+              <div className="space-y-2">
+                <Label htmlFor="termMonths">Plazo (meses)</Label>
+                <Input
+                  id="termMonths"
+                  type="number"
+                  value={termMonths}
+                  onChange={(e) => setTermMonths(e.target.value)}
+                  placeholder="12"
+                  min="1"
+                  max="360"
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="tnaTarget">TNA Objetivo (%)</Label>
@@ -263,7 +283,7 @@ export default function SimulatorPage() {
 
             {viewMode === 'single' && (
               <div className="space-y-2">
-                <Label>Tipo de Préstamo</Label>
+                <Label>Tipo de Prestamo</Label>
                 <Select value={loanType} onValueChange={(v) => setLoanType(v as any)}>
                   <SelectTrigger>
                     <SelectValue />
@@ -276,18 +296,20 @@ export default function SimulatorPage() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>Devengamiento Bullet</Label>
-              <Select value={accrualType} onValueChange={(v) => setAccrualType(v as any)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="exponential">Exponencial</SelectItem>
-                  <SelectItem value="linear">Lineal</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {viewMode === 'single' && loanType === 'bullet' && (
+              <div className="space-y-2">
+                <Label>Devengamiento Bullet</Label>
+                <Select value={accrualType} onValueChange={(v) => setAccrualType(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="exponential">Exponencial</SelectItem>
+                    <SelectItem value="linear">Lineal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {viewMode === 'single' && loanType === 'amortized' && (
               <div className="space-y-2">
@@ -297,12 +319,12 @@ export default function SimulatorPage() {
                   type="number"
                   value={customInstallment}
                   onChange={(e) => handleInstallmentChange(e.target.value)}
-                  placeholder="Dejar vacío para calcular"
+                  placeholder="Dejar vacio para calcular"
                 />
                 {impliedTna !== null && (
                   <p className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400">
                     <Zap className="h-3 w-3" />
-                    TNA implícita: {(impliedTna * 100).toFixed(2)}% (aplicada arriba)
+                    TNA implicita: {(impliedTna * 100).toFixed(2)}% (aplicada arriba)
                   </p>
                 )}
                 {reverseMutation.isPending && (
@@ -312,7 +334,48 @@ export default function SimulatorPage() {
             )}
           </div>
 
-          <Button onClick={handleSimulate} disabled={isLoading} className="w-full sm:w-auto">
+          {/* Compare terms chips */}
+          {viewMode === 'compare' && (
+            <div className="space-y-2">
+              <Label>Plazos a comparar (meses)</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                {compareTerms.map((term) => (
+                  <span
+                    key={term}
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium"
+                  >
+                    {term} meses
+                    <button onClick={() => removeCompareTerm(term)} className="hover:text-red-500 transition-colors">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                {compareTerms.length < 4 && (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      value={compareTermsInput}
+                      onChange={(e) => setCompareTermsInput(e.target.value)}
+                      placeholder="Ej: 24"
+                      className="w-24 h-8 text-sm"
+                      min="1"
+                      max="360"
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCompareTerm() } }}
+                    />
+                    <Button variant="outline" size="sm" className="h-8" onClick={addCompareTerm}>
+                      Agregar
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <Button
+            onClick={handleSimulate}
+            disabled={isLoading || (viewMode === 'compare' && compareTerms.length === 0)}
+            className="w-full sm:w-auto"
+          >
             {isLoading ? 'Calculando...' : 'Simular'}
           </Button>
         </CardContent>
@@ -321,67 +384,27 @@ export default function SimulatorPage() {
       {/* Results */}
       {hasResults && (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="results">Resultados</TabsTrigger>
             <TabsTrigger value="table">Tabla de Flujos</TabsTrigger>
-            <TabsTrigger value="chart">Gráficos</TabsTrigger>
           </TabsList>
 
           {/* ── Results Tab ── */}
           <TabsContent value="results" className="space-y-6 mt-6">
-            {compareResult && <CompareResultCards result={compareResult} onCreateLoan={handleCreateLoan} />}
+            {compareResults && <CompareTermsResultCards results={compareResults} onCreateLoan={handleCreateLoan} />}
             {singleResult && <SingleResultCards result={singleResult} onCreateLoan={handleCreateLoan} />}
           </TabsContent>
 
           {/* ── Table Tab ── */}
           <TabsContent value="table" className="space-y-6 mt-6">
-            {compareResult && (
-              <>
-                <AmortizationTable result={compareResult.amortized} title="Amortizado (Cuotas)" />
-                <BulletTable result={compareResult.bullet} title="Bullet (Descuento)" />
-              </>
-            )}
+            {compareResults && compareResults.map((r) => (
+              <AmortizationTable key={r.termMonths} result={r} title={`${r.termMonths} meses`} />
+            ))}
             {singleResult && singleResult.loanType === 'amortized' && (
               <AmortizationTable result={singleResult} title="Amortizado (Cuotas)" />
             )}
             {singleResult && singleResult.loanType === 'bullet' && (
               <BulletTable result={singleResult} title="Bullet (Descuento)" />
-            )}
-          </TabsContent>
-
-          {/* ── Chart Tab ── */}
-          <TabsContent value="chart" className="space-y-6 mt-6">
-            {compareResult && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Rendimiento Acumulado Comparativo</CardTitle>
-                  <CardDescription>Devengamiento acumulado: amortizado vs bullet</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[400px]">
-                    <ComparisonChart
-                      amortizedCurve={compareResult.amortized.accruedCurve}
-                      bulletCurve={compareResult.bullet.accruedCurve}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {singleResult && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Devengamiento Acumulado</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[350px]">
-                    <AccrualChart
-                      data={singleResult.accruedCurve}
-                      color={singleResult.loanType === 'amortized' ? '#3b82f6' : '#f59e0b'}
-                      label={singleResult.loanType === 'amortized' ? 'Interés Acumulado' : 'Devengamiento'}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
             )}
           </TabsContent>
         </Tabs>
@@ -557,43 +580,22 @@ function ResultCardContent({ result, title, onCreateLoan }: { result: Simulation
   )
 }
 
-function CompareResultCards({ result, onCreateLoan }: { result: ComparisonResult; onCreateLoan?: (result: SimulationResult) => void }) {
-  const recLabel =
-    result.recommendation === 'amortized'
-      ? 'Amortizado'
-      : result.recommendation === 'bullet'
-        ? 'Bullet'
-        : 'Ninguno'
-
+function CompareTermsResultCards({ results, onCreateLoan }: { results: SimulationResult[]; onCreateLoan?: (result: SimulationResult) => void }) {
   return (
-    <>
-      {/* Recommendation banner */}
-      <Card className={cn(
-        "border-2",
-        result.recommendation === 'neither'
-          ? "border-red-500/30 bg-red-500/5"
-          : "border-green-500/30 bg-green-500/5"
-      )}>
-        <CardContent className="py-4">
-          <div className="flex items-center gap-3">
-            <Info className="h-5 w-5 text-primary shrink-0" />
-            <div>
-              <p className="font-bold text-foreground">
-                Recomendación: <span className={result.recommendation === 'neither' ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>{recLabel}</span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Diferencia de TIR: {result.tirDifference > 0 ? '+' : ''}{result.tirDifference.toFixed(2)} pp a favor del amortizado
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        <ResultCardContent result={result.amortized} title="Amortizado (Cuotas)" onCreateLoan={onCreateLoan} />
-        <ResultCardContent result={result.bullet} title="Bullet (Descuento)" />
-      </div>
-    </>
+    <div className={cn(
+      "grid gap-6 grid-cols-1",
+      results.length === 2 && "lg:grid-cols-2",
+      results.length >= 3 && "lg:grid-cols-3",
+    )}>
+      {results.map((result) => (
+        <ResultCardContent
+          key={result.termMonths}
+          result={result}
+          title={`${result.termMonths} meses`}
+          onCreateLoan={onCreateLoan}
+        />
+      ))}
+    </div>
   )
 }
 
@@ -610,7 +612,7 @@ function AmortizationTable({ result, title }: { result: SimulationResult; title:
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">{title} - Tabla de Amortización</CardTitle>
+        <CardTitle className="text-lg">{title} - Tabla de Amortizacion</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -620,7 +622,7 @@ function AmortizationTable({ result, title }: { result: SimulationResult; title:
                 <th className="text-left py-2 px-3 font-medium">Mes</th>
                 <th className="text-left py-2 px-3 font-medium">Fecha</th>
                 <th className="text-right py-2 px-3 font-medium">Cuota</th>
-                <th className="text-right py-2 px-3 font-medium">Interés</th>
+                <th className="text-right py-2 px-3 font-medium">Interes</th>
                 <th className="text-right py-2 px-3 font-medium">Capital</th>
                 <th className="text-right py-2 px-3 font-medium">Saldo</th>
                 <th className="text-right py-2 px-3 font-medium">Rend. Acum.</th>
