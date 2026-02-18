@@ -28,6 +28,7 @@ import {
   AlertCircle,
   Banknote,
   Undo2,
+  Zap,
 } from 'lucide-react'
 
 export default function LoansPage() {
@@ -399,6 +400,59 @@ function CreateLoanDialog({
   const [tna, setTna] = useState(defaultValues?.tna || '')
   const [termMonths, setTermMonths] = useState(defaultValues?.termMonths || '')
   const [startDate, setStartDate] = useState(defaultValues?.startDate || formatDateToInput(new Date()))
+  const [customInstallment, setCustomInstallment] = useState('')
+  const [impliedTna, setImpliedTna] = useState<number | null>(null)
+
+  const reverseMutation = trpc.loans.reverseFromInstallment.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        const tnaPercent = (data.tna * 100).toFixed(2)
+        setImpliedTna(data.tna)
+        setTna(tnaPercent)
+      } else {
+        setImpliedTna(null)
+      }
+    },
+  })
+
+  function handleInstallmentChange(value: string) {
+    setCustomInstallment(value)
+    setImpliedTna(null)
+
+    const installment = parseFloat(value)
+    const cap = parseFloat(capital)
+    const term = parseInt(termMonths)
+
+    if (installment > 0 && cap > 0 && term > 0 && installment > cap / term) {
+      reverseMutation.mutate({
+        capital: cap,
+        termMonths: term,
+        desiredInstallment: installment,
+      })
+    }
+  }
+
+  // Re-trigger reverse calc when capital or term change and there's a custom installment
+  function handleCapitalChange(value: string) {
+    setCapital(value)
+    retriggerReverse(value, termMonths, customInstallment)
+  }
+
+  function handleTermChange(value: string) {
+    setTermMonths(value)
+    retriggerReverse(capital, value, customInstallment)
+  }
+
+  function retriggerReverse(cap: string, term: string, installment: string) {
+    if (!installment) return
+    setImpliedTna(null)
+    const c = parseFloat(cap)
+    const t = parseInt(term)
+    const i = parseFloat(installment)
+    if (i > 0 && c > 0 && t > 0 && i > c / t) {
+      reverseMutation.mutate({ capital: c, termMonths: t, desiredInstallment: i })
+    }
+  }
 
   const createMutation = trpc.loans.create.useMutation({
     onSuccess: () => {
@@ -409,6 +463,8 @@ function CreateLoanDialog({
       setCapital('')
       setTna('')
       setTermMonths('')
+      setCustomInstallment('')
+      setImpliedTna(null)
     },
   })
 
@@ -417,7 +473,7 @@ function CreateLoanDialog({
     createMutation.mutate({
       borrowerName,
       capital: parseFloat(capital),
-      tna: parseFloat(tna) / 100, // Convert from % to decimal
+      tna: parseFloat(tna) / 100,
       termMonths: parseInt(termMonths),
       startDate,
     })
@@ -453,48 +509,67 @@ function CreateLoanDialog({
                 id="loanCapital"
                 type="number"
                 value={capital}
-                onChange={(e) => setCapital(e.target.value)}
+                onChange={(e) => handleCapitalChange(e.target.value)}
                 placeholder="1000000"
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="loanTna">TNA (%)</Label>
-              <Input
-                id="loanTna"
-                type="number"
-                value={tna}
-                onChange={(e) => setTna(e.target.value)}
-                placeholder="55"
-                step="0.5"
-                required
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="loanTerm">Plazo (meses)</Label>
               <Input
                 id="loanTerm"
                 type="number"
                 value={termMonths}
-                onChange={(e) => setTermMonths(e.target.value)}
+                onChange={(e) => handleTermChange(e.target.value)}
                 placeholder="12"
                 min="1"
                 max="360"
                 required
               />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="loanStartDate">Fecha de Inicio</Label>
+              <Label htmlFor="loanTna">TNA (%)</Label>
               <Input
-                id="loanStartDate"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                id="loanTna"
+                type="number"
+                value={tna}
+                onChange={(e) => { setTna(e.target.value); setImpliedTna(null); setCustomInstallment('') }}
+                placeholder="55"
+                step="0.5"
                 required
               />
+              {impliedTna !== null && (
+                <p className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                  <Zap className="h-3 w-3" />
+                  Calculada desde la cuota
+                </p>
+              )}
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="loanInstallment">Cuota Deseada (opcional)</Label>
+              <Input
+                id="loanInstallment"
+                type="number"
+                value={customInstallment}
+                onChange={(e) => handleInstallmentChange(e.target.value)}
+                placeholder="Calcular TNA desde cuota"
+              />
+              {reverseMutation.isPending && (
+                <p className="text-xs text-muted-foreground">Calculando TNA...</p>
+              )}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="loanStartDate">Fecha de Inicio</Label>
+            <Input
+              id="loanStartDate"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              required
+            />
           </div>
 
           {createMutation.error && (
