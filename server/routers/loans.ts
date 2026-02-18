@@ -141,6 +141,21 @@ export const loansRouter = router({
     })
   }),
 
+  delete: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.id, userId: ctx.user.id },
+      })
+
+      if (!loan) {
+        throw new Error('Préstamo no encontrado')
+      }
+
+      await ctx.prisma.loan.delete({ where: { id: input.id } })
+      return { success: true }
+    }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
