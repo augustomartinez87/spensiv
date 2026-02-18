@@ -18,6 +18,8 @@ import {
   PanelLeftOpen,
   Settings,
   Sparkles,
+  Users,
+  PieChart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -29,6 +31,8 @@ const navigation = [
   { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
   { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
   { name: 'Prestamos', href: '/dashboard/loans', icon: Banknote },
+  { name: 'Personas', href: '/dashboard/persons', icon: Users },
+  { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
   { name: 'Importar', href: '/dashboard/import', icon: FileUp },
 ]
 
@@ -110,7 +114,7 @@ export default function DashboardLayout({
         {/* Premium Plan Card */}
         {!sidebarCollapsed && (
           <div className="px-3 pb-3">
-            <div className="rounded-xl bg-gradient-to-br from-[hsl(230,40%,18%)] to-[hsl(230,35%,13%)] border border-white/[0.06] p-4">
+            <div className="rounded-xl bg-gradient-to-br from-[#1F1F1F] to-[#171717] border border-white/[0.06] p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="h-4 w-4 text-amber-400" />
                 <span className="text-xs font-bold text-white uppercase tracking-wider">Premium Plan</span>
@@ -118,7 +122,7 @@ export default function DashboardLayout({
               <p className="text-[11px] text-[hsl(var(--sidebar-foreground))] leading-relaxed mb-3">
                 Unlock advanced analytics and projection tools.
               </p>
-              <button className="w-full py-2 rounded-lg bg-[hsl(var(--sidebar-active))] hover:bg-[hsl(200,80%,48%)] text-white text-xs font-semibold transition-colors">
+              <button className="w-full py-2 rounded-lg bg-[#128DDA] hover:bg-[#056FE0] text-white text-xs font-semibold transition-colors">
                 Upgrade Now
               </button>
             </div>

@@ -44,7 +44,13 @@ import {
   Check,
   X,
   Infinity,
+  UserCircle,
+  ShieldCheck,
+  Shield,
+  ShieldAlert,
+  ShieldX,
 } from 'lucide-react'
+import { calculatePersonScore } from '@/lib/loan-scoring'
 
 export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
@@ -153,7 +159,15 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
             <CardContent className="p-5 space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-bold text-lg text-foreground">{loan.borrowerName}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-lg text-foreground">{loan.borrowerName}</h3>
+                    {loan.person && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 gap-1">
+                        <UserCircle className="h-3 w-3" />
+                        {loan.person.alias || loan.person.name}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {formatCurrency(Number(loan.capital), cur)}
                     {isInterestOnly
@@ -256,6 +270,9 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editStartDate, setEditStartDate] = useState('')
+  const [assignPersonOpen, setAssignPersonOpen] = useState(false)
+  const [assignPersonId, setAssignPersonId] = useState('')
+  const { data: allPersons } = trpc.persons.list.useQuery()
 
   const deleteMutation = trpc.loans.delete.useMutation({
     onSuccess: () => {
@@ -431,6 +448,50 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           )}
         </div>
       </div>
+
+      {/* Person assignment */}
+      {!loan.person && allPersons && allPersons.length > 0 && (
+        assignPersonOpen ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={assignPersonId} onValueChange={setAssignPersonId}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Seleccionar persona" />
+              </SelectTrigger>
+              <SelectContent>
+                {allPersons.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} · Score: {p.score}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              disabled={!assignPersonId || updateMutation.isPending}
+              onClick={() => {
+                updateMutation.mutate({ id: loanId, personId: assignPersonId })
+                setAssignPersonOpen(false)
+              }}
+            >
+              Asignar
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setAssignPersonOpen(false)}>
+              Cancelar
+            </Button>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => setAssignPersonOpen(true)}>
+            <UserCircle className="h-4 w-4 mr-2" />
+            Asignar persona
+          </Button>
+        )
+      )}
+      {loan.person && (
+        <div className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-muted">
+          <UserCircle className="h-4 w-4 text-muted-foreground" />
+          <span>Persona: <strong>{loan.person.name}</strong>{loan.person.alias ? ` (${loan.person.alias})` : ''}</span>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className={cn("grid gap-4", isInterestOnly ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-4")}>
@@ -864,6 +925,9 @@ function CreateLoanDialog({
   const [startDate, setStartDate] = useState(defaultValues?.startDate || formatDateToInput(new Date()))
   const [customInstallment, setCustomInstallment] = useState('')
   const [impliedTna, setImpliedTna] = useState<number | null>(null)
+  const [selectedPersonId, setSelectedPersonId] = useState<string>('')
+
+  const { data: persons } = trpc.persons.list.useQuery()
 
   const reverseMutation = trpc.loans.reverseFromInstallment.useMutation({
     onSuccess: (data) => {
@@ -935,6 +999,7 @@ function CreateLoanDialog({
       setTermMonths('')
       setCustomInstallment('')
       setImpliedTna(null)
+      setSelectedPersonId('')
     },
   })
 
@@ -948,6 +1013,7 @@ function CreateLoanDialog({
         loanType: 'interest_only',
         monthlyInterestRate: parseFloat(monthlyRate) / 100,
         startDate,
+        personId: selectedPersonId || undefined,
       })
     } else {
       createMutation.mutate({
@@ -958,6 +1024,7 @@ function CreateLoanDialog({
         tna: parseFloat(tna) / 100,
         termMonths: parseInt(termMonths),
         startDate,
+        personId: selectedPersonId || undefined,
       })
     }
   }
@@ -985,6 +1052,57 @@ function CreateLoanDialog({
               required
             />
           </div>
+
+          {/* Person selector */}
+          {persons && persons.length > 0 && (
+            <div className="space-y-2">
+              <Label>Persona (opcional)</Label>
+              <Select value={selectedPersonId} onValueChange={(v) => {
+                setSelectedPersonId(v === '__none__' ? '' : v)
+                if (v !== '__none__') {
+                  const p = persons.find((p) => p.id === v)
+                  if (p && !borrowerName) setBorrowerName(p.name)
+                }
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin persona asignada" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin persona</SelectItem>
+                  {persons.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.alias ? `(${p.alias})` : ''} · Score: {p.score}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedPersonId && (() => {
+                const sp = persons.find((p) => p.id === selectedPersonId)
+                if (!sp) return null
+                const isCritical = sp.category === 'critico'
+                return (
+                  <div className={cn(
+                    'text-xs px-3 py-2 rounded-lg flex items-center gap-2',
+                    isCritical
+                      ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                      : sp.category === 'alto'
+                        ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                        : sp.category === 'medio'
+                          ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+                          : 'bg-green-500/10 text-green-600 dark:text-green-400'
+                  )}>
+                    {isCritical ? <ShieldX className="h-3.5 w-3.5" /> : <Shield className="h-3.5 w-3.5" />}
+                    <span>
+                      {isCritical
+                        ? 'Score critico — no se recomienda prestar'
+                        : `Riesgo ${sp.category} · Spread minimo: +${(sp.minTnaSpread * 100).toFixed(0)}pp`
+                      }
+                    </span>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
 
           {/* Loan type & currency */}
           <div className="grid grid-cols-2 gap-4">

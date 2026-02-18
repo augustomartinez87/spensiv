@@ -30,6 +30,7 @@ model User {
   alerts        Alert[]
   bankStatements BankStatement[]
   loans          Loan[]
+  persons        Person[]
 
   @@map("users")
 }
@@ -330,10 +331,51 @@ model BankStatement {
 // PERSONAL LOANS
 // ============================================================================
 
+model Person {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Identificación
+  name            String
+  alias           String?
+  relationship    String   @default("conocido") // "amigo" | "amigo_de_amigo" | "conocido"
+  referrer        String?  // Quien lo refiere
+
+  // Perfil económico
+  incomeType      String   @default("informal") // "en_blanco" | "monotributo" | "informal"
+  sector          String?
+  tenureMonths    Int?     // Antigüedad laboral en meses
+  estimatedIncome Decimal? @db.Decimal(12, 2)
+
+  // Estabilidad
+  livesAlone      Boolean  @default(false)
+  hasChildren     Boolean  @default(false)
+  recentJobChanges Boolean @default(false)
+  previousDebts   Boolean  @default(false)
+
+  // Comportamiento (1-5)
+  punctualityScore     Int @default(3)
+  communicationScore   Int @default(3)
+  debtAttitudeScore    Int @default(3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  loans     Loan[]
+
+  @@index([userId])
+  @@map("persons")
+}
+
 model Loan {
   id              String   @id @default(cuid())
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  personId        String?
+  person          Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
 
   borrowerName    String   // Nombre/alias del deudor
   capital         Decimal  @db.Decimal(12, 2)
@@ -355,6 +397,7 @@ model Loan {
 
   @@index([userId])
   @@index([userId, status])
+  @@index([personId])
   @@map("loans")
 }
 

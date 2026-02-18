@@ -33,6 +33,7 @@ const createLoanInput = z.object({
   monthlyInterestRate: z.number().positive().optional(), // for interest_only (e.g. 0.10 = 10%)
   termMonths: z.number().int().min(1).max(360).optional(), // required for amortized
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  personId: z.string().optional(),
 })
 
 export const loansRouter = router({
@@ -110,6 +111,7 @@ export const loansRouter = router({
             totalAmount: null,
             startDate,
             status: 'active',
+            personId: input.personId ?? null,
             loanInstallments: { create: installments },
           },
           include: {
@@ -150,6 +152,7 @@ export const loansRouter = router({
           totalAmount,
           startDate,
           status: 'active',
+          personId: input.personId ?? null,
           loanInstallments: {
             create: table.map((row) => ({
               number: row.month,
@@ -222,6 +225,9 @@ export const loansRouter = router({
     const loans = await ctx.prisma.loan.findMany({
       where: { userId: ctx.user.id },
       include: {
+        person: {
+          select: { id: true, name: true, alias: true },
+        },
         loanInstallments: {
           orderBy: { number: 'asc' },
           select: {
@@ -256,6 +262,7 @@ export const loansRouter = router({
       id: z.string(),
       borrowerName: z.string().min(1).optional(),
       startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      personId: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const loan = await ctx.prisma.loan.findFirst({
@@ -270,6 +277,7 @@ export const loansRouter = router({
       const updates: Record<string, any> = {}
       if (input.borrowerName) updates.borrowerName = input.borrowerName
       if (input.startDate) updates.startDate = new Date(input.startDate + 'T00:00:00')
+      if (input.personId !== undefined) updates.personId = input.personId
 
       const updated = await ctx.prisma.loan.update({
         where: { id: input.id },
@@ -313,6 +321,9 @@ export const loansRouter = router({
       const loan = await ctx.prisma.loan.findFirst({
         where: { id: input.id, userId: ctx.user.id },
         include: {
+          person: {
+            select: { id: true, name: true, alias: true },
+          },
           loanInstallments: { orderBy: { number: 'asc' } },
         },
       })
