@@ -33,6 +33,10 @@ import {
   Zap,
   Banknote,
   X,
+  Share2,
+  BarChart3,
+  Copy,
+  Check,
 } from 'lucide-react'
 import type { SimulationResult } from '@/lib/loan-calculator'
 
@@ -46,6 +50,7 @@ type ViewMode = 'single' | 'compare'
 export default function SimulatorPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('compare')
   const [activeTab, setActiveTab] = useState('results')
+  const [resultsView, setResultsView] = useState<'analysis' | 'share'>('analysis')
   const resultsRef = useRef<HTMLDivElement>(null)
 
   // Form state
@@ -414,8 +419,41 @@ export default function SimulatorPage() {
 
           {/* ── Results Tab ── */}
           <TabsContent value="results" className="space-y-6 mt-6">
-            {compareResults && <CompareTermsResultCards results={compareResults} onCreateLoan={handleCreateLoan} />}
-            {singleResult && <SingleResultCards result={singleResult} onCreateLoan={handleCreateLoan} />}
+            {/* Sub-toggle: Mi análisis / Para compartir */}
+            <div className="flex gap-1 bg-muted rounded-lg p-0.5 w-fit">
+              <Button
+                variant={resultsView === 'analysis' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setResultsView('analysis')}
+              >
+                <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                Mi análisis
+              </Button>
+              <Button
+                variant={resultsView === 'share' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setResultsView('share')}
+              >
+                <Share2 className="h-3.5 w-3.5 mr-1.5" />
+                Para compartir
+              </Button>
+            </div>
+
+            {resultsView === 'analysis' && (
+              <>
+                {compareResults && <CompareTermsResultCards results={compareResults} onCreateLoan={handleCreateLoan} />}
+                {singleResult && <SingleResultCards result={singleResult} onCreateLoan={handleCreateLoan} />}
+              </>
+            )}
+
+            {resultsView === 'share' && (
+              <>
+                {compareResults && <ShareableResultCards results={compareResults} currency={currency} />}
+                {singleResult && <ShareableResultCards results={[singleResult]} currency={currency} />}
+              </>
+            )}
           </TabsContent>
 
           {/* ── Table Tab ── */}
@@ -669,6 +707,129 @@ function AmortizationTable({ result, title }: { result: SimulationResult; title:
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+// ─── Shareable View ──────────────────────────────────────────────────
+
+function ShareableResultCards({ results, currency }: { results: SimulationResult[]; currency: string }) {
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+
+  function generateWhatsAppText(result: SimulationResult): string {
+    if (result.loanType === 'bullet') {
+      return [
+        `💰 *Propuesta de Préstamo*`,
+        ``,
+        `Monto: ${formatCurrency(result.capital, currency)}`,
+        `Plazo: ${result.termMonths} meses`,
+        `Devolvés: ${formatCurrency(result.nominalValue!, currency)}`,
+        ``,
+        `En ${result.termMonths} meses devolvés ${formatCurrency(result.nominalValue!, currency)}`,
+      ].join('\n')
+    }
+
+    const installment = result.installmentAmount!
+    const total = result.totalPaid!
+    const monthlyPct = (result.monthlyRate * 100).toFixed(1)
+
+    return [
+      `💰 *Propuesta de Préstamo*`,
+      ``,
+      `Monto: ${formatCurrency(result.capital, currency)}`,
+      `Cuotas: ${result.termMonths} de ${formatCurrency(installment, currency)}`,
+      `Total a devolver: ${formatCurrency(total, currency)}`,
+      `Tasa: ${monthlyPct}% mensual`,
+      ``,
+      `En ${result.termMonths} meses pagás ${formatCurrency(total, currency)} en ${result.termMonths} cuotas de ${formatCurrency(installment, currency)}`,
+    ].join('\n')
+  }
+
+  async function handleCopy(index: number, result: SimulationResult) {
+    const text = generateWhatsAppText(result)
+    await navigator.clipboard.writeText(text)
+    setCopiedIndex(index)
+    setTimeout(() => setCopiedIndex(null), 2000)
+  }
+
+  return (
+    <div className={cn(
+      "grid gap-6 grid-cols-1",
+      results.length === 2 && "lg:grid-cols-2",
+      results.length >= 3 && "lg:grid-cols-3",
+    )}>
+      {results.map((result, index) => {
+        const isAmortized = result.loanType === 'amortized'
+        const installment = result.installmentAmount || 0
+        const total = result.totalPaid || result.nominalValue || 0
+        const monthlyPct = (result.monthlyRate * 100).toFixed(1)
+        const isCopied = copiedIndex === index
+
+        return (
+          <Card key={result.termMonths} className="overflow-hidden">
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 px-6 py-5 border-b border-border/50">
+              <p className="text-sm text-muted-foreground">Préstamo</p>
+              <p className="text-3xl font-black text-foreground mt-1">
+                {formatCurrency(result.capital, currency)}
+              </p>
+            </div>
+            <CardContent className="p-6 space-y-4">
+              {isAmortized ? (
+                <>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-muted-foreground">Cuotas</span>
+                    <span className="text-lg font-bold">{result.termMonths} de {formatCurrency(installment, currency)}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-muted-foreground">Total a devolver</span>
+                    <span className="text-lg font-bold">{formatCurrency(total, currency)}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-muted-foreground">Tasa mensual</span>
+                    <span className="text-lg font-bold">{monthlyPct}%</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-muted-foreground">Plazo</span>
+                    <span className="text-lg font-bold">{result.termMonths} meses</span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-muted-foreground">Devolvés</span>
+                    <span className="text-lg font-bold">{formatCurrency(result.nominalValue!, currency)}</span>
+                  </div>
+                </>
+              )}
+
+              <div className="bg-muted/50 rounded-lg px-4 py-3 text-sm text-muted-foreground">
+                {isAmortized
+                  ? `En ${result.termMonths} meses pagás ${formatCurrency(total, currency)} en ${result.termMonths} cuotas de ${formatCurrency(installment, currency)}`
+                  : `En ${result.termMonths} meses devolvés ${formatCurrency(result.nominalValue!, currency)}`
+                }
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => handleCopy(index, result)}
+              >
+                {isCopied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2 text-green-600" />
+                    Copiado
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copiar para WhatsApp
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        )
+      })}
+    </div>
   )
 }
 

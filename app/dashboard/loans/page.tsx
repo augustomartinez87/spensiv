@@ -278,70 +278,90 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
         const progress = !isInterestOnly && loan.totalCount > 0 ? (loan.paidCount / loan.totalCount) * 100 : 0
         const cur = loan.currency
 
+        // Parse title/subtitle from borrowerName
+        let cardTitle: string
+        let cardSubtitle: string | null = null
+        if (loan.person) {
+          cardTitle = loan.person.name || loan.person.alias || loan.borrowerName
+          // Remove person name from borrowerName to get subtitle
+          const parts = loan.borrowerName.split(' - ')
+          if (parts.length > 1) {
+            const personName = loan.person.name || loan.person.alias || ''
+            cardSubtitle = parts.filter(p => p.trim() !== personName.trim()).join(' - ') || null
+          }
+        } else {
+          const parts = loan.borrowerName.split(' - ')
+          cardTitle = parts[0]
+          cardSubtitle = parts.length > 1 ? parts.slice(1).join(' - ') : null
+        }
+
+        // Collect chips
+        const chips: { label: string; variant?: 'destructive' | 'outline' }[] = []
+        if (isInterestOnly) {
+          chips.push({ label: isZeroRate ? 'Sin intereses' : 'Solo interés', variant: 'outline' })
+        }
+        if (cur !== 'ARS') {
+          chips.push({ label: cur, variant: 'outline' })
+        }
+        if (Number(loan.tna) > 1.5) {
+          chips.push({ label: 'TNA >150%', variant: 'destructive' })
+        }
+        if (loan.person) {
+          const scoreResult = calculatePersonScore(loan.person)
+          if (scoreResult.score < 4) {
+            chips.push({ label: 'Alto riesgo', variant: 'destructive' })
+          }
+        }
+
         return (
           <Card
             key={loan.id}
             className="cursor-pointer hover:border-primary/50 transition-all duration-200"
             onClick={() => onSelect(loan.id)}
           >
-            <CardContent className="p-5 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-lg text-foreground">{loan.borrowerName}</h3>
-                    {loan.person && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 gap-1">
-                        <UserCircle className="h-3 w-3" />
-                        {loan.person.alias || loan.person.name}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {formatCurrency(Number(loan.capital), cur)}
-                    {isInterestOnly
-                      ? isZeroRate ? ' · Sin intereses' : ' · Solo interés'
-                      : ` a ${loan.termMonths} meses`
-                    }
-                  </p>
+            <CardContent className="p-5 space-y-3">
+              {/* NIVEL 1 — Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-lg text-foreground truncate">{cardTitle}</h3>
+                  {cardSubtitle && (
+                    <p className="text-sm text-muted-foreground truncate">{cardSubtitle}</p>
+                  )}
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {loan.person && (() => {
-                    const result = calculatePersonScore(loan.person)
-                    if (result.score < 4) {
-                      return (
-                        <Badge variant="destructive" className="text-[10px] px-1.5 gap-0.5">
-                          <ShieldX className="h-3 w-3" />
-                          Alto riesgo
-                        </Badge>
-                      )
-                    }
-                    return null
-                  })()}
-                  {Number(loan.tna) > 1.5 && (
-                    <Badge variant="destructive" className="text-[10px] px-1.5">
-                      TNA &gt;150%
-                    </Badge>
-                  )}
-                  {isInterestOnly && (
-                    <Badge variant="outline" className="text-[10px] px-1.5">
-                      {isZeroRate ? 'Sin intereses' : 'Solo interés'}
-                    </Badge>
-                  )}
-                  {cur !== 'ARS' && (
-                    <Badge variant="outline" className="text-[10px] px-1.5">
-                      {cur}
-                    </Badge>
-                  )}
-                  <Badge variant={
+                <Badge
+                  variant={
                     loan.status === 'active' ? 'default' :
                     loan.status === 'completed' ? 'secondary' : 'destructive'
-                  }>
-                    {loan.status === 'active' ? 'Activo' :
-                     loan.status === 'completed' ? 'Completado' : 'Moroso'}
-                  </Badge>
-                </div>
+                  }
+                  className="shrink-0"
+                >
+                  {loan.status === 'active' ? 'Activo' :
+                   loan.status === 'completed' ? 'Completado' : 'Moroso'}
+                </Badge>
               </div>
 
+              {/* NIVEL 2 — Info + Chips */}
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  {formatCurrency(Number(loan.capital), cur)}
+                  {' · '}
+                  {isInterestOnly
+                    ? isZeroRate ? 'Sin plazo fijo' : 'Solo interés'
+                    : `${loan.termMonths} meses`
+                  }
+                </p>
+                {chips.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {chips.map((chip) => (
+                      <Badge key={chip.label} variant={chip.variant || 'outline'} className="text-[10px] px-1.5 py-0">
+                        {chip.label}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* NIVEL 3 — Footer */}
               {/* Progress bar - only for amortized */}
               {!isInterestOnly && (
                 <div className="space-y-1.5">
@@ -349,7 +369,7 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                     <span className="text-muted-foreground">Cuotas pagadas</span>
                     <span className="font-medium text-foreground">{loan.paidCount}/{loan.totalCount}</span>
                   </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full bg-primary rounded-full transition-all duration-500"
                       style={{ width: `${progress}%` }}
@@ -358,25 +378,7 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                 </div>
               )}
 
-              {/* Interest-only info */}
-              {isInterestOnly && loan.status === 'active' && (
-                <div className={cn(
-                  "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
-                  isZeroRate
-                    ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                )}>
-                  <Infinity className="h-4 w-4 shrink-0" />
-                  <span>
-                    {isZeroRate
-                      ? `Préstamo sin intereses · ${formatCurrency(Number(loan.capital), cur)}`
-                      : `Interés mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
-                    }
-                  </span>
-                </div>
-              )}
-
-              {/* Next due */}
+              {/* Next due for amortized */}
               {nextDue && loan.status === 'active' && !isInterestOnly && (
                 <div className={cn(
                   "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
@@ -389,17 +391,35 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                   ) : (
                     <Clock className="h-4 w-4 shrink-0" />
                   )}
-                  <span>
+                  <span className="text-xs">
                     {isOverdue ? 'Vencida: ' : 'Próxima: '}
-                    {format(nextDue, "d 'de' MMM", { locale: es })} - {formatCurrency(loan.nextAmount, cur)}
+                    {format(nextDue, "d 'de' MMM", { locale: es })} · {formatCurrency(loan.nextAmount, cur)}
                   </span>
                 </div>
               )}
 
-              <div className="flex justify-between text-xs text-muted-foreground pt-1">
+              {/* Interest-only info */}
+              {isInterestOnly && loan.status === 'active' && (
+                <div className={cn(
+                  "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
+                  isZeroRate
+                    ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                )}>
+                  <Infinity className="h-4 w-4 shrink-0" />
+                  <span className="text-xs">
+                    {isZeroRate
+                      ? `Capital: ${formatCurrency(Number(loan.capital), cur)}`
+                      : `Interés mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                    }
+                  </span>
+                </div>
+              )}
+
+              <div className="flex justify-between text-xs text-muted-foreground border-t border-border/50 pt-2">
                 <span>
                   {isInterestOnly
-                    ? isZeroRate ? 'Sin intereses' : `Tasa mensual: ${(Number(loan.monthlyRate) * 100).toFixed(1)}%`
+                    ? isZeroRate ? 'Sin intereses' : `${(Number(loan.monthlyRate) * 100).toFixed(1)}% mensual`
                     : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
                   }
                 </span>
