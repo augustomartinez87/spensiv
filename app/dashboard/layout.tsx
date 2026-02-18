@@ -12,6 +12,7 @@ import {
   ListOrdered,
   Receipt,
   Calculator,
+  Banknote,
   Bell,
   PanelLeftClose,
   PanelLeftOpen,
@@ -27,6 +28,7 @@ const navigation = [
   { name: 'Movimientos', href: '/dashboard/transactions', icon: ListOrdered },
   { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
   { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
+  { name: 'Prestamos', href: '/dashboard/loans', icon: Banknote },
   { name: 'Importar', href: '/dashboard/import', icon: FileUp },
 ]
 

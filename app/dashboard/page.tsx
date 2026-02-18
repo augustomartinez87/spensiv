@@ -37,6 +37,7 @@ import {
   DollarSign,
   ArrowRight,
   HelpCircle,
+  Banknote,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -133,6 +134,7 @@ export default function DashboardPage() {
   const { data: prevBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period: previousPeriod })
   const { data: cardBalances, isLoading: loadingCardBalances } = trpc.dashboard.getCardBalances.useQuery({ period })
   const { data: upcomingPayments, isLoading: loadingPayments } = trpc.dashboard.getUpcomingPayments.useQuery()
+  const { data: loanMetrics } = trpc.loans.getDashboardMetrics.useQuery()
 
   const totalDebt = cardBalances?.totalDebt || 0
 
@@ -384,6 +386,48 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Loan Metrics */}
+          {loanMetrics && loanMetrics.activeLoansCount > 0 && (
+            <Card>
+              <CardHeader className="py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Banknote className="h-4 w-4" /> Prestamos Activos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 pb-3 space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-muted rounded-lg p-2.5">
+                    <p className="text-[10px] text-muted-foreground uppercase">Capital Prestado</p>
+                    <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalCapitalActive)}</p>
+                  </div>
+                  <div className="bg-muted rounded-lg p-2.5">
+                    <p className="text-[10px] text-muted-foreground uppercase">Por Cobrar</p>
+                    <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalPending)}</p>
+                  </div>
+                </div>
+                {loanMetrics.upcomingInstallments.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground font-medium">Proximas cuotas</p>
+                    {loanMetrics.upcomingInstallments.slice(0, 3).map((inst) => (
+                      <div key={inst.id} className="flex items-center justify-between text-xs py-1">
+                        <span className="text-foreground font-medium truncate">{inst.borrowerName}</span>
+                        <div className="text-right shrink-0 ml-2">
+                          <span className="font-bold">{formatCurrency(inst.amount)}</span>
+                          <span className="text-muted-foreground ml-1.5">
+                            {format(new Date(inst.dueDate), 'd MMM', { locale: es })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Link href="/dashboard/loans" className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors pt-1">
+                  Ver Prestamos <ArrowRight className="h-3 w-3" />
+                </Link>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Monthly Projection */}
           <MonthlyProjection

@@ -17,6 +17,12 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   Calculator,
   TrendingUp,
   TrendingDown,
@@ -25,6 +31,7 @@ import {
   XCircle,
   Info,
   Zap,
+  Banknote,
 } from 'lucide-react'
 import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
 
@@ -117,6 +124,42 @@ export default function SimulatorPage() {
       setCompareResult(null)
     }
     setActiveTab('results')
+  }
+
+  // Create Loan dialog state
+  const [createLoanOpen, setCreateLoanOpen] = useState(false)
+  const [createLoanDefaults, setCreateLoanDefaults] = useState<{
+    capital: string; tna: string; termMonths: string; startDate: string
+  } | null>(null)
+  const [borrowerName, setBorrowerName] = useState('')
+
+  const createLoanMutation = trpc.loans.create.useMutation({
+    onSuccess: () => {
+      setCreateLoanOpen(false)
+      setBorrowerName('')
+    },
+  })
+
+  function handleCreateLoan(result: SimulationResult) {
+    setCreateLoanDefaults({
+      capital: result.capital.toString(),
+      tna: (result.tnaTarget * 100).toFixed(2),
+      termMonths: result.termMonths.toString(),
+      startDate: startDate,
+    })
+    setCreateLoanOpen(true)
+  }
+
+  function submitCreateLoan(e: React.FormEvent) {
+    e.preventDefault()
+    if (!createLoanDefaults) return
+    createLoanMutation.mutate({
+      borrowerName,
+      capital: parseFloat(createLoanDefaults.capital),
+      tna: parseFloat(createLoanDefaults.tna) / 100,
+      termMonths: parseInt(createLoanDefaults.termMonths),
+      startDate: createLoanDefaults.startDate,
+    })
   }
 
   const hasResults = singleResult || compareResult
@@ -286,8 +329,8 @@ export default function SimulatorPage() {
 
           {/* ── Results Tab ── */}
           <TabsContent value="results" className="space-y-6 mt-6">
-            {compareResult && <CompareResultCards result={compareResult} />}
-            {singleResult && <SingleResultCards result={singleResult} />}
+            {compareResult && <CompareResultCards result={compareResult} onCreateLoan={handleCreateLoan} />}
+            {singleResult && <SingleResultCards result={singleResult} onCreateLoan={handleCreateLoan} />}
           </TabsContent>
 
           {/* ── Table Tab ── */}
@@ -343,6 +386,57 @@ export default function SimulatorPage() {
           </TabsContent>
         </Tabs>
       )}
+
+      {/* Create Loan Dialog */}
+      <Dialog open={createLoanOpen} onOpenChange={setCreateLoanOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear Prestamo desde Simulacion</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={submitCreateLoan} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="simBorrower">Nombre del Deudor</Label>
+              <Input
+                id="simBorrower"
+                value={borrowerName}
+                onChange={(e) => setBorrowerName(e.target.value)}
+                placeholder="Ej: Juan Perez"
+                required
+                autoFocus
+              />
+            </div>
+            {createLoanDefaults && (
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-muted rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Capital</p>
+                  <p className="font-bold">{formatCurrency(parseFloat(createLoanDefaults.capital))}</p>
+                </div>
+                <div className="bg-muted rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">TNA</p>
+                  <p className="font-bold">{createLoanDefaults.tna}%</p>
+                </div>
+                <div className="bg-muted rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Plazo</p>
+                  <p className="font-bold">{createLoanDefaults.termMonths} meses</p>
+                </div>
+                <div className="bg-muted rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Inicio</p>
+                  <p className="font-bold">{createLoanDefaults.startDate}</p>
+                </div>
+              </div>
+            )}
+            {createLoanMutation.error && (
+              <p className="text-sm text-red-500">{createLoanMutation.error.message}</p>
+            )}
+            {createLoanMutation.isSuccess && (
+              <p className="text-sm text-green-600 dark:text-green-400">Prestamo creado exitosamente</p>
+            )}
+            <Button type="submit" className="w-full" disabled={createLoanMutation.isPending || createLoanMutation.isSuccess}>
+              {createLoanMutation.isPending ? 'Creando...' : createLoanMutation.isSuccess ? 'Creado' : 'Crear Prestamo'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -397,7 +491,7 @@ function ConvenienceIndicator({ isConvenient, spread }: { isConvenient: boolean;
   )
 }
 
-function ResultCardContent({ result, title }: { result: SimulationResult; title: string }) {
+function ResultCardContent({ result, title, onCreateLoan }: { result: SimulationResult; title: string; onCreateLoan?: (result: SimulationResult) => void }) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -448,12 +542,22 @@ function ResultCardContent({ result, title }: { result: SimulationResult; title:
           )}
         </div>
         <ConvenienceIndicator isConvenient={result.isConvenient} spread={result.spread} />
+        {result.loanType === 'amortized' && onCreateLoan && (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => onCreateLoan(result)}
+          >
+            <Banknote className="h-4 w-4 mr-2" />
+            Crear Prestamo con estos parametros
+          </Button>
+        )}
       </CardContent>
     </Card>
   )
 }
 
-function CompareResultCards({ result }: { result: ComparisonResult }) {
+function CompareResultCards({ result, onCreateLoan }: { result: ComparisonResult; onCreateLoan?: (result: SimulationResult) => void }) {
   const recLabel =
     result.recommendation === 'amortized'
       ? 'Amortizado'
@@ -486,16 +590,16 @@ function CompareResultCards({ result }: { result: ComparisonResult }) {
       </Card>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        <ResultCardContent result={result.amortized} title="Amortizado (Cuotas)" />
+        <ResultCardContent result={result.amortized} title="Amortizado (Cuotas)" onCreateLoan={onCreateLoan} />
         <ResultCardContent result={result.bullet} title="Bullet (Descuento)" />
       </div>
     </>
   )
 }
 
-function SingleResultCards({ result }: { result: SimulationResult }) {
+function SingleResultCards({ result, onCreateLoan }: { result: SimulationResult; onCreateLoan?: (result: SimulationResult) => void }) {
   const title = result.loanType === 'amortized' ? 'Amortizado (Cuotas)' : 'Bullet (Descuento)'
-  return <ResultCardContent result={result} title={title} />
+  return <ResultCardContent result={result} title={title} onCreateLoan={onCreateLoan} />
 }
 
 // ─── Tables ──────────────────────────────────────────────────────────
