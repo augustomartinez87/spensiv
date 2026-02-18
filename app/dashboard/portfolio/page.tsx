@@ -61,7 +61,12 @@ export default function PortfolioPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground tracking-tight">Cartera</h1>
-          <p className="text-muted-foreground mt-1">Dashboard de riesgo crediticio</p>
+          <p className="text-muted-foreground mt-1">
+            Dashboard de riesgo crediticio
+            {metrics?.mepRate && (
+              <span className="ml-2 text-xs text-muted-foreground/70">· TC MEP: {formatCurrency(metrics.mepRate)}</span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor="fciRate" className="text-sm text-muted-foreground shrink-0">Tasa FCI (%)</Label>

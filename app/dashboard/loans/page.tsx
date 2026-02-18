@@ -64,11 +64,16 @@ export default function LoansPage() {
     <div className="space-y-8">
       <LoanListHeader view={view} onViewChange={setView} />
       <LoansDashboardSummary />
-      {view === 'list' ? (
-        <LoanListContent onSelect={setSelectedLoanId} />
-      ) : (
-        <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
-      )}
+      <div className="grid gap-6 md:grid-cols-[1fr_280px]">
+        <div>
+          {view === 'list' ? (
+            <LoanListContent onSelect={setSelectedLoanId} />
+          ) : (
+            <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
+          )}
+        </div>
+        <UpcomingInstallmentsGadget />
+      </div>
     </div>
   )
 }
@@ -126,102 +131,109 @@ function LoansDashboardSummary() {
 
   if (!metrics || metrics.activeLoansCount === 0) return null
 
+  return (
+    <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Capital activo</p>
+          <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalCapitalActive)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{metrics.activeLoansCount} prestamo{metrics.activeLoansCount !== 1 ? 's' : ''}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pendiente cobro</p>
+          <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalPending)}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Esta semana</p>
+          <p className={cn(
+            'text-xl font-bold mt-1',
+            metrics.thisWeekCount > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'
+          )}>
+            {metrics.thisWeekCount > 0 ? formatCurrency(metrics.thisWeekAmount) : '-'}
+          </p>
+          {metrics.thisWeekCount > 0 && (
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{metrics.thisWeekCount} cuota{metrics.thisWeekCount !== 1 ? 's' : ''}</p>
+          )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Vencidas</p>
+          <p className={cn(
+            'text-xl font-bold mt-1',
+            metrics.overdueCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+          )}>
+            {metrics.overdueCount > 0 ? formatCurrency(metrics.overdueAmount) : 'Ninguna'}
+          </p>
+          {metrics.overdueCount > 0 && (
+            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{metrics.overdueCount} cuota{metrics.overdueCount !== 1 ? 's' : ''} sin cobrar</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ─── Upcoming Installments Gadget ───────────────────────────────────
+
+function UpcomingInstallmentsGadget() {
+  const { data: metrics } = trpc.loans.getDashboardMetrics.useQuery()
+
+  if (!metrics || metrics.upcomingInstallments.length === 0) return null
+
   const now = new Date()
 
   return (
-    <div className="space-y-4">
-      {/* Stat cards */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Capital activo</p>
-            <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalCapitalActive)}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{metrics.activeLoansCount} prestamo{metrics.activeLoansCount !== 1 ? 's' : ''}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pendiente cobro</p>
-            <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalPending)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Esta semana</p>
-            <p className={cn(
-              'text-xl font-bold mt-1',
-              metrics.thisWeekCount > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'
-            )}>
-              {metrics.thisWeekCount > 0 ? formatCurrency(metrics.thisWeekAmount) : '-'}
-            </p>
-            {metrics.thisWeekCount > 0 && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{metrics.thisWeekCount} cuota{metrics.thisWeekCount !== 1 ? 's' : ''}</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Vencidas</p>
-            <p className={cn(
-              'text-xl font-bold mt-1',
-              metrics.overdueCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-            )}>
-              {metrics.overdueCount > 0 ? formatCurrency(metrics.overdueAmount) : 'Ninguna'}
-            </p>
-            {metrics.overdueCount > 0 && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{metrics.overdueCount} cuota{metrics.overdueCount !== 1 ? 's' : ''} sin cobrar</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Upcoming installments */}
-      {metrics.upcomingInstallments.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Proximas cuotas a cobrar</p>
-            <div className="space-y-2">
-              {metrics.upcomingInstallments.map((inst) => {
-                const dueDate = new Date(inst.dueDate)
-                const isOverdue = dueDate < now
-                return (
-                  <div key={inst.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        'flex flex-col items-center justify-center h-9 w-9 rounded-lg shrink-0',
-                        isOverdue ? 'bg-red-500/10' : 'bg-muted'
-                      )}>
-                        <span className={cn(
-                          'text-[8px] font-bold uppercase leading-none',
-                          isOverdue ? 'text-red-500' : 'text-muted-foreground'
-                        )}>
-                          {format(dueDate, 'MMM', { locale: es })}
-                        </span>
-                        <span className="text-sm font-bold text-foreground leading-none">
-                          {format(dueDate, 'd')}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{inst.borrowerName}</p>
-                        <p className={cn(
-                          'text-xs',
-                          isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground'
-                        )}>
-                          Cuota {inst.number}{isOverdue ? ' · VENCIDA' : ''}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-bold text-foreground">
-                      {formatCurrency(inst.amount, inst.currency)}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+    <Card className="h-fit sticky top-20">
+      <CardContent className="p-4">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Proximas cuotas</p>
+        <div className="space-y-3">
+          {metrics.upcomingInstallments.map((inst) => {
+            const dueDate = new Date(inst.dueDate)
+            const isOverdue = dueDate < now
+            return (
+              <div key={inst.id} className="flex items-center gap-2.5">
+                <div className={cn(
+                  'flex flex-col items-center justify-center h-9 w-9 rounded-lg shrink-0',
+                  isOverdue ? 'bg-red-500/10' : 'bg-muted'
+                )}>
+                  <span className={cn(
+                    'text-[8px] font-bold uppercase leading-none',
+                    isOverdue ? 'text-red-500' : 'text-muted-foreground'
+                  )}>
+                    {format(dueDate, 'MMM', { locale: es })}
+                  </span>
+                  <span className="text-sm font-bold text-foreground leading-none">
+                    {format(dueDate, 'd')}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-foreground truncate">{inst.borrowerName}</p>
+                  <p className={cn(
+                    'text-[10px]',
+                    isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground'
+                  )}>
+                    #{inst.number}{isOverdue ? ' · VENCIDA' : ''}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs font-bold text-foreground">
+                    {formatCurrency(inst.amount, inst.currency)}
+                  </p>
+                  {inst.currency !== 'ARS' && (
+                    <p className="text-[10px] text-muted-foreground">{inst.currency}</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

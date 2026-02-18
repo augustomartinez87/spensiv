@@ -3,6 +3,7 @@ import { router, protectedProcedure } from '@/lib/trpc'
 import { simulateLoan, compareLoanTypes, reverseFromInstallment, tnaToMonthlyRate, frenchInstallment, generateAmortizationTable } from '@/lib/loan-calculator'
 import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
 import { addMonths } from 'date-fns'
+import { getDolarMep, pesify } from '@/lib/dolar'
 
 const simulateInput = z.object({
   capital: z.number().positive('El capital debe ser positivo'),
@@ -402,40 +403,47 @@ export const loansRouter = router({
     }),
 
   getDashboardMetrics: protectedProcedure.query(async ({ ctx }) => {
-    const activeLoans = await ctx.prisma.loan.findMany({
-      where: { userId: ctx.user.id, status: 'active' },
-      include: {
-        loanInstallments: {
-          where: { isPaid: false },
-          orderBy: { dueDate: 'asc' },
-          select: {
-            id: true,
-            number: true,
-            dueDate: true,
-            amount: true,
+    const [activeLoans, mepRate] = await Promise.all([
+      ctx.prisma.loan.findMany({
+        where: { userId: ctx.user.id, status: 'active' },
+        include: {
+          loanInstallments: {
+            where: { isPaid: false },
+            orderBy: { dueDate: 'asc' },
+            select: {
+              id: true,
+              number: true,
+              dueDate: true,
+              amount: true,
+            },
           },
         },
-      },
-    })
+      }),
+      getDolarMep(),
+    ])
 
     const totalCapitalActive = activeLoans.reduce(
-      (sum, loan) => sum + Number(loan.capital),
+      (sum, loan) => sum + pesify(Number(loan.capital), loan.currency, mepRate),
       0
     )
 
     const totalPending = activeLoans.reduce(
       (sum, loan) =>
-        sum + loan.loanInstallments.reduce((s, i) => s + Number(i.amount), 0),
+        sum + loan.loanInstallments.reduce(
+          (s, i) => s + pesify(Number(i.amount), loan.currency, mepRate),
+          0
+        ),
       0
     )
 
     const now = new Date()
 
-    // All unpaid installments flattened
+    // All unpaid installments flattened (keep original currency for display)
     const allUnpaid = activeLoans.flatMap((loan) =>
       loan.loanInstallments.map((i) => ({
         ...i,
         amount: Number(i.amount),
+        amountArs: pesify(Number(i.amount), loan.currency, mepRate),
         borrowerName: loan.borrowerName,
         loanId: loan.id,
         currency: loan.currency,
@@ -445,7 +453,7 @@ export const loansRouter = router({
     // Overdue (past due date)
     const overdueInstallments = allUnpaid.filter((i) => i.dueDate < now)
     const overdueCount = overdueInstallments.length
-    const overdueAmount = overdueInstallments.reduce((s, i) => s + i.amount, 0)
+    const overdueAmount = overdueInstallments.reduce((s, i) => s + i.amountArs, 0)
 
     // This week's installments
     const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
@@ -453,7 +461,7 @@ export const loansRouter = router({
       (i) => i.dueDate >= now && i.dueDate <= weekFromNow
     )
 
-    // Next 5 upcoming (not overdue)
+    // Next 5 upcoming
     const upcomingInstallments = allUnpaid
       .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
       .slice(0, 5)
@@ -465,7 +473,7 @@ export const loansRouter = router({
       overdueCount,
       overdueAmount,
       thisWeekCount: thisWeek.length,
-      thisWeekAmount: thisWeek.reduce((s, i) => s + i.amount, 0),
+      thisWeekAmount: thisWeek.reduce((s, i) => s + i.amountArs, 0),
       upcomingInstallments,
     }
   }),
