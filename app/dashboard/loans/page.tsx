@@ -147,6 +147,7 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
         const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
         const isOverdue = nextDue && nextDue < now
         const isInterestOnly = loan.loanType === 'interest_only'
+        const isZeroRate = Number(loan.monthlyRate) === 0
         const progress = !isInterestOnly && loan.totalCount > 0 ? (loan.paidCount / loan.totalCount) * 100 : 0
         const cur = loan.currency
 
@@ -171,7 +172,7 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                   <p className="text-sm text-muted-foreground">
                     {formatCurrency(Number(loan.capital), cur)}
                     {isInterestOnly
-                      ? ' · Solo interes'
+                      ? isZeroRate ? ' · Sin intereses' : ' · Solo interes'
                       : ` a ${loan.termMonths} meses`
                     }
                   </p>
@@ -179,7 +180,7 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                 <div className="flex items-center gap-1.5">
                   {isInterestOnly && (
                     <Badge variant="outline" className="text-[10px] px-1.5">
-                      Solo interes
+                      {isZeroRate ? 'Sin intereses' : 'Solo interes'}
                     </Badge>
                   )}
                   {cur !== 'ARS' && (
@@ -215,10 +216,18 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
 
               {/* Interest-only info */}
               {isInterestOnly && loan.status === 'active' && (
-                <div className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <div className={cn(
+                  "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
+                  isZeroRate
+                    ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                )}>
                   <Infinity className="h-4 w-4 shrink-0" />
                   <span>
-                    Interes mensual: {formatCurrency(Number(loan.installmentAmount), cur)}
+                    {isZeroRate
+                      ? `Prestamo sin intereses · ${formatCurrency(Number(loan.capital), cur)}`
+                      : `Interes mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                    }
                   </span>
                 </div>
               )}
@@ -246,11 +255,11 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
               <div className="flex justify-between text-xs text-muted-foreground pt-1">
                 <span>
                   {isInterestOnly
-                    ? `Tasa mensual: ${(Number(loan.monthlyRate) * 100).toFixed(1)}%`
+                    ? isZeroRate ? 'Sin intereses' : `Tasa mensual: ${(Number(loan.monthlyRate) * 100).toFixed(1)}%`
                     : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
                   }
                 </span>
-                <span>TNA: {(Number(loan.tna) * 100).toFixed(1)}%</span>
+                <span>{isZeroRate ? 'TNA: 0%' : `TNA: ${(Number(loan.tna) * 100).toFixed(1)}%`}</span>
               </div>
             </CardContent>
           </Card>
@@ -395,7 +404,9 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-foreground">{loan.borrowerName}</h1>
                 {isInterestOnly && (
-                  <Badge variant="outline" className="text-xs">Solo interes</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {Number(loan.monthlyRate) === 0 ? 'Sin intereses' : 'Solo interes'}
+                  </Badge>
                 )}
                 {cur !== 'ARS' && (
                   <Badge variant="outline" className="text-xs">{cur}</Badge>
@@ -403,7 +414,9 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
               </div>
               <p className="text-sm text-muted-foreground">
                 {isInterestOnly
-                  ? `${formatCurrency(Number(loan.capital), cur)} · Interes mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                  ? Number(loan.monthlyRate) === 0
+                    ? `${formatCurrency(Number(loan.capital), cur)} · Sin intereses`
+                    : `${formatCurrency(Number(loan.capital), cur)} · Interes mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
                   : `${formatCurrency(Number(loan.capital), cur)} - ${loan.termMonths} cuotas de ${formatCurrency(Number(loan.installmentAmount), cur)}`
                 }
                 {' · '}Inicio: {format(new Date(loan.startDate), "d MMM yyyy", { locale: es })}

@@ -29,8 +29,8 @@ const createLoanInput = z.object({
   capital: z.number().positive(),
   currency: z.enum(['ARS', 'USD', 'EUR']).default('ARS'),
   loanType: z.enum(['amortized', 'interest_only']).default('amortized'),
-  tna: z.number().positive().optional(), // for amortized
-  monthlyInterestRate: z.number().positive().optional(), // for interest_only (e.g. 0.10 = 10%)
+  tna: z.number().min(0).optional(), // for amortized (0 = sin intereses)
+  monthlyInterestRate: z.number().min(0).optional(), // for interest_only (0 = sin intereses)
   termMonths: z.number().int().min(1).max(360).optional(), // required for amortized
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   personId: z.string().optional(),
@@ -81,7 +81,7 @@ export const loansRouter = router({
       if (input.loanType === 'interest_only') {
         // Interest-only: no fixed term, monthly interest payments
         const rate = input.monthlyInterestRate
-        if (!rate) throw new Error('La tasa mensual es requerida para prestamos interest-only')
+        if (rate === undefined || rate === null) throw new Error('La tasa mensual es requerida para prestamos interest-only')
 
         const monthlyInterest = input.capital * rate
         // Convert monthly rate to TNA for storage: TNA = (1 + r_m)^12 - 1
@@ -124,7 +124,7 @@ export const loansRouter = router({
 
       // Amortized loan (existing logic)
       if (!input.termMonths) throw new Error('El plazo es requerido para prestamos amortizados')
-      if (!input.tna) throw new Error('La TNA es requerida para prestamos amortizados')
+      if (input.tna === undefined || input.tna === null) throw new Error('La TNA es requerida para prestamos amortizados')
 
       const monthlyRate = tnaToMonthlyRate(input.tna)
       const installmentAmount = frenchInstallment(input.capital, monthlyRate, input.termMonths)
