@@ -429,17 +429,32 @@ export const loansRouter = router({
       0
     )
 
-    // Next 5 installments due across all loans
-    const upcomingInstallments = activeLoans
-      .flatMap((loan) =>
-        loan.loanInstallments.map((i) => ({
-          ...i,
-          amount: Number(i.amount),
-          borrowerName: loan.borrowerName,
-          loanId: loan.id,
-          currency: loan.currency,
-        }))
-      )
+    const now = new Date()
+
+    // All unpaid installments flattened
+    const allUnpaid = activeLoans.flatMap((loan) =>
+      loan.loanInstallments.map((i) => ({
+        ...i,
+        amount: Number(i.amount),
+        borrowerName: loan.borrowerName,
+        loanId: loan.id,
+        currency: loan.currency,
+      }))
+    )
+
+    // Overdue (past due date)
+    const overdueInstallments = allUnpaid.filter((i) => i.dueDate < now)
+    const overdueCount = overdueInstallments.length
+    const overdueAmount = overdueInstallments.reduce((s, i) => s + i.amount, 0)
+
+    // This week's installments
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const thisWeek = allUnpaid.filter(
+      (i) => i.dueDate >= now && i.dueDate <= weekFromNow
+    )
+
+    // Next 5 upcoming (not overdue)
+    const upcomingInstallments = allUnpaid
       .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
       .slice(0, 5)
 
@@ -447,6 +462,10 @@ export const loansRouter = router({
       activeLoansCount: activeLoans.length,
       totalCapitalActive,
       totalPending,
+      overdueCount,
+      overdueAmount,
+      thisWeekCount: thisWeek.length,
+      thisWeekAmount: thisWeek.reduce((s, i) => s + i.amount, 0),
       upcomingInstallments,
     }
   }),
