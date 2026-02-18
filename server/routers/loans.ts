@@ -266,6 +266,14 @@ export const loansRouter = router({
 
       return {
         ...loan,
+        person: loan.person
+          ? {
+              ...loan.person,
+              estimatedIncome: loan.person.estimatedIncome
+                ? Number(loan.person.estimatedIncome)
+                : null,
+            }
+          : null,
         paidCount: paid,
         totalCount: total,
         nextDueDate: nextInstallment?.dueDate || null,

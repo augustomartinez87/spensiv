@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc-client'
 import { StatCard } from '@/components/dashboard/stat-card'
@@ -15,7 +15,6 @@ const CardDetailModal = dynamic(() => import('@/components/cards/card-detail-mod
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatCurrency, cn, getDaysUntilClosing } from '@/lib/utils'
@@ -23,7 +22,6 @@ import {
   Calendar,
   CreditCard,
   AlertCircle,
-  Search,
   Plus,
   Star,
   Home,
@@ -87,35 +85,6 @@ function getCategoryIcon(category: string) {
   return map[category] || ShoppingBag
 }
 
-function getCategoryBadgeColor(category: string): string {
-  const map: Record<string, string> = {
-    'Lujos': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-    'Gastos Fijos': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    'Educacion': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    'Educación': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    'Deudas': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    'Compras': 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
-    'Salud': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-    'Comida': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-    'Transporte': 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
-    'Servicios': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
-    'Ingresos': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  }
-  return map[category] || 'bg-muted text-muted-foreground'
-}
-
-function getExpenseTypeDotColor(type: string | null | undefined): string {
-  switch (type) {
-    case 'structural':
-      return '#1f6c9c'
-    case 'emotional_recurrent':
-      return '#feb92e'
-    case 'emotional_impulsive':
-      return '#e54352'
-    default:
-      return '#9ca3af'
-  }
-}
 
 export default function DashboardPage() {
   const now = new Date()
@@ -123,7 +92,6 @@ export default function DashboardPage() {
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   )
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   const previousPeriod = getPreviousPeriod(period)
 
@@ -147,8 +115,8 @@ export default function DashboardPage() {
             <Skeleton className="h-10 w-32" />
           </div>
         </div>
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-36" />)}
+        <div className="grid gap-4 grid-cols-3">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-36" />)}
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-[300px]" />
@@ -202,7 +170,7 @@ export default function DashboardPage() {
       </div>
 
       {/* === ROW 1: Key metrics === */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-3">
         <StatCard
           title="Egresos del periodo"
           value={balance.totalExpense}
@@ -218,27 +186,147 @@ export default function DashboardPage() {
           previousValue={prevBalance?.totalIncome}
         />
         <StatCard
-          title="Balance neto"
-          value={balance.balance}
-          type="balance"
-          previousValue={prevBalance?.balance}
-        />
-        <StatCard
           title="Deuda total"
           value={totalDebt}
           type="expense"
         />
       </div>
 
-      {/* === ROW 2: Projection + Upcoming payments === */}
+      {/* === ROW 2: Projection + Active Loans === */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-        {/* Monthly Projection — highlighted */}
         <MonthlyProjection
           balance={balance.balance}
           totalIncome={balance.totalIncome}
           totalExpense={balance.totalExpense}
           cardBalances={cardBalances}
         />
+
+        {/* Active Loans */}
+        <Card>
+          <CardHeader className="py-4">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Banknote className="h-4 w-4" /> Préstamos Activos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            {loanMetrics && loanMetrics.activeLoansCount > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-muted rounded-lg p-2.5">
+                    <p className="text-[10px] text-muted-foreground uppercase">Capital</p>
+                    <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalCapitalActive)}</p>
+                  </div>
+                  <div className="bg-muted rounded-lg p-2.5">
+                    <p className="text-[10px] text-muted-foreground uppercase">Por Cobrar</p>
+                    <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalPending)}</p>
+                  </div>
+                </div>
+                {loanMetrics.overdueCount > 0 && (
+                  <div className="bg-red-500/10 rounded-lg p-2.5">
+                    <p className="text-[10px] text-red-600 dark:text-red-400 uppercase font-medium">En mora</p>
+                    <p className="text-sm font-bold text-red-600 dark:text-red-400">{formatCurrency(loanMetrics.overdueAmount)}</p>
+                  </div>
+                )}
+                {loanMetrics.upcomingInstallments.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground font-medium">Próximas cuotas</p>
+                    {loanMetrics.upcomingInstallments.slice(0, 3).map((inst) => (
+                      <div key={inst.id} className="flex items-center justify-between text-xs py-1">
+                        <span className="text-foreground font-medium truncate">{inst.borrowerName}</span>
+                        <div className="text-right shrink-0 ml-2">
+                          <span className="font-bold">{formatCurrency(inst.amount, inst.currency)}</span>
+                          <span className="text-muted-foreground ml-1.5">
+                            {format(new Date(inst.dueDate), 'd MMM', { locale: es })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Link href="/dashboard/loans" className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors pt-1">
+                  Ver Préstamos <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground italic">Sin préstamos activos</p>
+                <Link href="/dashboard/loans" className="text-xs text-primary hover:text-primary/80 mt-2 inline-block">
+                  Crear préstamo
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* === ROW 3: Cards + Upcoming Payments === */}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        {/* Cards */}
+        <Card>
+          <CardHeader className="py-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <CreditCard className="h-4 w-4" /> Tarjetas
+            </CardTitle>
+            <Link href="/dashboard/cards">
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            <div className="space-y-1">
+              {cardList.map((card) => {
+                const hasPeriodBalance = card.currentPeriodBalance > 0
+                return (
+                  <div
+                    key={card.id}
+                    onClick={() => setSelectedCardId(card.id)}
+                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200 cursor-pointer group"
+                  >
+                    <div className={cn('h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0', getBankColor(card.bank || ''))}>
+                      {getBankInitials(card.bank || card.name)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{card.name}</p>
+                        {(() => {
+                          const days = getDaysUntilClosing(card.closingDay)
+                          if (days <= 7) {
+                            return (
+                              <span className={cn(
+                                "text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0",
+                                days <= 3
+                                  ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                                  : "bg-muted text-muted-foreground"
+                              )}>
+                                {days}d
+                              </span>
+                            )
+                          }
+                          return null
+                        })()}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : 'Tarjeta'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-foreground">
+                        {formatCurrency(hasPeriodBalance ? card.currentPeriodBalance : card.totalBalance)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {hasPeriodBalance
+                          ? `${formatCurrency(card.totalBalance)} total`
+                          : 'Deuda total'}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+              {cardList.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4 italic">Sin tarjetas registradas</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Upcoming Payments */}
         <Card>
@@ -301,128 +389,12 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* === ROW 3: Cards + Active Loans + Expense Types === */}
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
-        {/* Cards */}
-        <Card>
-          <CardHeader className="py-4 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <CreditCard className="h-4 w-4" /> Tarjetas
-            </CardTitle>
-            <Link href="/dashboard/cards">
-              <Button variant="ghost" size="icon" className="h-7 w-7">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <div className="space-y-1">
-              {cardList.map((card) => (
-                <div
-                  key={card.id}
-                  onClick={() => setSelectedCardId(card.id)}
-                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200 cursor-pointer group"
-                >
-                  <div className={cn('h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0', getBankColor(card.bank || ''))}>
-                    {getBankInitials(card.bank || card.name)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{card.name}</p>
-                      {(() => {
-                        const days = getDaysUntilClosing(card.closingDay)
-                        if (days <= 7) {
-                          return (
-                            <span className={cn(
-                              "text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0",
-                              days <= 3
-                                ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
-                                : "bg-muted text-muted-foreground"
-                            )}>
-                              {days}d
-                            </span>
-                          )
-                        }
-                        return null
-                      })()}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : 'Tarjeta'}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-foreground">{formatCurrency(card.totalBalance)}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {card.currentPeriodBalance > 0 && card.currentPeriodBalance !== card.totalBalance
-                        ? `${formatCurrency(card.currentPeriodBalance)} este mes`
-                        : 'Deuda total'}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {cardList.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4 italic">Sin tarjetas registradas</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Active Loans */}
-        <Card>
-          <CardHeader className="py-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Banknote className="h-4 w-4" /> Préstamos Activos
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            {loanMetrics && loanMetrics.activeLoansCount > 0 ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-muted rounded-lg p-2.5">
-                    <p className="text-[10px] text-muted-foreground uppercase">Capital</p>
-                    <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalCapitalActive)}</p>
-                  </div>
-                  <div className="bg-muted rounded-lg p-2.5">
-                    <p className="text-[10px] text-muted-foreground uppercase">Por Cobrar</p>
-                    <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalPending)}</p>
-                  </div>
-                </div>
-                {loanMetrics.overdueCount > 0 && (
-                  <div className="bg-red-500/10 rounded-lg p-2.5">
-                    <p className="text-[10px] text-red-600 dark:text-red-400 uppercase font-medium">En mora</p>
-                    <p className="text-sm font-bold text-red-600 dark:text-red-400">{formatCurrency(loanMetrics.overdueAmount)}</p>
-                  </div>
-                )}
-                {loanMetrics.upcomingInstallments.length > 0 && (
-                  <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-medium">Próximas cuotas</p>
-                    {loanMetrics.upcomingInstallments.slice(0, 3).map((inst) => (
-                      <div key={inst.id} className="flex items-center justify-between text-xs py-1">
-                        <span className="text-foreground font-medium truncate">{inst.borrowerName}</span>
-                        <div className="text-right shrink-0 ml-2">
-                          <span className="font-bold">{formatCurrency(inst.amount, inst.currency)}</span>
-                          <span className="text-muted-foreground ml-1.5">
-                            {format(new Date(inst.dueDate), 'd MMM', { locale: es })}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <Link href="/dashboard/loans" className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors pt-1">
-                  Ver Préstamos <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-            ) : (
-              <div className="text-center py-6">
-                <p className="text-sm text-muted-foreground italic">Sin préstamos activos</p>
-                <Link href="/dashboard/loans" className="text-xs text-primary hover:text-primary/80 mt-2 inline-block">
-                  Crear préstamo
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Expense Types */}
+      {/* === ROW 4: Category Pie + Expense Types === */}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        <CategoryPieChart
+          data={balance.aggregations.expensesByCategory}
+          title="Gastos por categoría"
+        />
         <ExpenseTypeChart
           data={balance.aggregations.expensesByType}
           title="Tipos de gasto"
@@ -430,20 +402,19 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* === ROW 4: Category Pie + Recent Movements === */}
+      {/* === ROW 5: Recent Movements (Expenses + Income) === */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-        <CategoryPieChart
-          data={balance.aggregations.expensesByCategory}
-          title="Gastos por categoría"
-          selectedCategory={selectedCategory}
-          onCategoryClick={setSelectedCategory}
+        <RecentMovements
+          installments={balance.installments}
+          cashTransactions={balance.cashTransactions || []}
+          incomes={balance.incomes}
+          filter="expense"
         />
         <RecentMovements
           installments={balance.installments}
           cashTransactions={balance.cashTransactions || []}
           incomes={balance.incomes}
-          selectedCategory={selectedCategory}
-          onClearCategory={() => setSelectedCategory(null)}
+          filter="income"
         />
       </div>
 
@@ -473,25 +444,13 @@ function RecentMovements({
   installments,
   cashTransactions,
   incomes,
-  selectedCategory,
-  onClearCategory,
+  filter,
 }: {
   installments: any[]
   cashTransactions: any[]
   incomes: any[]
-  selectedCategory?: string | null
-  onClearCategory?: () => void
+  filter: 'expense' | 'income'
 }) {
-  const [searchInput, setSearchInput] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchQuery(searchInput)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [searchInput])
-
   const movements: UnifiedMovement[] = [
     ...installments.map((inst) => ({
       id: `inst-${inst.id}`,
@@ -528,35 +487,20 @@ function RecentMovements({
       type: 'income' as const,
     })),
   ]
+    .filter((m) => m.type === filter)
     .sort((a, b) => b.date.getTime() - a.date.getTime())
 
-  const categoryFiltered = selectedCategory
-    ? movements.filter(m => m.category === selectedCategory)
-    : movements
-
-  const filtered = searchQuery
-    ? categoryFiltered.filter(m => {
-      const query = searchQuery.toLowerCase().trim()
-      const amountStr = m.amount.toString()
-      const amountFormatted = formatCurrency(m.amount).toLowerCase()
-
-      return (
-        m.description.toLowerCase().includes(query) ||
-        m.category.toLowerCase().includes(query) ||
-        m.method.toLowerCase().includes(query) ||
-        amountStr.includes(query) ||
-        amountFormatted.includes(query)
-      )
-    })
-    : categoryFiltered
-
-  const display = filtered.slice(0, 10)
+  const display = movements.slice(0, 8)
+  const subtitle = filter === 'expense' ? 'Egresos' : 'Ingresos'
 
   return (
     <Card>
-      <CardHeader className="border-b py-4 space-y-3">
+      <CardHeader className="border-b py-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold">Movimientos recientes</CardTitle>
+          <div>
+            <CardTitle className="text-base font-semibold">Movimientos recientes</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+          </div>
           <Link
             href="/dashboard/transactions"
             className="text-sm text-primary hover:underline font-medium"
@@ -564,164 +508,49 @@ function RecentMovements({
             Ver todo
           </Link>
         </div>
-        {selectedCategory && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">
-              Filtrando por: {selectedCategory}
-            </span>
-            <button
-              onClick={onClearCategory}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Limpiar
-            </button>
-          </div>
-        )}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por descripción, categoría, monto..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9 h-9 text-sm"
-          />
-        </div>
       </CardHeader>
       <CardContent className="p-0">
         {display.length === 0 ? (
           <div className="p-8 text-center">
-            {searchQuery ? (
-              <div className="space-y-2">
-                <p className="text-muted-foreground text-sm">
-                  No se encontraron movimientos
-                </p>
-                <p className="text-xs text-muted-foreground/70">
-                  Probá buscando por descripción, categoría, método de pago o monto
-                </p>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                No hay actividad registrada en este periodo
-              </p>
-            )}
+            <p className="text-muted-foreground text-sm">
+              No hay {filter === 'expense' ? 'egresos' : 'ingresos'} en este periodo
+            </p>
           </div>
         ) : (
-          <>
-            {/* Desktop Table */}
-            <div className="hidden md:block">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-xs text-muted-foreground uppercase tracking-wider">
-                    <th className="text-left px-4 py-3 font-medium">Fecha</th>
-                    <th className="text-left px-4 py-3 font-medium">Descripción</th>
-                    <th className="text-left px-4 py-3 font-medium">Categoría</th>
-                    <th className="text-left px-4 py-3 font-medium">Método</th>
-                    <th className="text-right px-4 py-3 font-medium">Monto</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {display.map((m) => {
-                    const CatIcon = getCategoryIcon(m.category)
-                    return (
-                      <tr key={m.id} className="hover:bg-accent/50 transition-all duration-200">
-                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                          {format(m.date, 'd MMM, yyyy', { locale: es })}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-foreground">{m.description}</div>
-                          {m.subcategory && (
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {m.subcategory}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className={cn(
-                              'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
-                              getCategoryBadgeColor(m.category)
-                            )}>
-                              <CatIcon className="h-3 w-3" />
-                              {m.category}
-                            </span>
-                            {m.type === 'expense' && m.expenseType && (
-                              <div
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: getExpenseTypeDotColor(m.expenseType) }}
-                                title={m.expenseType === 'structural' ? 'Estructural' :
-                                  m.expenseType === 'emotional_recurrent' ? 'Emocional Recurrente' :
-                                    'Emocional Impulsivo'}
-                              />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{m.method}</td>
-                        <td
-                          className={cn(
-                            'px-4 py-3 text-right font-semibold whitespace-nowrap',
-                            m.type === 'income'
-                              ? 'text-green-600 dark:text-green-400'
-                              : 'text-foreground'
-                          )}
-                        >
-                          {m.type === 'income' ? '+' : '-'}{formatCurrency(m.amount)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Compact List */}
-            <div className="md:hidden divide-y divide-border">
-              {display.map((m) => {
-                const CatIcon = getCategoryIcon(m.category)
-                return (
-                  <div key={m.id} className="flex items-center justify-between p-4 hover:bg-accent/50 transition-all duration-200">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        'h-8 w-8 rounded-xl flex items-center justify-center shrink-0',
-                        m.type === 'income' ? 'bg-green-500/10' : 'bg-muted'
-                      )}>
-                        <CatIcon className={cn('h-4 w-4', m.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground')} />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm text-foreground">{m.description}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {format(m.date, 'd MMM', { locale: es })} &middot; {m.method}
-                          {m.subcategory && ` · ${m.subcategory}`}
-                        </p>
-                        {m.type === 'expense' && m.expenseType && (
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <div
-                              className="w-1.5 h-1.5 rounded-full"
-                              style={{ backgroundColor: getExpenseTypeDotColor(m.expenseType) }}
-                            />
-                            <span className="text-[10px] text-muted-foreground">
-                              {m.expenseType === 'structural' ? 'Estructural' :
-                                m.expenseType === 'emotional_recurrent' ? 'Emocional Recurrente' :
-                                  'Emocional Impulsivo'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+          <div className="divide-y divide-border">
+            {display.map((m) => {
+              const CatIcon = getCategoryIcon(m.category)
+              return (
+                <div key={m.id} className="flex items-center justify-between px-4 py-3 hover:bg-accent/50 transition-all duration-200">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={cn(
+                      'h-8 w-8 rounded-xl flex items-center justify-center shrink-0',
+                      filter === 'income' ? 'bg-green-500/10' : 'bg-muted'
+                    )}>
+                      <CatIcon className={cn('h-4 w-4', filter === 'income' ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground')} />
                     </div>
-                    <p
-                      className={cn(
-                        'font-semibold text-sm',
-                        m.type === 'income'
-                          ? 'text-green-600 dark:text-green-400'
-                          : 'text-foreground'
-                      )}
-                    >
-                      {m.type === 'income' ? '+' : '-'}{formatCurrency(m.amount)}
-                    </p>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm text-foreground truncate">{m.description}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {format(m.date, 'd MMM', { locale: es })} &middot; {m.method}
+                        {m.subcategory && ` · ${m.subcategory}`}
+                      </p>
+                    </div>
                   </div>
-                )
-              })}
-            </div>
-          </>
+                  <p
+                    className={cn(
+                      'font-semibold text-sm shrink-0 ml-2',
+                      filter === 'income'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-foreground'
+                    )}
+                  >
+                    {filter === 'income' ? '+' : '-'}{formatCurrency(m.amount)}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
         )}
       </CardContent>
     </Card>
