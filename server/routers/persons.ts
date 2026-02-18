@@ -117,11 +117,14 @@ export const personsRouter = router({
               loanInstallments: {
                 select: {
                   id: true,
+                  number: true,
                   amount: true,
                   interest: true,
                   isPaid: true,
+                  paidAt: true,
                   dueDate: true,
                 },
+                orderBy: { dueDate: 'asc' },
               },
             },
             orderBy: { createdAt: 'desc' },

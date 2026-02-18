@@ -24,6 +24,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
+import { format, differenceInDays } from 'date-fns'
+import { es } from 'date-fns/locale'
 import {
   Plus,
   ArrowLeft,
@@ -35,6 +37,12 @@ import {
   ShieldX,
   Shield,
   Banknote,
+  Clock,
+  CheckCircle2,
+  Circle,
+  AlertCircle,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react'
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
@@ -339,12 +347,188 @@ function PersonDetail({ personId, onBack }: { personId: string; onBack: () => vo
         </CardContent>
       </Card>
 
+      {/* Payment History Timeline */}
+      <PaymentHistory loans={person.loans} />
+
       <PersonFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
         editPerson={person}
       />
     </div>
+  )
+}
+
+// ─── Payment History Timeline ───────────────────────────────────────
+
+function PaymentHistory({ loans }: { loans: any[] }) {
+  // Flatten all installments across loans with loan context
+  const allInstallments = loans.flatMap((loan) =>
+    loan.loanInstallments.map((inst: any) => ({
+      ...inst,
+      amount: Number(inst.amount),
+      dueDate: new Date(inst.dueDate),
+      paidAt: inst.paidAt ? new Date(inst.paidAt) : null,
+      loanName: loan.borrowerName,
+      currency: loan.currency,
+      loanId: loan.id,
+    }))
+  )
+
+  if (allInstallments.length === 0) return null
+
+  // Sort by dueDate descending (most recent first)
+  const sorted = [...allInstallments].sort(
+    (a, b) => b.dueDate.getTime() - a.dueDate.getTime()
+  )
+
+  const now = new Date()
+
+  // Stats
+  const paid = sorted.filter((i) => i.isPaid)
+  const totalPaid = paid.length
+  const onTime = paid.filter((i) => {
+    if (!i.paidAt) return true
+    return differenceInDays(i.paidAt, i.dueDate) <= 0
+  }).length
+  const late = paid.filter((i) => {
+    if (!i.paidAt) return false
+    return differenceInDays(i.paidAt, i.dueDate) > 0
+  }).length
+  const overdue = sorted.filter((i) => !i.isPaid && i.dueDate < now).length
+  const punctualityRate = totalPaid > 0 ? Math.round((onTime / totalPaid) * 100) : null
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Clock className="h-5 w-5" />
+          Historial de Pagos
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Stats row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="text-center p-3 rounded-lg bg-muted/50">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Pagadas</p>
+            <p className="text-lg font-bold text-foreground">{totalPaid}</p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-green-500/10">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">A tiempo</p>
+            <p className="text-lg font-bold text-green-600 dark:text-green-400">{onTime}</p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-amber-500/10">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Con demora</p>
+            <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{late}</p>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-red-500/10">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Vencidas</p>
+            <p className="text-lg font-bold text-red-600 dark:text-red-400">{overdue}</p>
+          </div>
+        </div>
+
+        {/* Punctuality indicator */}
+        {punctualityRate !== null && (
+          <div className={cn(
+            'flex items-center gap-2 px-3 py-2 rounded-lg text-sm',
+            punctualityRate >= 80
+              ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+              : punctualityRate >= 50
+                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                : 'bg-red-500/10 text-red-600 dark:text-red-400'
+          )}>
+            {punctualityRate >= 80 ? (
+              <TrendingUp className="h-4 w-4" />
+            ) : (
+              <TrendingDown className="h-4 w-4" />
+            )}
+            <span>Puntualidad real: <strong>{punctualityRate}%</strong> ({onTime}/{totalPaid} a tiempo)</span>
+          </div>
+        )}
+
+        {/* Timeline */}
+        <div className="relative">
+          {/* Vertical line */}
+          <div className="absolute left-[15px] top-0 bottom-0 w-px bg-border" />
+
+          <div className="space-y-0">
+            {sorted.slice(0, 20).map((inst) => {
+              const isOverdue = !inst.isPaid && inst.dueDate < now
+              const isPaid = inst.isPaid
+              const isPending = !inst.isPaid && !isOverdue
+              const daysLate = isPaid && inst.paidAt
+                ? differenceInDays(inst.paidAt, inst.dueDate)
+                : isOverdue
+                  ? differenceInDays(now, inst.dueDate)
+                  : 0
+
+              return (
+                <div key={inst.id} className="relative flex items-start gap-3 py-2.5 pl-0">
+                  {/* Dot */}
+                  <div className={cn(
+                    'relative z-10 flex items-center justify-center w-[31px] h-[31px] shrink-0',
+                  )}>
+                    {isPaid ? (
+                      <CheckCircle2 className={cn(
+                        'h-5 w-5',
+                        daysLate > 0
+                          ? 'text-amber-500'
+                          : 'text-green-500'
+                      )} />
+                    ) : isOverdue ? (
+                      <AlertCircle className="h-5 w-5 text-red-500" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                    <div>
+                      <p className={cn(
+                        'text-sm font-medium',
+                        isOverdue ? 'text-red-600 dark:text-red-400' : 'text-foreground'
+                      )}>
+                        Cuota {inst.number} · {inst.loanName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Vence: {format(inst.dueDate, "d MMM yyyy", { locale: es })}
+                        {isPaid && inst.paidAt && (
+                          <span className={cn(
+                            'ml-1',
+                            daysLate > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'
+                          )}>
+                            · Pagada {format(inst.paidAt, "d MMM", { locale: es })}
+                            {daysLate > 0 && ` (+${daysLate}d)`}
+                          </span>
+                        )}
+                        {isOverdue && (
+                          <span className="text-red-500 ml-1 font-medium">
+                            · {daysLate}d vencida
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <span className={cn(
+                      'text-sm font-semibold shrink-0',
+                      isPaid ? 'text-foreground' : isOverdue ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
+                    )}>
+                      {formatCurrency(inst.amount, inst.currency)}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {sorted.length > 20 && (
+            <p className="text-xs text-muted-foreground text-center mt-2 pl-10">
+              +{sorted.length - 20} cuotas mas
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
