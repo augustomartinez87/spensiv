@@ -30,23 +30,23 @@ import { CardScheduleEditor } from '@/components/cards/card-schedule-editor'
 type CardBrand = 'visa' | 'mastercard' | 'amex'
 
 interface CardFormData {
-  name: string
   bank: string
   brand: CardBrand
   last4: string
   closingDay: number
   dueDay: number
   creditLimit: number | undefined
+  holderType: 'primary' | 'additional'
 }
 
 const initialFormData: CardFormData = {
-  name: '',
   bank: '',
   brand: 'visa',
   last4: '',
   closingDay: 1,
   dueDay: 1,
   creditLimit: undefined,
+  holderType: 'primary',
 }
 
 function getBankColor(bank: string): string {
@@ -116,26 +116,26 @@ export default function CardsPage() {
 
   const handleCreate = () => {
     createMutation.mutate({
-      name: formData.name,
       bank: formData.bank,
       brand: formData.brand,
       last4: formData.last4 || undefined,
       closingDay: formData.closingDay,
       dueDay: formData.dueDay,
       creditLimit: formData.creditLimit,
+      holderType: formData.holderType,
     })
   }
 
   const handleEdit = (card: any) => {
     setSelectedCard(card.id)
     setFormData({
-      name: card.name,
       bank: card.bank,
       brand: card.brand,
       last4: card.last4 || '',
       closingDay: card.closingDay,
       dueDay: card.dueDay,
       creditLimit: card.creditLimit ? Number(card.creditLimit) : undefined,
+      holderType: card.holderType || 'additional',
     })
     setIsEditOpen(true)
   }
@@ -144,13 +144,13 @@ export default function CardsPage() {
     if (!selectedCard) return
     updateMutation.mutate({
       id: selectedCard,
-      name: formData.name,
       bank: formData.bank,
       brand: formData.brand,
       last4: formData.last4 || undefined,
       closingDay: formData.closingDay,
       dueDay: formData.dueDay,
       creditLimit: formData.creditLimit,
+      holderType: formData.holderType,
     })
   }
 
@@ -205,15 +205,6 @@ export default function CardsPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="name">Nombre</Label>
-                <Input
-                  id="name"
-                  placeholder="ej: CIUDAD Visa"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
                 <Label htmlFor="bank">Banco</Label>
                 <Input
                   id="bank"
@@ -235,6 +226,21 @@ export default function CardsPage() {
                     <SelectItem value="visa">Visa</SelectItem>
                     <SelectItem value="mastercard">Mastercard</SelectItem>
                     <SelectItem value="amex">American Express</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="holderType">Titularidad</Label>
+                <Select
+                  value={formData.holderType}
+                  onValueChange={(value: 'primary' | 'additional') => setFormData({ ...formData, holderType: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona titularidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="primary">Titular</SelectItem>
+                    <SelectItem value="additional">Adicional</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -287,7 +293,7 @@ export default function CardsPage() {
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending || !formData.name || !formData.bank}>
+              <Button onClick={handleCreate} disabled={createMutation.isPending || !formData.bank}>
                 {createMutation.isPending ? 'Guardando...' : 'Guardar'}
               </Button>
             </DialogFooter>
@@ -324,6 +330,14 @@ export default function CardsPage() {
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                           {getBrandName(card.brand)}
+                        </span>
+                        <span className={cn(
+                          "text-xs font-medium px-2 py-0.5 rounded-full",
+                          card.holderType === 'primary'
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                            : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                        )}>
+                          {card.holderType === 'primary' ? 'Titular' : 'Adicional'}
                         </span>
                         {card.last4 && (
                           <span className="text-xs font-mono text-muted-foreground">**** {card.last4}</span>
@@ -448,14 +462,6 @@ export default function CardsPage() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="edit-name">Nombre</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-2">
               <Label htmlFor="edit-bank">Banco</Label>
               <Input
                 id="edit-bank"
@@ -476,6 +482,21 @@ export default function CardsPage() {
                   <SelectItem value="visa">Visa</SelectItem>
                   <SelectItem value="mastercard">Mastercard</SelectItem>
                   <SelectItem value="amex">American Express</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-holderType">Titularidad</Label>
+              <Select
+                value={formData.holderType}
+                onValueChange={(value: 'primary' | 'additional') => setFormData({ ...formData, holderType: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona titularidad" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="primary">Titular</SelectItem>
+                  <SelectItem value="additional">Adicional</SelectItem>
                 </SelectContent>
               </Select>
             </div>

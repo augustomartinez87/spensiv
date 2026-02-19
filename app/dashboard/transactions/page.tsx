@@ -37,7 +37,7 @@ export default function TransactionsPage() {
     expenseType: '',
     notes: '',
   })
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
   const [visibleCount, setVisibleCount] = useState(20)
 
   // Filtros
@@ -457,7 +457,9 @@ export default function TransactionsPage() {
                           <th className="text-left py-3 px-4 font-medium">Categoría</th>
                           <th className="text-left py-3 px-4 font-medium">Tipo</th>
                           <th className="text-left py-3 px-4 font-medium">Método</th>
+                          <th className="text-left py-3 px-4 font-medium">Método</th>
                           <th className="text-right py-3 px-4 font-medium">Monto</th>
+                          <th className="w-[100px]"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -465,7 +467,7 @@ export default function TransactionsPage() {
                           <tr
                             key={transaction.id}
                             className={cn(
-                              "hover:bg-muted/50 transition-colors",
+                              "group hover:bg-muted/50 transition-colors",
                               transaction.isVoided && "opacity-50 line-through"
                             )}
                           >
@@ -490,6 +492,39 @@ export default function TransactionsPage() {
                             <td className="py-2.5 px-4 text-right font-semibold whitespace-nowrap">
                               {formatCurrency(Number(transaction.totalAmount))}
                             </td>
+                            <td className="py-2.5 px-4 text-right">
+                              <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  title="Editar"
+                                  onClick={() => {
+                                    setEditingTransaction(transaction)
+                                    setEditFormData({
+                                      description: transaction.description,
+                                      categoryId: transaction.categoryId || '',
+                                      expenseType: transaction.expenseType || '',
+                                      notes: transaction.notes || '',
+                                    })
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  title="Eliminar"
+                                  onClick={() => setTransactionToDelete({
+                                    id: transaction.id,
+                                    description: transaction.description
+                                  })}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -507,184 +542,172 @@ export default function TransactionsPage() {
             </>
           ) : (
             <>
-            <div className="space-y-4">
-              {displayedTransactions?.map((transaction) => (
-                <Card
-                  key={transaction.id}
-                  className={transaction.isVoided ? 'opacity-60' : ''}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg">
-                            {transaction.description}
-                          </CardTitle>
-                          {transaction.isVoided && (
-                            <span className="text-xs bg-red-500/15 text-red-600 dark:text-red-400 px-2 py-0.5 rounded">
-                              ANULADO
+              <div className="space-y-4">
+                {displayedTransactions?.map((transaction) => (
+                  <Card
+                    key={transaction.id}
+                    className={transaction.isVoided ? 'opacity-60' : ''}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-lg">
+                              {transaction.description}
+                            </CardTitle>
+                            {transaction.isVoided && (
+                              <span className="text-xs bg-red-500/15 text-red-600 dark:text-red-400 px-2 py-0.5 rounded">
+                                ANULADO
+                              </span>
+                            )}
+                          </div>
+                          <CardDescription className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${getPaymentMethodColor((transaction as any).paymentMethod || 'credit_card')}`}>
+                              {getPaymentMethodIcon((transaction as any).paymentMethod || 'credit_card')}
+                              {getPaymentMethodLabel((transaction as any).paymentMethod || 'credit_card')}
+                            </span>
+                            {transaction.card && (
+                              <span>{transaction.card.name}</span>
+                            )}
+                            <span>-</span>
+                            <span>{format(new Date(transaction.purchaseDate), "d 'de' MMMM, yyyy", { locale: es })}</span>
+                          </CardDescription>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold">
+                            {formatCurrency(Number(transaction.totalAmount))}
+                          </div>
+                          {(transaction as any).paymentMethod === 'credit_card' && transaction.installments > 1 && (
+                            <div className="text-sm text-muted-foreground">
+                              {transaction.installments} cuotas de{' '}
+                              {formatCurrency(Number(transaction.totalAmount) / transaction.installments)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-xs px-2 py-0.5 rounded ${getExpenseTypeColor(transaction.expenseType)}`}>
+                            {getExpenseTypeLabel(transaction.expenseType)}
+                          </span>
+                          {transaction.notes && (
+                            <span className="text-xs text-muted-foreground">
+                              {transaction.notes}
                             </span>
                           )}
                         </div>
-                        <CardDescription className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${getPaymentMethodColor((transaction as any).paymentMethod || 'credit_card')}`}>
-                            {getPaymentMethodIcon((transaction as any).paymentMethod || 'credit_card')}
-                            {getPaymentMethodLabel((transaction as any).paymentMethod || 'credit_card')}
-                          </span>
-                          {transaction.card && (
-                            <span>{transaction.card.name}</span>
+                        <div className="flex items-center gap-2">
+                          {!transaction.isVoided && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingTransaction(transaction)
+                                  setEditFormData({
+                                    description: transaction.description,
+                                    categoryId: transaction.categoryId || '',
+                                    expenseType: transaction.expenseType || '',
+                                    notes: transaction.notes || '',
+                                  })
+                                }}
+                              >
+                                <Pencil className="h-4 w-4 mr-1" />
+                                Editar
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => setTransactionToDelete({
+                                  id: transaction.id,
+                                  description: transaction.description
+                                })}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Eliminar
+                              </Button>
+                            </>
                           )}
-                          <span>-</span>
-                          <span>{format(new Date(transaction.purchaseDate), "d 'de' MMMM, yyyy", { locale: es })}</span>
-                        </CardDescription>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold">
-                          {formatCurrency(Number(transaction.totalAmount))}
-                        </div>
-                        {(transaction as any).paymentMethod === 'credit_card' && transaction.installments > 1 && (
-                          <div className="text-sm text-muted-foreground">
-                            {transaction.installments} cuotas de{' '}
-                            {formatCurrency(Number(transaction.totalAmount) / transaction.installments)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-0.5 rounded ${getExpenseTypeColor(transaction.expenseType)}`}>
-                          {getExpenseTypeLabel(transaction.expenseType)}
-                        </span>
-                        {transaction.notes && (
-                          <span className="text-xs text-muted-foreground">
-                            {transaction.notes}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!transaction.isVoided && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingTransaction(transaction)
-                                setEditFormData({
-                                  description: transaction.description,
-                                  categoryId: transaction.categoryId || '',
-                                  expenseType: transaction.expenseType || '',
-                                  notes: transaction.notes || '',
-                                })
-                              }}
-                            >
-                              <Pencil className="h-4 w-4 mr-1" />
-                              Editar
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => setTransactionToDelete({
-                                id: transaction.id,
-                                description: transaction.description
-                              })}
-                            >
-                              <Trash2 className="h-4 w-4 mr-1" />
-                              Eliminar
-                            </Button>
+                          {transaction.isVoided && (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setTransactionToVoid({
-                                id: transaction.id,
-                                description: transaction.description,
-                                amount: Number(transaction.totalAmount)
-                              })}
+                              onClick={() => unvoidMutation.mutate(transaction.id)}
+                              disabled={unvoidMutation.isPending}
                             >
-                              <Ban className="h-4 w-4 mr-1" />
-                              Anular
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              Restaurar
                             </Button>
-                          </>
-                        )}
-                        {transaction.isVoided && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => unvoidMutation.mutate(transaction.id)}
-                            disabled={unvoidMutation.isPending}
-                          >
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                            Restaurar
-                          </Button>
-                        )}
-                        {(transaction as any).paymentMethod === 'credit_card' && transaction.installmentsList?.length > 0 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setExpandedTransaction(
-                              expandedTransaction === transaction.id ? null : transaction.id
-                            )}
-                          >
-                            {expandedTransaction === transaction.id ? (
-                              <ChevronUp className="h-4 w-4" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4" />
-                            )}
-                            Ver cuotas
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    {expandedTransaction === transaction.id && transaction.installmentsList?.length > 0 && (
-                      <div className="mt-4 border-t pt-4">
-                        <h4 className="text-sm font-medium mb-2">Detalle de cuotas</h4>
-                        <div className="grid gap-2">
-                          {transaction.installmentsList.map((installment) => (
-                            <div
-                              key={installment.id}
-                              className="flex items-center justify-between text-sm p-2 bg-muted rounded"
+                          )}
+                          {(transaction as any).paymentMethod === 'credit_card' && transaction.installmentsList?.length > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setExpandedTransaction(
+                                expandedTransaction === transaction.id ? null : transaction.id
+                              )}
                             >
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">
-                                  Cuota {installment.installmentNumber}/{transaction.installments}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  {format(new Date(installment.impactDate), "MMMM yyyy", { locale: es })}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">
-                                  {formatCurrency(Number(installment.amount))}
-                                </span>
-                                {installment.isPaid ? (
-                                  <span className="text-xs bg-green-500/15 text-green-600 dark:text-green-400 px-2 py-0.5 rounded">
-                                    Pagada
-                                  </span>
-                                ) : (
-                                  <span className="text-xs bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 px-2 py-0.5 rounded">
-                                    Pendiente
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                              {expandedTransaction === transaction.id ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                              Ver cuotas
+                            </Button>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            {remainingCount > 0 && (
-              <div className="flex justify-center">
-                <Button variant="outline" onClick={() => setVisibleCount(v => v + 20)}>
-                  Ver más ({remainingCount} restantes)
-                </Button>
+
+                      {expandedTransaction === transaction.id && transaction.installmentsList?.length > 0 && (
+                        <div className="mt-4 border-t pt-4">
+                          <h4 className="text-sm font-medium mb-2">Detalle de cuotas</h4>
+                          <div className="grid gap-2">
+                            {transaction.installmentsList.map((installment) => (
+                              <div
+                                key={installment.id}
+                                className="flex items-center justify-between text-sm p-2 bg-muted rounded"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">
+                                    Cuota {installment.installmentNumber}/{transaction.installments}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    {format(new Date(installment.impactDate), "MMMM yyyy", { locale: es })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">
+                                    {formatCurrency(Number(installment.amount))}
+                                  </span>
+                                  {installment.isPaid ? (
+                                    <span className="text-xs bg-green-500/15 text-green-600 dark:text-green-400 px-2 py-0.5 rounded">
+                                      Pagada
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 px-2 py-0.5 rounded">
+                                      Pendiente
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            )}
+              {remainingCount > 0 && (
+                <div className="flex justify-center">
+                  <Button variant="outline" onClick={() => setVisibleCount(v => v + 20)}>
+                    Ver más ({remainingCount} restantes)
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </>

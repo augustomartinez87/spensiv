@@ -45,7 +45,6 @@ export const cardsRouter = router({
   create: protectedProcedure
     .input(
       z.object({
-        name: z.string().min(1),
         bank: z.string().min(1),
         brand: z.enum(['visa', 'mastercard', 'amex']),
         last4: z.string().length(4).optional(),
@@ -53,12 +52,16 @@ export const cardsRouter = router({
         dueDay: z.number().min(1).max(31),
         creditLimit: z.number().positive().optional(),
         color: z.string().optional(),
+        holderType: z.enum(['primary', 'additional']).default('primary'),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const name = `${input.bank} ${input.brand.charAt(0).toUpperCase() + input.brand.slice(1)}`
+
       return ctx.prisma.creditCard.create({
         data: {
           userId: ctx.user.id,
+          name,
           ...input,
         },
       })
@@ -71,7 +74,6 @@ export const cardsRouter = router({
     .input(
       z.object({
         id: z.string(),
-        name: z.string().min(1).optional(),
         bank: z.string().min(1).optional(),
         brand: z.enum(['visa', 'mastercard', 'amex']).optional(),
         last4: z.string().length(4).optional(),
@@ -79,6 +81,7 @@ export const cardsRouter = router({
         dueDay: z.number().min(1).max(31).optional(),
         creditLimit: z.number().positive().optional(),
         color: z.string().optional(),
+        holderType: z.enum(['primary', 'additional']).optional(),
         isActive: z.boolean().optional(),
       })
     )
@@ -96,9 +99,20 @@ export const cardsRouter = router({
         })
       }
 
+      // Re-generate name if bank or brand changes
+      let name = card.name
+      if (data.bank || data.brand) {
+        const bank = data.bank || card.bank
+        const brand = data.brand || card.brand
+        name = `${bank} ${brand.charAt(0).toUpperCase() + brand.slice(1)}`
+      }
+
       return ctx.prisma.creditCard.update({
         where: { id },
-        data,
+        data: {
+          ...data,
+          name,
+        },
       })
     }),
 
