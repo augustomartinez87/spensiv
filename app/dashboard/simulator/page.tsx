@@ -552,10 +552,10 @@ function MetricCard({
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 min-w-0">
       <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{label}</p>
-      <p className={cn("text-2xl font-black", colors[variant])}>{value}</p>
-      {subvalue && <p className="text-xs text-muted-foreground">{subvalue}</p>}
+      <p className={cn("text-lg lg:text-xl font-black truncate", colors[variant])}>{value}</p>
+      {subvalue && <p className="text-xs text-muted-foreground truncate">{subvalue}</p>}
     </div>
   )
 }
@@ -594,7 +594,7 @@ function ResultCardContent({ result, title, onCreateLoan }: { result: Simulation
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <MetricCard
             label="TIR Efectiva (TEA)"
             value={`${(result.tirEffective * 100).toFixed(2)}%`}
