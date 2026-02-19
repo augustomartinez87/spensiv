@@ -235,8 +235,27 @@ export const dashboardRouter = router({
       // Calcular deuda total real (suma de todos los balances)
       const totalDebt = cardBalances.reduce((sum, card) => sum + card.totalBalance, 0)
 
+      // Get third-party amounts per card
+      const thirdPartyByCard = await ctx.prisma.thirdPartyPurchase.groupBy({
+        by: ['cardId'],
+        where: {
+          userId: ctx.user.id,
+          status: 'active',
+        },
+        _sum: { totalAmount: true },
+      })
+
+      const thirdPartyMap = new Map(
+        thirdPartyByCard.map((tp) => [tp.cardId, Number(tp._sum.totalAmount || 0)])
+      )
+
+      const cardsWithThirdParty = cardBalances.map((card) => ({
+        ...card,
+        thirdPartyAmount: thirdPartyMap.get(card.id) || 0,
+      }))
+
       return {
-        cards: cardBalances,
+        cards: cardsWithThirdParty,
         totalDebt,
         cardCount: cards.length,
       }

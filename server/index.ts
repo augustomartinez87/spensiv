@@ -6,6 +6,7 @@ import { incomesRouter } from './routers/incomes'
 import { loansRouter } from './routers/loans'
 import { personsRouter } from './routers/persons'
 import { portfolioRouter } from './routers/portfolio'
+import { thirdPartyPurchasesRouter } from './routers/third-party-purchases'
 
 export const appRouter = router({
   cards: cardsRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
   loans: loansRouter,
   persons: personsRouter,
   portfolio: portfolioRouter,
+  thirdPartyPurchases: thirdPartyPurchasesRouter,
 })
 
 export type AppRouter = typeof appRouter

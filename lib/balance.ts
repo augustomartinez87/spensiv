@@ -42,6 +42,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
                 },
                 transaction: {
                     isVoided: false,
+                    isForThirdParty: false,
                 },
             },
             include: {
@@ -66,6 +67,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
             where: {
                 userId,
                 isVoided: false,
+                isForThirdParty: false,
                 paymentMethod: { in: ['cash', 'transfer', 'debit_card'] },
                 purchaseDate: {
                     gte: startDate,

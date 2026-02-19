@@ -22,15 +22,16 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  cards         CreditCard[]
-  transactions  Transaction[]
-  incomes       Income[]
-  categories    Category[]
-  preferences   UserPreferences?
-  alerts        Alert[]
-  bankStatements BankStatement[]
-  loans          Loan[]
-  persons        Person[]
+  cards               CreditCard[]
+  transactions        Transaction[]
+  incomes             Income[]
+  categories          Category[]
+  preferences         UserPreferences?
+  alerts              Alert[]
+  bankStatements      BankStatement[]
+  loans               Loan[]
+  persons             Person[]
+  thirdPartyPurchases ThirdPartyPurchase[]
 
   @@map("users")
 }
@@ -79,9 +80,10 @@ model CreditCard {
   updatedAt DateTime @updatedAt
 
   // Relations
-  transactions  Transaction[]
-  billingCycles BillingCycle[]
-  closingSchedules CardClosingSchedule[]
+  transactions        Transaction[]
+  billingCycles       BillingCycle[]
+  closingSchedules    CardClosingSchedule[]
+  thirdPartyPurchases ThirdPartyPurchase[]
 
   @@index([userId])
   @@map("credit_cards")
@@ -176,7 +178,8 @@ model Transaction {
   updatedAt DateTime @updatedAt
 
   // Relations
-  installmentsList Installment[]
+  installmentsList   Installment[]
+  thirdPartyPurchase ThirdPartyPurchase?
 
   @@index([userId])
   @@index([cardId])
@@ -364,7 +367,8 @@ model Person {
   updatedAt DateTime @updatedAt
 
   // Relations
-  loans     Loan[]
+  loans                Loan[]
+  thirdPartyPurchases  ThirdPartyPurchase[]
 
   @@index([userId])
   @@map("persons")
@@ -447,4 +451,67 @@ model Alert {
 
   @@index([userId])
   @@map("alerts")
+}
+
+// ============================================================================
+// THIRD-PARTY PURCHASES (COMPRAS DE TERCEROS)
+// ============================================================================
+
+model ThirdPartyPurchase {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  description     String
+  personId        String?
+  person          Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+  personName      String   // Nombre libre (por si no hay Person)
+
+  cardId          String
+  card            CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  transactionId   String   @unique
+  transaction     Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  totalAmount     Decimal  @db.Decimal(12, 2)
+  installments    Int      @default(1)
+  installmentAmount Decimal @db.Decimal(12, 2)
+  currency        String   @default("ARS") // "ARS" | "USD"
+
+  purchaseDate    DateTime
+  firstDueDate    DateTime?
+  status          String   @default("active") // "active" | "completed"
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  collectionInstallments ThirdPartyInstallment[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([cardId])
+  @@map("third_party_purchases")
+}
+
+model ThirdPartyInstallment {
+  id                    String   @id @default(cuid())
+  thirdPartyPurchaseId  String
+  thirdPartyPurchase    ThirdPartyPurchase @relation(fields: [thirdPartyPurchaseId], references: [id], onDelete: Cascade)
+
+  number          Int      // 1, 2, 3, ..., N
+  amount          Decimal  @db.Decimal(12, 2)
+  dueDate         DateTime
+
+  isCollected     Boolean  @default(false)
+  collectedAt     DateTime?
+  collectionNotes String?
+
+  createdAt DateTime @default(now())
+
+  @@index([thirdPartyPurchaseId])
+  @@index([thirdPartyPurchaseId, isCollected])
+  @@index([dueDate])
+  @@map("third_party_installments")
 }

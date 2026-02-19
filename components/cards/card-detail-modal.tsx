@@ -22,6 +22,7 @@ import {
   TrendingUp,
   Building2,
   Hash,
+  Users,
 } from 'lucide-react'
 
 interface CardDetailModalProps {
@@ -65,6 +66,10 @@ function getBrandName(brand: string): string {
 
 export function CardDetailModal({ cardId, isOpen, onClose }: CardDetailModalProps) {
   const { data: cardDetail, isLoading } = trpc.cards.getDetail.useQuery(
+    cardId || '',
+    { enabled: !!cardId }
+  )
+  const { data: thirdPartySummary } = trpc.thirdPartyPurchases.getSummaryByCard.useQuery(
     cardId || '',
     { enabled: !!cardId }
   )
@@ -285,6 +290,38 @@ export function CardDetailModal({ cardId, isOpen, onClose }: CardDetailModalProp
                       </span>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Compras de terceros */}
+          {thirdPartySummary && thirdPartySummary.count > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Compras de Terceros
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase">Activas</p>
+                    <p className="text-lg font-bold">{thirdPartySummary.count}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase">Monto total</p>
+                    <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                      {formatCurrency(thirdPartySummary.totalAmount)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase">Pendiente</p>
+                    <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                      {formatCurrency(thirdPartySummary.pendingAmount)}
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

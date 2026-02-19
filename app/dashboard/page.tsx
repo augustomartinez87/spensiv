@@ -4,11 +4,11 @@ import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc-client'
 import { StatCard } from '@/components/dashboard/stat-card'
+import { CompactProjection } from '@/components/dashboard/compact-projection'
 import { MonthSelector } from '@/components/dashboard/month-selector'
 
 const CategoryPieChart = dynamic(() => import('@/components/dashboard/category-pie-chart').then(m => m.CategoryPieChart), { ssr: false })
 const ExpenseTypeChart = dynamic(() => import('@/components/dashboard/expense-type-chart').then(m => m.ExpenseTypeChart), { ssr: false })
-const MonthlyProjection = dynamic(() => import('@/components/dashboard/monthly-projection').then(m => m.MonthlyProjection), { ssr: false })
 const TransactionForm = dynamic(() => import('@/components/transactions/transaction-form').then(m => m.TransactionForm), { ssr: false })
 const IncomeForm = dynamic(() => import('@/components/transactions/income-form').then(m => m.IncomeForm), { ssr: false })
 const CardDetailModal = dynamic(() => import('@/components/cards/card-detail-modal').then(m => m.CardDetailModal), { ssr: false })
@@ -101,8 +101,6 @@ export default function DashboardPage() {
   const { data: upcomingPayments, isLoading: loadingPayments } = trpc.dashboard.getUpcomingPayments.useQuery()
   const { data: loanMetrics } = trpc.loans.getDashboardMetrics.useQuery()
 
-  const totalDebt = cardBalances?.totalDebt || 0
-
   const isLoading = isLoadingBalance || loadingCardBalances || loadingPayments
 
   if (isLoading) {
@@ -169,7 +167,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* === ROW 1: Key metrics === */}
+      {/* === ROW 1: Egresos | Ingresos | Proyección === */}
       <div className="grid gap-4 grid-cols-3">
         <StatCard
           title="Egresos del periodo"
@@ -185,81 +183,14 @@ export default function DashboardPage() {
           type="income"
           previousValue={prevBalance?.totalIncome}
         />
-        <StatCard
-          title="Deuda total"
-          value={totalDebt}
-          type="expense"
-        />
-      </div>
-
-      {/* === ROW 2: Projection + Active Loans === */}
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-        <MonthlyProjection
+        <CompactProjection
           balance={balance.balance}
           totalIncome={balance.totalIncome}
           totalExpense={balance.totalExpense}
-          cardBalances={cardBalances}
         />
-
-        {/* Active Loans */}
-        <Card>
-          <CardHeader className="py-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Banknote className="h-4 w-4" /> Préstamos Activos
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            {loanMetrics && loanMetrics.activeLoansCount > 0 ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-muted rounded-lg p-2.5">
-                    <p className="text-[10px] text-muted-foreground uppercase">Capital</p>
-                    <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalCapitalActive)}</p>
-                  </div>
-                  <div className="bg-muted rounded-lg p-2.5">
-                    <p className="text-[10px] text-muted-foreground uppercase">Por Cobrar</p>
-                    <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalPending)}</p>
-                  </div>
-                </div>
-                {loanMetrics.overdueCount > 0 && (
-                  <div className="bg-red-500/10 rounded-lg p-2.5">
-                    <p className="text-[10px] text-red-600 dark:text-red-400 uppercase font-medium">En mora</p>
-                    <p className="text-sm font-bold text-red-600 dark:text-red-400">{formatCurrency(loanMetrics.overdueAmount)}</p>
-                  </div>
-                )}
-                {loanMetrics.upcomingInstallments.length > 0 && (
-                  <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-medium">Próximas cuotas</p>
-                    {loanMetrics.upcomingInstallments.slice(0, 3).map((inst) => (
-                      <div key={inst.id} className="flex items-center justify-between text-xs py-1">
-                        <span className="text-foreground font-medium truncate">{inst.borrowerName}</span>
-                        <div className="text-right shrink-0 ml-2">
-                          <span className="font-bold">{formatCurrency(inst.amount, inst.currency)}</span>
-                          <span className="text-muted-foreground ml-1.5">
-                            {format(new Date(inst.dueDate), 'd MMM', { locale: es })}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <Link href="/dashboard/loans" className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors pt-1">
-                  Ver Préstamos <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-            ) : (
-              <div className="text-center py-6">
-                <p className="text-sm text-muted-foreground italic">Sin préstamos activos</p>
-                <Link href="/dashboard/loans" className="text-xs text-primary hover:text-primary/80 mt-2 inline-block">
-                  Crear préstamo
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
-      {/* === ROW 3: Cards + Upcoming Payments === */}
+      {/* === ROW 2: Tarjetas + Próximos Vencimientos === */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         {/* Cards */}
         <Card>
@@ -305,6 +236,11 @@ export default function DashboardPage() {
                           }
                           return null
                         })()}
+                        {card.thirdPartyAmount > 0 && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                            {formatCurrency(card.thirdPartyAmount)} terceros
+                          </span>
+                        )}
                       </div>
                       <p className="text-[10px] text-muted-foreground">{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : 'Tarjeta'}</p>
                     </div>
@@ -389,7 +325,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* === ROW 4: Category Pie + Expense Types === */}
+      {/* === ROW 3: Category Pie + Expense Types === */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         <CategoryPieChart
           data={balance.aggregations.expensesByCategory}
@@ -402,7 +338,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* === ROW 5: Recent Movements (Expenses + Income) === */}
+      {/* === ROW 4: Recent Movements (Expenses + Income) === */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         <RecentMovements
           installments={balance.installments}
@@ -417,6 +353,65 @@ export default function DashboardPage() {
           filter="income"
         />
       </div>
+
+      {/* === ROW 5: Préstamos Activos (full width) === */}
+      <Card>
+        <CardHeader className="py-4">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Banknote className="h-4 w-4" /> Préstamos Activos
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-3 pb-3">
+          {loanMetrics && loanMetrics.activeLoansCount > 0 ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="bg-muted rounded-lg p-2.5">
+                  <p className="text-[10px] text-muted-foreground uppercase">Capital</p>
+                  <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalCapitalActive)}</p>
+                </div>
+                <div className="bg-muted rounded-lg p-2.5">
+                  <p className="text-[10px] text-muted-foreground uppercase">Por Cobrar</p>
+                  <p className="text-sm font-bold text-foreground">{formatCurrency(loanMetrics.totalPending)}</p>
+                </div>
+                {loanMetrics.overdueCount > 0 && (
+                  <div className="bg-red-500/10 rounded-lg p-2.5">
+                    <p className="text-[10px] text-red-600 dark:text-red-400 uppercase font-medium">En mora</p>
+                    <p className="text-sm font-bold text-red-600 dark:text-red-400">{formatCurrency(loanMetrics.overdueAmount)}</p>
+                  </div>
+                )}
+              </div>
+              {loanMetrics.upcomingInstallments.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground font-medium">Próximas cuotas</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                    {loanMetrics.upcomingInstallments.slice(0, 4).map((inst) => (
+                      <div key={inst.id} className="flex items-center justify-between text-xs py-1 px-2">
+                        <span className="text-foreground font-medium truncate">{inst.borrowerName}</span>
+                        <div className="text-right shrink-0 ml-2">
+                          <span className="font-bold">{formatCurrency(inst.amount, inst.currency)}</span>
+                          <span className="text-muted-foreground ml-1.5">
+                            {format(new Date(inst.dueDate), 'd MMM', { locale: es })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Link href="/dashboard/loans" className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors pt-1">
+                Ver Préstamos <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-sm text-muted-foreground italic">Sin préstamos activos</p>
+              <Link href="/dashboard/loans" className="text-xs text-primary hover:text-primary/80 mt-2 inline-block">
+                Crear préstamo
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Card Detail Modal */}
       <CardDetailModal
