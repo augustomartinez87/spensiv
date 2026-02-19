@@ -280,6 +280,105 @@ export const thirdPartyPurchasesRouter = router({
     }),
 
   /**
+   * Listar transacciones huérfanas (isForThirdParty=true sin ThirdPartyPurchase)
+   */
+  getPendingTransactions: protectedProcedure.query(async ({ ctx }) => {
+    const transactions = await ctx.prisma.transaction.findMany({
+      where: {
+        userId: ctx.user.id,
+        isForThirdParty: true,
+        isVoided: false,
+        thirdPartyPurchase: null,
+      },
+      include: {
+        card: { select: { id: true, name: true, bank: true, brand: true } },
+      },
+      orderBy: { purchaseDate: 'desc' },
+    })
+
+    return transactions.map((t) => ({
+      id: t.id,
+      description: t.description,
+      totalAmount: Number(t.totalAmount),
+      installments: t.installments,
+      purchaseDate: t.purchaseDate,
+      card: t.card,
+      cardId: t.cardId,
+    }))
+  }),
+
+  /**
+   * Crear ThirdPartyPurchase a partir de transacción existente (huérfana)
+   */
+  createFromTransaction: protectedProcedure
+    .input(
+      z.object({
+        transactionId: z.string(),
+        personName: z.string().min(1),
+        personId: z.string().optional(),
+        currency: z.enum(['ARS', 'USD']).default('ARS'),
+        firstDueDate: z.string().optional(),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const transaction = await ctx.prisma.transaction.findUnique({
+        where: { id: input.transactionId },
+        include: { thirdPartyPurchase: true },
+      })
+
+      if (!transaction || transaction.userId !== ctx.user.id) {
+        throw new Error('Transacción no encontrada')
+      }
+
+      if (!transaction.isForThirdParty) {
+        throw new Error('La transacción no está marcada como tercero')
+      }
+
+      if (transaction.thirdPartyPurchase) {
+        throw new Error('La transacción ya tiene una compra de tercero asociada')
+      }
+
+      const installmentAmount = Number(transaction.totalAmount) / transaction.installments
+      const purchaseDate = transaction.purchaseDate
+      const firstDueDate = input.firstDueDate ? new Date(input.firstDueDate) : null
+
+      const thirdPartyPurchase = await ctx.prisma.thirdPartyPurchase.create({
+        data: {
+          userId: ctx.user.id,
+          description: transaction.description.replace(/^\[Tercero\] /, ''),
+          personId: input.personId || null,
+          personName: input.personName,
+          cardId: transaction.cardId!,
+          transactionId: transaction.id,
+          totalAmount: transaction.totalAmount,
+          installments: transaction.installments,
+          installmentAmount: new Decimal(installmentAmount),
+          currency: input.currency,
+          purchaseDate,
+          firstDueDate,
+          notes: input.notes,
+          collectionInstallments: {
+            create: Array.from({ length: transaction.installments }, (_, i) => {
+              const dueDate = new Date(firstDueDate || purchaseDate)
+              dueDate.setMonth(dueDate.getMonth() + i)
+              return {
+                number: i + 1,
+                amount: new Decimal(installmentAmount),
+                dueDate,
+              }
+            }),
+          },
+        },
+        include: {
+          collectionInstallments: true,
+        },
+      })
+
+      return thirdPartyPurchase
+    }),
+
+  /**
    * Resumen de terceros por tarjeta
    */
   getSummaryByCard: protectedProcedure

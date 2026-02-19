@@ -10,7 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, CreditCard, Banknote, ArrowRightLeft } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { ToastAction } from '@/components/ui/toast'
+import { useRouter } from 'next/navigation'
+import { Plus, CreditCard, Banknote, ArrowRightLeft, Users } from 'lucide-react'
 import { formatDateToInput, parseInputDate, formatCurrency, cn } from '@/lib/utils'
 
 type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'transfer'
@@ -27,6 +30,7 @@ interface TransactionFormData {
   subcategory: string
   expenseType: ExpenseType
   notes: string
+  isForThirdParty: boolean
 }
 
 const initialFormData: TransactionFormData = {
@@ -40,6 +44,7 @@ const initialFormData: TransactionFormData = {
   subcategory: '',
   expenseType: 'structural',
   notes: '',
+  isForThirdParty: false,
 }
 
 const expenseTypeOptions = [
@@ -64,6 +69,7 @@ export function TransactionForm({
   const [open, setOpen] = useState(false)
   const { toast } = useToast()
   const utils = trpc.useUtils()
+  const router = useRouter()
 
   const [formData, setFormData] = useState<TransactionFormData>(initialFormData)
 
@@ -72,15 +78,30 @@ export function TransactionForm({
 
   const createMutation = trpc.transactions.create.useMutation({
     onSuccess: () => {
-      toast({
-        title: 'Gasto registrado',
-        description: 'El gasto se registró exitosamente',
-      })
+      const wasForThirdParty = formData.isForThirdParty
       setOpen(false)
       setFormData(initialFormData)
       utils.dashboard.getMonthlyBalance.invalidate()
       utils.transactions.list.invalidate()
       utils.dashboard.getCardBalances.invalidate()
+
+      if (wasForThirdParty) {
+        utils.thirdPartyPurchases.getPendingTransactions.invalidate()
+        toast({
+          title: 'Compra de tercero registrada',
+          description: 'Completá los datos del tercero para hacer seguimiento del cobro',
+          action: (
+            <ToastAction altText="Ir a terceros" onClick={() => router.push('/dashboard/third-party')}>
+              Completar
+            </ToastAction>
+          ),
+        })
+      } else {
+        toast({
+          title: 'Gasto registrado',
+          description: 'El gasto se registró exitosamente',
+        })
+      }
     },
     onError: (error) => {
       toast({
@@ -114,7 +135,7 @@ export function TransactionForm({
     }
 
     createMutation.mutate({
-      description: formData.description,
+      description: formData.isForThirdParty ? `[Tercero] ${formData.description}` : formData.description,
       totalAmount: amount,
       purchaseDate: parseInputDate(formData.purchaseDate),
       paymentMethod: formData.paymentMethod,
@@ -123,6 +144,7 @@ export function TransactionForm({
       categoryId: formData.categoryId || undefined,
       expenseType: formData.expenseType,
       notes: formData.notes || undefined,
+      isForThirdParty: formData.isForThirdParty || undefined,
     })
   }
 
@@ -297,6 +319,21 @@ export function TransactionForm({
                 max="60"
                 value={formData.installments}
                 onChange={(e) => setFormData({ ...formData, installments: e.target.value })}
+              />
+            </div>
+          )}
+
+          {/* Para tercero (solo crédito) */}
+          {isCreditCard && (
+            <div className="flex items-center gap-3 rounded-xl border border-purple-500/20 bg-purple-500/5 p-3">
+              <Users className="h-4 w-4 text-purple-500 shrink-0" />
+              <Label htmlFor="is-third-party" className="flex-1 text-sm cursor-pointer">
+                Es para un tercero
+              </Label>
+              <Switch
+                id="is-third-party"
+                checked={formData.isForThirdParty}
+                onCheckedChange={(checked) => setFormData({ ...formData, isForThirdParty: checked })}
               />
             </div>
           )}

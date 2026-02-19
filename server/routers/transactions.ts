@@ -258,6 +258,81 @@ export const transactionsRouter = router({
   }),
 
   /**
+   * Compras en cuotas activas (con cuotas pendientes)
+   */
+  getActiveInstallmentPurchases: protectedProcedure
+    .input(
+      z
+        .object({
+          cardId: z.string().optional(),
+          includeThirdParty: z.boolean().optional().default(true),
+        })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const where: any = {
+        userId: ctx.user.id,
+        installments: { gt: 1 },
+        isVoided: false,
+        paymentMethod: 'credit_card',
+      }
+
+      if (input?.cardId) {
+        where.cardId = input.cardId
+      }
+
+      if (input?.includeThirdParty === false) {
+        where.isForThirdParty = false
+      }
+
+      const transactions = await ctx.prisma.transaction.findMany({
+        where,
+        include: {
+          card: { select: { id: true, name: true, bank: true, brand: true } },
+          category: { select: { id: true, name: true } },
+          installmentsList: {
+            orderBy: { installmentNumber: 'asc' },
+            select: {
+              id: true,
+              installmentNumber: true,
+              amount: true,
+              isPaid: true,
+              impactDate: true,
+            },
+          },
+        },
+        orderBy: { purchaseDate: 'desc' },
+      })
+
+      // Filter to only those with pending installments and map
+      return transactions
+        .filter((t) => t.installmentsList.some((i) => !i.isPaid))
+        .map((t) => {
+          const paidCount = t.installmentsList.filter((i) => i.isPaid).length
+          const installmentAmount =
+            Number(t.totalAmount) / t.installments
+
+          return {
+            id: t.id,
+            description: t.description,
+            totalAmount: Number(t.totalAmount),
+            installments: t.installments,
+            paidCount,
+            pendingCount: t.installments - paidCount,
+            installmentAmount,
+            purchaseDate: t.purchaseDate,
+            isForThirdParty: t.isForThirdParty,
+            card: t.card,
+            category: t.category,
+            installmentsList: t.installmentsList.map((i) => ({
+              ...i,
+              amount: Number(i.amount),
+            })),
+          }
+        })
+    }),
+
+  /**
    * Estadísticas de gastos
    */
   getStats: protectedProcedure

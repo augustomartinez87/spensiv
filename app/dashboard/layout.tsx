@@ -19,6 +19,7 @@ import {
 
   Users,
   PieChart,
+  Layers,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -39,6 +40,7 @@ const navigation: NavSection[] = [
     items: [
       { name: 'Tarjetas', href: '/dashboard/cards', icon: CardsIcon },
       { name: 'Compras Terceros', href: '/dashboard/third-party', icon: Users },
+      { name: 'Cuotas', href: '/dashboard/installments', icon: Layers },
       { name: 'Movimientos', href: '/dashboard/transactions', icon: ListOrdered },
       { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
     ],
