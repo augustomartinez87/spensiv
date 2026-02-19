@@ -54,6 +54,7 @@ export interface SimulationResult {
 
   // Amortized specific
   installmentAmount?: number
+  roundedInstallmentAmount?: number  // strategically rounded up to multiple of 100
   amortizationTable?: AmortizationRow[]
   totalPaid?: number
 
@@ -305,6 +306,54 @@ export function calculateIRR(cashFlows: number[], maxIterations = 100, tolerance
   return rate
 }
 
+// ─── Strategic Rounding ──────────────────────────────────────────────
+
+/**
+ * Función A: Redondeo puro hacia arriba al múltiplo más cercano.
+ */
+export function roundUpToMultiple(amount: number, multiple = 100): number {
+  return Math.ceil(amount / multiple) * multiple
+}
+
+/**
+ * Función C: Valida que una cuota dada produce TIR ≥ TNA objetivo.
+ */
+export function validateInstallmentYield(
+  capital: number,
+  termMonths: number,
+  installment: number,
+  minTNA: number,
+): boolean {
+  const cashFlows = [-capital, ...Array(termMonths).fill(installment)]
+  const tirMonthly = calculateIRR(cashFlows)
+  const tirTNA = monthlyRateToTNA(tirMonthly)
+  return tirTNA >= minTNA
+}
+
+/**
+ * Función B+C: Redondeo estratégico + validación.
+ * Redondea hacia arriba y verifica que la TIR no caiga por debajo de la TNA objetivo.
+ * En el caso extremo de que el redondeo no sea suficiente, sube al siguiente múltiplo.
+ */
+export function strategicRoundInstallment(
+  capital: number,
+  termMonths: number,
+  exactInstallment: number,
+  minTNA: number,
+  multiple = 100,
+): number {
+  let rounded = roundUpToMultiple(exactInstallment, multiple)
+
+  // Safety: bump up if rounding somehow reduces yield below floor (edge case)
+  let attempts = 0
+  while (!validateInstallmentYield(capital, termMonths, rounded, minTNA) && attempts < 10) {
+    rounded += multiple
+    attempts++
+  }
+
+  return rounded
+}
+
 // ─── Main Simulation Engine ──────────────────────────────────────────
 
 export function simulateLoan(input: LoanInput): SimulationResult {
@@ -345,11 +394,16 @@ function simulateAmortized(
   input: LoanInput & { monthlyRate: number; hurdleMonthlyRate: number },
   base: Partial<SimulationResult>,
 ): SimulationResult {
-  const { capital, termMonths, monthlyRate, customInstallment, startDate, hurdleRate } = input
+  const { capital, termMonths, monthlyRate, customInstallment, startDate, hurdleRate, tnaTarget } = input
 
   const installmentAmount = customInstallment && customInstallment > 0
     ? customInstallment
     : frenchInstallment(capital, monthlyRate, termMonths)
+
+  // Strategic rounding: round to nearest 100 ceiling, validate TIR >= TNA target
+  const roundedInstallmentAmount = strategicRoundInstallment(
+    capital, termMonths, installmentAmount, tnaTarget,
+  )
 
   const table = generateAmortizationTable(capital, monthlyRate, termMonths, installmentAmount, startDate)
   const totalPaid = round2(installmentAmount * termMonths)
@@ -371,6 +425,7 @@ function simulateAmortized(
   return {
     ...base,
     installmentAmount: round2(installmentAmount),
+    roundedInstallmentAmount,
     amortizationTable: table,
     totalPaid,
     tirEffective,

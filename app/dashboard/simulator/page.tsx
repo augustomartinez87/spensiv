@@ -798,13 +798,13 @@ function ShareableSimulationView({
       `Monto: ${formatCurrency(capital, currency)}`,
       ``,
       ...results.map(r => {
-        const amt = r.installmentAmount || r.nominalValue || 0
+        const amt = r.roundedInstallmentAmount || r.installmentAmount || r.nominalValue || 0
         return r.loanType === 'amortized'
           ? `${r.termMonths} cuotas de ${formatCurrency(amt, currency)}`
           : `${r.termMonths} meses → ${formatCurrency(amt, currency)}`
       }),
       ``,
-      `💡 La opción de ${lowestInstallment.termMonths} cuotas tiene la cuota más baja: ${formatCurrency(lowestInstallment.installmentAmount || lowestInstallment.nominalValue || 0, currency)}/mes`,
+      `💡 La opción de ${lowestInstallment.termMonths} cuotas tiene la cuota más baja: ${formatCurrency(lowestInstallment.roundedInstallmentAmount || lowestInstallment.installmentAmount || lowestInstallment.nominalValue || 0, currency)}/mes`,
     ]
     await navigator.clipboard.writeText(lines.join('\n'))
     setCopied(true)
@@ -905,7 +905,7 @@ function ShareableSimulationView({
       // Amount
       ctx.fillStyle = '#f5f5f5'
       ctx.font = '800 24px Inter, system-ui, sans-serif'
-      const amt = r.installmentAmount || r.nominalValue || 0
+      const amt = r.roundedInstallmentAmount || r.installmentAmount || r.nominalValue || 0
       ctx.fillText(formatCurrency(amt, currency), cx, cardY + 82)
 
       // Per month
@@ -915,7 +915,7 @@ function ShareableSimulationView({
     })
 
     // Footer
-    const lowestAmt = lowestInstallment.installmentAmount || lowestInstallment.nominalValue || 0
+    const lowestAmt = lowestInstallment.roundedInstallmentAmount || lowestInstallment.installmentAmount || lowestInstallment.nominalValue || 0
     ctx.fillStyle = '#666'
     ctx.font = '400 13px Inter, system-ui, sans-serif'
     ctx.textAlign = 'center'
@@ -964,7 +964,7 @@ function ShareableSimulationView({
         results.length <= 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 sm:grid-cols-3",
       )}>
         {results.map((result, index) => {
-          const amt = result.installmentAmount || result.nominalValue || 0
+          const amt = result.roundedInstallmentAmount || result.installmentAmount || result.nominalValue || 0
           return (
             <InstallmentPlanCard
               key={result.termMonths}
@@ -990,7 +990,7 @@ function ShareableSimulationView({
               <div>
                 <p className="font-bold text-foreground">
                   Plan seleccionado: {selectedResult.termMonths} cuotas de{' '}
-                  {formatCurrency(selectedResult.installmentAmount || selectedResult.nominalValue || 0, currency)}
+                  {formatCurrency(selectedResult.roundedInstallmentAmount || selectedResult.installmentAmount || selectedResult.nominalValue || 0, currency)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Cuotas fijas · Sin costos ocultos
