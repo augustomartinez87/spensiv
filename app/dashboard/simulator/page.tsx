@@ -724,6 +724,7 @@ interface InstallmentPlanCardProps {
   isRecommended: boolean
   isSelected: boolean
   onSelect: () => void
+  formatClean: (amount: number) => string
 }
 
 function InstallmentPlanCard({
@@ -733,6 +734,7 @@ function InstallmentPlanCard({
   isRecommended,
   isSelected,
   onSelect,
+  formatClean,
 }: InstallmentPlanCardProps) {
   return (
     <div className="relative">
@@ -758,7 +760,7 @@ function InstallmentPlanCard({
             {termMonths} cuotas
           </p>
           <p className="text-2xl font-black text-foreground">
-            {formatCurrency(installmentAmount, currency)}
+            {formatClean(installmentAmount)}
           </p>
           <p className="text-xs text-muted-foreground">por mes</p>
         </CardContent>
@@ -790,28 +792,32 @@ function ShareableSimulationView({
   const selectedResult = results[selectedIndex] ?? null
   const lowestInstallment = results[maxTermIndex]
 
+  // No-decimal currency formatter for clean display
+  const fmtClean = (amount: number) =>
+    new Intl.NumberFormat('es-AR', { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
+
   // ─── Clipboard copy ────────────────────────────────────────────────
   const handleCopyText = useCallback(async () => {
     const lines = [
       `💰 *Simulación de préstamo*`,
       ``,
-      `Monto: ${formatCurrency(capital, currency)}`,
+      `Monto: ${fmtClean(capital)}`,
       ``,
       ...results.map(r => {
         const amt = r.roundedInstallmentAmount || r.installmentAmount || r.nominalValue || 0
         return r.loanType === 'amortized'
-          ? `${r.termMonths} cuotas de ${formatCurrency(amt, currency)}`
-          : `${r.termMonths} meses → ${formatCurrency(amt, currency)}`
+          ? `${r.termMonths} cuotas de ${fmtClean(amt)}`
+          : `${r.termMonths} meses → ${fmtClean(amt)}`
       }),
       ``,
-      `💡 La opción de ${lowestInstallment.termMonths} cuotas tiene la cuota más baja: ${formatCurrency(lowestInstallment.roundedInstallmentAmount || lowestInstallment.installmentAmount || lowestInstallment.nominalValue || 0, currency)}/mes`,
+      `Elegí la opción que te quede más cómoda.`,
     ]
     await navigator.clipboard.writeText(lines.join('\n'))
     setCopied(true)
     setTimeout(() => setCopied(false), 2500)
-  }, [results, capital, currency])
+  }, [results, capital, currency, fmtClean])
 
-  // ─── Canvas image generation ───────────────────────────────────────
+  // ─── Canvas image generation (LIGHT THEME) ────────────────────────
   const handleGenerateImage = useCallback(async () => {
     const W = 800
     const H = 520
@@ -820,37 +826,34 @@ function ShareableSimulationView({
     canvas.height = H
     const ctx = canvas.getContext('2d')!
 
-    // Background gradient
-    const bgGrad = ctx.createLinearGradient(0, 0, 0, H)
-    bgGrad.addColorStop(0, '#0f0f0f')
-    bgGrad.addColorStop(1, '#181818')
-    ctx.fillStyle = bgGrad
+    // Light background
+    ctx.fillStyle = '#f8f9fa'
     ctx.fillRect(0, 0, W, H)
 
     // Subtle accent line at top
     const accentGrad = ctx.createLinearGradient(0, 0, W, 0)
     accentGrad.addColorStop(0, 'transparent')
-    accentGrad.addColorStop(0.2, '#128dda')
-    accentGrad.addColorStop(0.8, '#128dda')
+    accentGrad.addColorStop(0.2, '#2563eb')
+    accentGrad.addColorStop(0.8, '#2563eb')
     accentGrad.addColorStop(1, 'transparent')
     ctx.fillStyle = accentGrad
     ctx.fillRect(0, 0, W, 3)
 
     // Title
-    ctx.fillStyle = '#888'
+    ctx.fillStyle = '#6b7280'
     ctx.font = '600 13px Inter, system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.fillText('SIMULACIÓN DE PRÉSTAMO', W / 2, 55)
 
     // Amount
-    ctx.fillStyle = '#f5f5f5'
+    ctx.fillStyle = '#111827'
     ctx.font = '800 38px Inter, system-ui, sans-serif'
-    ctx.fillText(`Monto: ${formatCurrency(capital, currency)}`, W / 2, 105)
+    ctx.fillText(`Monto: ${fmtClean(capital)}`, W / 2, 105)
 
     // Subtitle
-    ctx.fillStyle = '#777'
+    ctx.fillStyle = '#6b7280'
     ctx.font = '400 14px Inter, system-ui, sans-serif'
-    ctx.fillText('Elegí el plan que mejor se adapte a tu presupuesto', W / 2, 138)
+    ctx.fillText('Elegí la opción que te quede más cómoda.', W / 2, 138)
 
     // Cards — dynamically sized
     const n = results.length
@@ -867,17 +870,31 @@ function ShareableSimulationView({
       const isRec = i === maxTermIndex
 
       // Card bg
-      ctx.fillStyle = isRec ? '#152535' : '#1c1c1c'
+      ctx.fillStyle = '#ffffff'
       ctx.beginPath()
       ctx.roundRect(x, cardY, cardW, cardH, 12)
       ctx.fill()
 
       // Card border
-      ctx.strokeStyle = isRec ? '#128dda' : '#2a2a2a'
+      ctx.strokeStyle = isRec ? '#2563eb' : '#e5e7eb'
       ctx.lineWidth = isRec ? 2 : 1
       ctx.beginPath()
       ctx.roundRect(x, cardY, cardW, cardH, 12)
       ctx.stroke()
+
+      // Card shadow (subtle)
+      if (!isRec) {
+        ctx.shadowColor = 'rgba(0,0,0,0.06)'
+        ctx.shadowBlur = 8
+        ctx.shadowOffsetY = 2
+        ctx.fillStyle = '#ffffff'
+        ctx.beginPath()
+        ctx.roundRect(x, cardY, cardW, cardH, 12)
+        ctx.fill()
+        ctx.shadowColor = 'transparent'
+        ctx.shadowBlur = 0
+        ctx.shadowOffsetY = 0
+      }
 
       // Badge
       if (isRec) {
@@ -886,46 +903,39 @@ function ShareableSimulationView({
         const badgeH = 22
         const badgeX = cx - badgeW / 2
         const badgeY = cardY - 11
-        ctx.fillStyle = '#128dda'
+        ctx.fillStyle = '#2563eb'
         ctx.beginPath()
         ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 11)
         ctx.fill()
-        ctx.fillStyle = '#fff'
+        ctx.fillStyle = '#ffffff'
         ctx.font = '600 10px Inter, system-ui, sans-serif'
         ctx.textAlign = 'center'
         ctx.fillText(badgeText, cx, badgeY + 15)
       }
 
       // Term label
-      ctx.fillStyle = '#999'
+      ctx.fillStyle = '#6b7280'
       ctx.font = '600 12px Inter, system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.fillText(`${r.termMonths} CUOTAS`, cx, cardY + 40)
 
       // Amount
-      ctx.fillStyle = '#f5f5f5'
+      ctx.fillStyle = '#111827'
       ctx.font = '800 24px Inter, system-ui, sans-serif'
       const amt = r.roundedInstallmentAmount || r.installmentAmount || r.nominalValue || 0
-      ctx.fillText(formatCurrency(amt, currency), cx, cardY + 82)
+      ctx.fillText(fmtClean(amt), cx, cardY + 82)
 
       // Per month
-      ctx.fillStyle = '#666'
+      ctx.fillStyle = '#9ca3af'
       ctx.font = '400 12px Inter, system-ui, sans-serif'
       ctx.fillText('por mes', cx, cardY + 108)
     })
 
     // Footer
-    const lowestAmt = lowestInstallment.roundedInstallmentAmount || lowestInstallment.installmentAmount || lowestInstallment.nominalValue || 0
-    ctx.fillStyle = '#666'
+    ctx.fillStyle = '#9ca3af'
     ctx.font = '400 13px Inter, system-ui, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(
-      `💡 ${lowestInstallment.termMonths} cuotas = cuota más baja: ${formatCurrency(lowestAmt, currency)}/mes`,
-      W / 2, H - 40
-    )
-    ctx.fillStyle = '#444'
-    ctx.font = '400 11px Inter, system-ui, sans-serif'
-    ctx.fillText('Cuotas fijas · Sin costos ocultos', W / 2, H - 18)
+    ctx.fillText('Cuotas fijas.', W / 2, H - 30)
 
     // Download
     canvas.toBlob((blob) => {
@@ -941,7 +951,7 @@ function ShareableSimulationView({
       setImageGenerated(true)
       setTimeout(() => setImageGenerated(false), 2500)
     }, 'image/png')
-  }, [results, capital, currency, maxTermIndex])
+  }, [results, capital, currency, maxTermIndex, fmtClean])
 
   return (
     <div ref={shareRef} className="space-y-8">
@@ -954,7 +964,7 @@ function ShareableSimulationView({
           Monto del préstamo: {formatCurrency(capital, currency)}
         </h2>
         <p className="text-muted-foreground text-sm sm:text-base">
-          Elegí el plan de cuotas que mejor se adapte a tu presupuesto.
+          Elegí la opción que te quede más cómoda.
         </p>
       </div>
 
@@ -974,6 +984,7 @@ function ShareableSimulationView({
               isRecommended={index === maxTermIndex}
               isSelected={selectedIndex === index}
               onSelect={() => setSelectedIndex(index)}
+              formatClean={fmtClean}
             />
           )
         })}
@@ -990,10 +1001,10 @@ function ShareableSimulationView({
               <div>
                 <p className="font-bold text-foreground">
                   Plan seleccionado: {selectedResult.termMonths} cuotas de{' '}
-                  {formatCurrency(selectedResult.roundedInstallmentAmount || selectedResult.installmentAmount || selectedResult.nominalValue || 0, currency)}
+                  {fmtClean(selectedResult.roundedInstallmentAmount || selectedResult.installmentAmount || selectedResult.nominalValue || 0)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Cuotas fijas · Sin costos ocultos
+                  Cuotas fijas.
                 </p>
               </div>
             </div>
