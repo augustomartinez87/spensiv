@@ -194,38 +194,38 @@ export default function DashboardPage() {
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         {/* Cards */}
         <Card>
-          <CardHeader className="py-4 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <CreditCard className="h-4 w-4" /> Tarjetas
+          <CardHeader className="py-2.5 px-3 flex flex-row items-center justify-between">
+            <CardTitle className="text-xs font-semibold flex items-center gap-1.5">
+              <CreditCard className="h-3.5 w-3.5" /> Tarjetas
             </CardTitle>
             <Link href="/dashboard/cards">
-              <Button variant="ghost" size="icon" className="h-7 w-7">
-                <Plus className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-6 w-6">
+                <Plus className="h-3.5 w-3.5" />
               </Button>
             </Link>
           </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <div className="space-y-1">
+          <CardContent className="px-2.5 pb-2.5 pt-0">
+            <div className="space-y-0.5">
               {cardList.map((card) => {
                 const hasPeriodBalance = card.currentPeriodBalance > 0
                 return (
                   <div
                     key={card.id}
                     onClick={() => setSelectedCardId(card.id)}
-                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200 cursor-pointer group"
+                    className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-accent transition-all duration-200 cursor-pointer group"
                   >
-                    <div className={cn('h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0', getBankColor(card.bank || ''))}>
+                    <div className={cn('h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0', getBankColor(card.bank || ''))}>
                       {getBankInitials(card.bank || card.name)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{card.name}</p>
+                        <p className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors">{card.name}</p>
                         {(() => {
                           const days = getDaysUntilClosing(card.closingDay)
                           if (days <= 7) {
                             return (
                               <span className={cn(
-                                "text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0",
+                                "text-[9px] font-medium px-1 py-0.5 rounded-full shrink-0",
                                 days <= 3
                                   ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
                                   : "bg-muted text-muted-foreground"
@@ -237,18 +237,17 @@ export default function DashboardPage() {
                           return null
                         })()}
                         {card.thirdPartyAmount > 0 && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                          <span className="text-[9px] font-medium px-1 py-0.5 rounded-full shrink-0 bg-purple-500/15 text-purple-600 dark:text-purple-400">
                             {formatCurrency(card.thirdPartyAmount)} terceros
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-muted-foreground">{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : 'Tarjeta'}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-foreground">
+                      <p className="text-xs font-bold text-foreground">
                         {formatCurrency(hasPeriodBalance ? card.currentPeriodBalance : card.totalBalance)}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-[9px] text-muted-foreground">
                         {hasPeriodBalance
                           ? `${formatCurrency(card.totalBalance)} total`
                           : 'Deuda total'}
@@ -258,7 +257,7 @@ export default function DashboardPage() {
                 )
               })}
               {cardList.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4 italic">Sin tarjetas registradas</p>
+                <p className="text-xs text-muted-foreground text-center py-3 italic">Sin tarjetas registradas</p>
               )}
             </div>
           </CardContent>
@@ -266,36 +265,36 @@ export default function DashboardPage() {
 
         {/* Upcoming Payments */}
         <Card>
-          <CardHeader className="py-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Calendar className="h-4 w-4" /> Próximos Vencimientos
+          <CardHeader className="py-2.5 px-3">
+            <CardTitle className="text-xs font-semibold flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" /> Próximos Vencimientos
             </CardTitle>
           </CardHeader>
-          <CardContent className="px-3 pb-3">
+          <CardContent className="px-2.5 pb-2.5 pt-0">
             {nextPayments.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-0.5">
                 {nextPayments.map((p) => {
                   const dueDate = new Date(p.dueDate)
                   const isOverdue = p.daysUntil < 0
                   return (
-                    <div key={p.card.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent transition-all duration-200">
+                    <div key={p.card.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-accent transition-all duration-200">
                       <div className={cn(
-                        "flex flex-col items-center justify-center h-11 w-11 rounded-xl shrink-0",
+                        "flex flex-col items-center justify-center h-9 w-9 rounded-lg shrink-0",
                         isOverdue ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"
                       )}>
                         <span className={cn(
-                          "text-[9px] font-bold uppercase leading-none",
+                          "text-[8px] font-bold uppercase leading-none",
                           isOverdue ? "text-red-600 dark:text-red-400" : "text-red-500"
                         )}>
                           {format(dueDate, 'MMM', { locale: es })}
                         </span>
-                        <span className="text-lg font-bold text-foreground leading-none">
+                        <span className="text-sm font-bold text-foreground leading-none">
                           {format(dueDate, 'd')}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{p.card.name}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs font-medium text-foreground truncate">{p.card.name}</p>
+                        <p className="text-[10px] text-muted-foreground">
                           {isOverdue ? (
                             <span className="text-red-600 dark:text-red-400 font-medium">VENCIDO</span>
                           ) : (
@@ -303,21 +302,19 @@ export default function DashboardPage() {
                           )}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className={cn(
-                          "text-sm font-bold",
-                          isOverdue ? "text-red-600 dark:text-red-400" : "text-foreground"
-                        )}>{formatCurrency(p.amount)}</p>
-                      </div>
+                      <p className={cn(
+                        "text-xs font-bold shrink-0",
+                        isOverdue ? "text-red-600 dark:text-red-400" : "text-foreground"
+                      )}>{formatCurrency(p.amount)}</p>
                     </div>
                   )
                 })}
-                <Link href="/dashboard/projections" className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors pt-2">
+                <Link href="/dashboard/projections" className="flex items-center justify-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors pt-1">
                   Ver Calendario <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
             ) : (
-              <div className="text-center py-6 text-muted-foreground text-sm italic">
+              <div className="text-center py-4 text-muted-foreground text-xs italic">
                 No hay vencimientos próximos
               </div>
             )}

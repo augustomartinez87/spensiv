@@ -27,20 +27,18 @@ export function CompactProjection({
       return {
         message: 'Estás en déficit',
         icon: AlertTriangle,
-        iconBg: 'bg-red-500/10',
-        iconColor: 'text-red-600 dark:text-red-400',
-        valueColor: 'text-red-600 dark:text-red-400',
-        progressColor: '[&>div]:bg-red-500',
+        color: 'text-red-200',
+        bgColor: 'from-red-900/80 to-red-700/60 dark:from-red-950 dark:to-red-800/50',
+        borderColor: 'border-red-700/30',
       }
     }
     if (expensePercentage > 80) {
       return {
         message: 'Cuidado con los gastos',
         icon: AlertTriangle,
-        iconBg: 'bg-yellow-500/10',
-        iconColor: 'text-yellow-600 dark:text-yellow-400',
-        valueColor: 'text-yellow-600 dark:text-yellow-400',
-        progressColor: '[&>div]:bg-yellow-500',
+        color: 'text-yellow-200',
+        bgColor: 'from-yellow-900/80 to-yellow-700/60 dark:from-yellow-950 dark:to-yellow-800/50',
+        borderColor: 'border-yellow-700/30',
       }
     }
     return {
@@ -48,10 +46,9 @@ export function CompactProjection({
         ? `Podrías ahorrar ${formatCurrency(savingsPotential)}`
         : 'Vas por buen camino',
       icon: CheckCircle2,
-      iconBg: 'bg-emerald-500/10',
-      iconColor: 'text-emerald-600 dark:text-emerald-400',
-      valueColor: 'text-emerald-600 dark:text-emerald-400',
-      progressColor: '[&>div]:bg-emerald-500',
+      color: 'text-emerald-200',
+      bgColor: 'from-emerald-900/80 to-emerald-700/60 dark:from-emerald-950 dark:to-emerald-800/50',
+      borderColor: 'border-emerald-700/30',
     }
   }
 
@@ -59,28 +56,35 @@ export function CompactProjection({
   const Icon = status.icon
 
   return (
-    <Card className="hover:shadow-md">
+    <Card className={cn(
+      "overflow-hidden bg-gradient-to-br border",
+      status.bgColor,
+      status.borderColor
+    )}>
       <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-3">
-          <div className={cn('p-2.5 rounded-xl', status.iconBg)}>
-            <Icon className={cn('h-5 w-5', status.iconColor)} />
-          </div>
+        <div className="flex items-start justify-between">
+          <p className={cn("text-xs font-medium uppercase tracking-wider", status.color)}>
+            Proyección Mensual
+          </p>
+          <Icon className={cn("h-5 w-5", status.color)} />
         </div>
-        <p className="text-xs font-medium text-muted-foreground mb-1">Proyección mensual</p>
-        <div className={cn('text-3xl font-bold tracking-tight', balance >= 0 ? 'text-foreground' : status.valueColor)}>
-          {balance < 0 && '-'}${Math.abs(balance).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
+
+        <p className="text-3xl font-bold text-white mt-3 tracking-tight">
+          {formatCurrency(balance)}
+        </p>
+
         <div className="mt-3">
-          <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-            <span>Gastos vs Ingresos</span>
-            <span>{expensePercentage.toFixed(0)}%</span>
+          <div className="flex justify-between text-[10px] text-white/70 mb-1">
+            <span>Gastos</span>
+            <span>{expensePercentage.toFixed(0)}% de ingresos</span>
           </div>
           <Progress
             value={Math.min(expensePercentage, 100)}
-            className={cn('h-1.5', status.progressColor)}
+            className="h-1.5 bg-white/20"
           />
         </div>
-        <p className={cn('text-xs font-medium mt-2', status.iconColor)}>
+
+        <p className={cn("text-xs font-medium mt-2", status.color)}>
           {status.message}
         </p>
       </CardContent>
