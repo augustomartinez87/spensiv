@@ -333,6 +333,58 @@ export const transactionsRouter = router({
     }),
 
   /**
+   * Marcar cuota de compra como pagada
+   */
+  markInstallmentPaid: protectedProcedure
+    .input(z.object({ installmentId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const installment = await ctx.prisma.installment.findFirst({
+        where: {
+          id: input.installmentId,
+          transaction: { userId: ctx.user.id },
+        },
+      })
+
+      if (!installment) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Cuota no encontrada',
+        })
+      }
+
+      return ctx.prisma.installment.update({
+        where: { id: input.installmentId },
+        data: { isPaid: true, paidAt: new Date() },
+      })
+    }),
+
+  /**
+   * Desmarcar cuota de compra como pagada
+   */
+  unmarkInstallmentPaid: protectedProcedure
+    .input(z.object({ installmentId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const installment = await ctx.prisma.installment.findFirst({
+        where: {
+          id: input.installmentId,
+          transaction: { userId: ctx.user.id },
+        },
+      })
+
+      if (!installment) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Cuota no encontrada',
+        })
+      }
+
+      return ctx.prisma.installment.update({
+        where: { id: input.installmentId },
+        data: { isPaid: false, paidAt: null },
+      })
+    }),
+
+  /**
    * Estadísticas de gastos
    */
   getStats: protectedProcedure
