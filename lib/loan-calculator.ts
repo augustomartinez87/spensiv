@@ -14,6 +14,7 @@ export interface LoanInput {
   accrualType: AccrualType
   customInstallment?: number  // optional manual installment
   startDate: string          // YYYY-MM-DD
+  roundingMultiple?: number  // 0 = disabled, 1000 = default, 100 = option
 }
 
 export interface AmortizationRow {
@@ -394,16 +395,19 @@ function simulateAmortized(
   input: LoanInput & { monthlyRate: number; hurdleMonthlyRate: number },
   base: Partial<SimulationResult>,
 ): SimulationResult {
-  const { capital, termMonths, monthlyRate, customInstallment, startDate, hurdleRate, tnaTarget } = input
+  const { capital, termMonths, monthlyRate, customInstallment, startDate, hurdleRate, tnaTarget, roundingMultiple } = input
 
-  const installmentAmount = customInstallment && customInstallment > 0
+  const exactInstallment = customInstallment && customInstallment > 0
     ? customInstallment
     : frenchInstallment(capital, monthlyRate, termMonths)
 
-  // Strategic rounding: round to nearest 100 ceiling, validate TIR >= TNA target
-  const roundedInstallmentAmount = strategicRoundInstallment(
-    capital, termMonths, installmentAmount, tnaTarget,
-  )
+  // Strategic rounding: round up to nearest multiple, validate TIR >= TNA target
+  const roundedInstallmentAmount = roundingMultiple && roundingMultiple > 0
+    ? strategicRoundInstallment(capital, termMonths, exactInstallment, tnaTarget, roundingMultiple)
+    : undefined
+
+  // When rounding is enabled, use rounded amount for everything (table, TIR, totals)
+  const installmentAmount = roundedInstallmentAmount ?? exactInstallment
 
   const table = generateAmortizationTable(capital, monthlyRate, termMonths, installmentAmount, startDate)
   const totalPaid = round2(installmentAmount * termMonths)
@@ -425,7 +429,7 @@ function simulateAmortized(
   return {
     ...base,
     installmentAmount: round2(installmentAmount),
-    roundedInstallmentAmount,
+    roundedInstallmentAmount: roundedInstallmentAmount ?? round2(exactInstallment),
     amortizationTable: table,
     totalPaid,
     tirEffective,

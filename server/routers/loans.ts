@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
-import { simulateLoan, compareLoanTypes, reverseFromInstallment, tnaToMonthlyRate, frenchInstallment, generateAmortizationTable } from '@/lib/loan-calculator'
+import { simulateLoan, compareLoanTypes, reverseFromInstallment, tnaToMonthlyRate, frenchInstallment, generateAmortizationTable, strategicRoundInstallment } from '@/lib/loan-calculator'
 import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
 import { addMonths } from 'date-fns'
 import { getDolarMep, pesify } from '@/lib/dolar'
@@ -14,6 +14,7 @@ const simulateInput = z.object({
   accrualType: z.enum(['linear', 'exponential']).default('exponential'),
   customInstallment: z.number().positive().optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  roundingMultiple: z.number().int().min(0).optional(),
 })
 
 const compareTermsInput = z.object({
@@ -23,6 +24,7 @@ const compareTermsInput = z.object({
   accrualType: z.enum(['linear', 'exponential']).default('exponential'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   terms: z.array(z.number().int().min(1).max(360)).min(1).max(4),
+  roundingMultiple: z.number().int().min(0).optional(),
 })
 
 const createLoanInput = z.object({
@@ -35,6 +37,7 @@ const createLoanInput = z.object({
   termMonths: z.number().int().min(1).max(360).optional(), // required for amortized
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   personId: z.string().optional(),
+  roundingMultiple: z.number().int().min(0).optional(),
 })
 
 export const loansRouter = router({
@@ -56,6 +59,7 @@ export const loansRouter = router({
           loanType: 'amortized',
           accrualType: input.accrualType,
           startDate: input.startDate,
+          roundingMultiple: input.roundingMultiple,
         })
       )
     }),
@@ -128,7 +132,10 @@ export const loansRouter = router({
       if (input.tna === undefined || input.tna === null) throw new Error('La TNA es requerida para prestamos amortizados')
 
       const monthlyRate = tnaToMonthlyRate(input.tna)
-      const installmentAmount = frenchInstallment(input.capital, monthlyRate, input.termMonths)
+      const exactInstallment = frenchInstallment(input.capital, monthlyRate, input.termMonths)
+      const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
+        ? strategicRoundInstallment(input.capital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
+        : exactInstallment
       const totalAmount = installmentAmount * input.termMonths
 
       const table = generateAmortizationTable(

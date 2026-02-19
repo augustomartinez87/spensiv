@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -68,6 +69,10 @@ export default function SimulatorPage() {
   const [customInstallment, setCustomInstallment] = useState('')
   const [impliedTna, setImpliedTna] = useState<number | null>(null)
   const [startDate, setStartDate] = useState(formatDateToInput(new Date()))
+
+  // Rounding state
+  const [roundEnabled, setRoundEnabled] = useState(true)
+  const [roundingMultiple, setRoundingMultiple] = useState<number>(1000)
 
   // Compare terms state
   const [compareTermsInput, setCompareTermsInput] = useState('')
@@ -141,6 +146,7 @@ export default function SimulatorPage() {
       hurdleRate: parseFloat(hurdleRate) / 100,
       accrualType: accrualType as 'linear' | 'exponential',
       startDate,
+      roundingMultiple: roundEnabled ? roundingMultiple : 0,
     }
 
     if (viewMode === 'compare') {
@@ -164,7 +170,7 @@ export default function SimulatorPage() {
   // Create Loan dialog state
   const [createLoanOpen, setCreateLoanOpen] = useState(false)
   const [createLoanDefaults, setCreateLoanDefaults] = useState<{
-    capital: string; tna: string; termMonths: string; startDate: string; currency: 'ARS' | 'USD'
+    capital: string; tna: string; termMonths: string; startDate: string; currency: 'ARS' | 'USD'; roundingMultiple: number
   } | null>(null)
   const [borrowerName, setBorrowerName] = useState('')
 
@@ -182,6 +188,7 @@ export default function SimulatorPage() {
       termMonths: result.termMonths.toString(),
       startDate: startDate,
       currency,
+      roundingMultiple: roundEnabled ? roundingMultiple : 0,
     })
     setCreateLoanOpen(true)
   }
@@ -196,6 +203,7 @@ export default function SimulatorPage() {
       tna: parseFloat(createLoanDefaults.tna) / 100,
       termMonths: parseInt(createLoanDefaults.termMonths),
       startDate: createLoanDefaults.startDate,
+      roundingMultiple: createLoanDefaults.roundingMultiple,
     })
   }
 
@@ -362,6 +370,34 @@ export default function SimulatorPage() {
                   <p className="text-xs text-muted-foreground">Calculando TNA...</p>
                 )}
               </div>
+            )}
+          </div>
+
+          {/* Rounding toggle */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="round-installments"
+                checked={roundEnabled}
+                onCheckedChange={setRoundEnabled}
+              />
+              <Label htmlFor="round-installments" className="text-sm cursor-pointer">
+                Redondear cuotas
+              </Label>
+            </div>
+            {roundEnabled && (
+              <Select value={roundingMultiple.toString()} onValueChange={(v) => setRoundingMultiple(parseInt(v))}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1000">Múltiplos de $1.000</SelectItem>
+                  <SelectItem value="100">Múltiplos de $100</SelectItem>
+                  <SelectItem value="500">Múltiplos de $500</SelectItem>
+                  <SelectItem value="5000">Múltiplos de $5.000</SelectItem>
+                  <SelectItem value="10000">Múltiplos de $10.000</SelectItem>
+                </SelectContent>
+              </Select>
             )}
           </div>
 
