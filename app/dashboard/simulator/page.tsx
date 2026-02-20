@@ -42,6 +42,7 @@ import {
   ArrowRight,
   Download,
   CheckCircle,
+  Clock,
 } from 'lucide-react'
 import type { SimulationResult } from '@/lib/loan-calculator'
 
@@ -174,6 +175,8 @@ export default function SimulatorPage() {
   } | null>(null)
   const [borrowerName, setBorrowerName] = useState('')
 
+  const [isPreApprove, setIsPreApprove] = useState(false)
+
   const createLoanMutation = trpc.loans.create.useMutation({
     onSuccess: () => {
       setCreateLoanOpen(false)
@@ -181,7 +184,29 @@ export default function SimulatorPage() {
     },
   })
 
+  const preApproveMutation = trpc.loans.createPreApproved.useMutation({
+    onSuccess: () => {
+      setCreateLoanOpen(false)
+      setBorrowerName('')
+      setIsPreApprove(false)
+    },
+  })
+
   function handleCreateLoan(result: SimulationResult) {
+    setIsPreApprove(false)
+    setCreateLoanDefaults({
+      capital: result.capital.toString(),
+      tna: (result.tnaTarget * 100).toFixed(2),
+      termMonths: result.termMonths.toString(),
+      startDate: startDate,
+      currency,
+      roundingMultiple: roundEnabled ? roundingMultiple : 0,
+    })
+    setCreateLoanOpen(true)
+  }
+
+  function handlePreApproveLoan(result: SimulationResult) {
+    setIsPreApprove(true)
     setCreateLoanDefaults({
       capital: result.capital.toString(),
       tna: (result.tnaTarget * 100).toFixed(2),
@@ -196,7 +221,7 @@ export default function SimulatorPage() {
   function submitCreateLoan(e: React.FormEvent) {
     e.preventDefault()
     if (!createLoanDefaults) return
-    createLoanMutation.mutate({
+    const payload = {
       borrowerName,
       capital: parseFloat(createLoanDefaults.capital),
       currency: createLoanDefaults.currency,
@@ -204,7 +229,12 @@ export default function SimulatorPage() {
       termMonths: parseInt(createLoanDefaults.termMonths),
       startDate: createLoanDefaults.startDate,
       roundingMultiple: createLoanDefaults.roundingMultiple,
-    })
+    }
+    if (isPreApprove) {
+      preApproveMutation.mutate(payload)
+    } else {
+      createLoanMutation.mutate(payload)
+    }
   }
 
   const hasResults = singleResult || compareResults
@@ -483,8 +513,8 @@ export default function SimulatorPage() {
 
               {resultsView === 'analysis' && (
                 <>
-                  {compareResults && <CompareTermsResultCards results={compareResults} onCreateLoan={handleCreateLoan} />}
-                  {singleResult && <SingleResultCards result={singleResult} onCreateLoan={handleCreateLoan} />}
+                  {compareResults && <CompareTermsResultCards results={compareResults} onCreateLoan={handleCreateLoan} onPreApprove={handlePreApproveLoan} />}
+                  {singleResult && <SingleResultCards result={singleResult} onCreateLoan={handleCreateLoan} onPreApprove={handlePreApproveLoan} />}
                 </>
               )}
 
@@ -493,6 +523,7 @@ export default function SimulatorPage() {
                   results={compareResults || (singleResult ? [singleResult] : [])}
                   currency={currency}
                   onCreateLoan={handleCreateLoan}
+                  onPreApprove={handlePreApproveLoan}
                 />
               )}
             </TabsContent>
@@ -517,7 +548,7 @@ export default function SimulatorPage() {
       <Dialog open={createLoanOpen} onOpenChange={setCreateLoanOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Crear Préstamo desde Simulación</DialogTitle>
+            <DialogTitle>{isPreApprove ? 'Guardar Préstamo Preaprobado' : 'Crear Préstamo desde Simulación'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submitCreateLoan} className="space-y-4">
             <div className="space-y-2">
@@ -551,14 +582,30 @@ export default function SimulatorPage() {
                 </div>
               </div>
             )}
-            {createLoanMutation.error && (
-              <p className="text-sm text-red-500">{createLoanMutation.error.message}</p>
+            {isPreApprove && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-2 rounded-lg">
+                El préstamo se guardará como preaprobado. Cuando se transfiera el dinero, confirmalo desde la página de préstamos para activarlo.
+              </p>
             )}
-            {createLoanMutation.isSuccess && (
-              <p className="text-sm text-green-600 dark:text-green-400">Préstamo creado exitosamente</p>
+            {(createLoanMutation.error || preApproveMutation.error) && (
+              <p className="text-sm text-red-500">{(createLoanMutation.error || preApproveMutation.error)?.message}</p>
             )}
-            <Button type="submit" className="w-full" disabled={createLoanMutation.isPending || createLoanMutation.isSuccess}>
-              {createLoanMutation.isPending ? 'Creando...' : createLoanMutation.isSuccess ? 'Creado' : 'Crear Préstamo'}
+            {(createLoanMutation.isSuccess || preApproveMutation.isSuccess) && (
+              <p className="text-sm text-green-600 dark:text-green-400">
+                {isPreApprove ? 'Préstamo preaprobado guardado' : 'Préstamo creado exitosamente'}
+              </p>
+            )}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={createLoanMutation.isPending || preApproveMutation.isPending || createLoanMutation.isSuccess || preApproveMutation.isSuccess}
+            >
+              {(createLoanMutation.isPending || preApproveMutation.isPending)
+                ? (isPreApprove ? 'Guardando...' : 'Creando...')
+                : (createLoanMutation.isSuccess || preApproveMutation.isSuccess)
+                  ? (isPreApprove ? 'Guardado' : 'Creado')
+                  : (isPreApprove ? 'Guardar Preaprobado' : 'Crear Préstamo')
+              }
             </Button>
           </form>
         </DialogContent>
@@ -617,7 +664,7 @@ function ConvenienceIndicator({ isConvenient, spread }: { isConvenient: boolean;
   )
 }
 
-function ResultCardContent({ result, title, onCreateLoan }: { result: SimulationResult; title: string; onCreateLoan?: (result: SimulationResult) => void }) {
+function ResultCardContent({ result, title, onCreateLoan, onPreApprove }: { result: SimulationResult; title: string; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void }) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -669,21 +716,33 @@ function ResultCardContent({ result, title, onCreateLoan }: { result: Simulation
         </div>
         <ConvenienceIndicator isConvenient={result.isConvenient} spread={result.spread} />
         {result.loanType === 'amortized' && onCreateLoan && (
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => onCreateLoan(result)}
-          >
-            <Banknote className="h-4 w-4 mr-2" />
-            Crear Préstamo con estos parámetros
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => onCreateLoan(result)}
+            >
+              <Banknote className="h-4 w-4 mr-2" />
+              Crear Préstamo
+            </Button>
+            {onPreApprove && (
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => onPreApprove(result)}
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                Preaprobar
+              </Button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
   )
 }
 
-function CompareTermsResultCards({ results, onCreateLoan }: { results: SimulationResult[]; onCreateLoan?: (result: SimulationResult) => void }) {
+function CompareTermsResultCards({ results, onCreateLoan, onPreApprove }: { results: SimulationResult[]; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void }) {
   return (
     <div className={cn(
       "grid gap-6 grid-cols-1",
@@ -696,15 +755,16 @@ function CompareTermsResultCards({ results, onCreateLoan }: { results: Simulatio
           result={result}
           title={`${result.termMonths} meses`}
           onCreateLoan={onCreateLoan}
+          onPreApprove={onPreApprove}
         />
       ))}
     </div>
   )
 }
 
-function SingleResultCards({ result, onCreateLoan }: { result: SimulationResult; onCreateLoan?: (result: SimulationResult) => void }) {
+function SingleResultCards({ result, onCreateLoan, onPreApprove }: { result: SimulationResult; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void }) {
   const title = result.loanType === 'amortized' ? 'Amortizado (Cuotas)' : 'Bullet (Descuento)'
-  return <ResultCardContent result={result} title={title} onCreateLoan={onCreateLoan} />
+  return <ResultCardContent result={result} title={title} onCreateLoan={onCreateLoan} onPreApprove={onPreApprove} />
 }
 
 // ─── Tables ──────────────────────────────────────────────────────────
@@ -809,10 +869,12 @@ function ShareableSimulationView({
   results,
   currency,
   onCreateLoan,
+  onPreApprove,
 }: {
   results: SimulationResult[]
   currency: string
   onCreateLoan?: (result: SimulationResult) => void
+  onPreApprove?: (result: SimulationResult) => void
 }) {
   const [copied, setCopied] = useState(false)
   const [imageGenerated, setImageGenerated] = useState(false)
@@ -1044,14 +1106,28 @@ function ShareableSimulationView({
                 </p>
               </div>
             </div>
-            {onCreateLoan && selectedResult.loanType === 'amortized' && (
-              <Button
-                onClick={() => onCreateLoan(selectedResult)}
-                className="w-full sm:w-auto shrink-0"
-              >
-                Continuar con este plan
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+            {selectedResult.loanType === 'amortized' && (
+              <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                {onCreateLoan && (
+                  <Button
+                    onClick={() => onCreateLoan(selectedResult)}
+                    className="flex-1 sm:flex-none"
+                  >
+                    Crear Préstamo
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                )}
+                {onPreApprove && (
+                  <Button
+                    variant="outline"
+                    onClick={() => onPreApprove(selectedResult)}
+                    className="flex-1 sm:flex-none"
+                  >
+                    <Clock className="h-4 w-4 mr-2" />
+                    Preaprobar
+                  </Button>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>

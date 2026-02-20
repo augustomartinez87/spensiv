@@ -433,6 +433,135 @@ export const loansRouter = router({
       return updated
     }),
 
+  createPreApproved: protectedProcedure
+    .input(createLoanInput)
+    .mutation(async ({ ctx, input }) => {
+      const startDate = new Date(input.startDate + 'T00:00:00')
+
+      if (input.loanType === 'interest_only') {
+        const rate = input.monthlyInterestRate
+        if (rate === undefined || rate === null) throw new Error('La tasa mensual es requerida para prestamos interest-only')
+
+        const monthlyInterest = input.capital * rate
+        const tna = Math.pow(1 + rate, 12) - 1
+
+        const loan = await ctx.prisma.loan.create({
+          data: {
+            userId: ctx.user.id,
+            borrowerName: input.borrowerName,
+            capital: input.capital,
+            currency: input.currency,
+            loanType: 'interest_only',
+            tna,
+            termMonths: null,
+            monthlyRate: rate,
+            installmentAmount: monthlyInterest,
+            totalAmount: null,
+            startDate,
+            status: 'pre_approved',
+            personId: input.personId ?? null,
+          },
+        })
+
+        return loan
+      }
+
+      // Amortized
+      if (!input.termMonths) throw new Error('El plazo es requerido para prestamos amortizados')
+      if (input.tna === undefined || input.tna === null) throw new Error('La TNA es requerida para prestamos amortizados')
+
+      const monthlyRate = tnaToMonthlyRate(input.tna)
+      const exactInstallment = frenchInstallment(input.capital, monthlyRate, input.termMonths)
+      const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
+        ? strategicRoundInstallment(input.capital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
+        : exactInstallment
+      const totalAmount = installmentAmount * input.termMonths
+
+      const loan = await ctx.prisma.loan.create({
+        data: {
+          userId: ctx.user.id,
+          borrowerName: input.borrowerName,
+          capital: input.capital,
+          currency: input.currency,
+          loanType: 'amortized',
+          tna: input.tna,
+          termMonths: input.termMonths,
+          monthlyRate,
+          installmentAmount,
+          totalAmount,
+          startDate,
+          status: 'pre_approved',
+          personId: input.personId ?? null,
+        },
+      })
+
+      return loan
+    }),
+
+  confirmPreApproved: protectedProcedure
+    .input(z.object({
+      loanId: z.string(),
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.loanId, userId: ctx.user.id, status: 'pre_approved' },
+      })
+
+      if (!loan) throw new Error('Préstamo preaprobado no encontrado')
+
+      const startDate = new Date(input.startDate + 'T00:00:00')
+
+      if (loan.loanType === 'interest_only') {
+        const monthlyInterest = Number(loan.installmentAmount)
+        const installments = Array.from({ length: 12 }, (_, i) => ({
+          loanId: loan.id,
+          number: i + 1,
+          dueDate: addMonths(startDate, i + 1),
+          amount: monthlyInterest,
+          interest: monthlyInterest,
+          principal: 0,
+          balance: Number(loan.capital),
+        }))
+
+        await ctx.prisma.loanInstallment.createMany({ data: installments })
+      } else {
+        const monthlyRate = Number(loan.monthlyRate)
+        const termMonths = loan.termMonths!
+        const installmentAmount = Number(loan.installmentAmount)
+
+        const table = generateAmortizationTable(
+          Number(loan.capital),
+          monthlyRate,
+          termMonths,
+          installmentAmount,
+          input.startDate,
+        )
+
+        await ctx.prisma.loanInstallment.createMany({
+          data: table.map((row) => ({
+            loanId: loan.id,
+            number: row.month,
+            dueDate: addMonths(startDate, row.month),
+            amount: row.installment,
+            interest: row.interest,
+            principal: row.principal,
+            balance: row.balance,
+          })),
+        })
+      }
+
+      const updated = await ctx.prisma.loan.update({
+        where: { id: loan.id },
+        data: { startDate, status: 'active' },
+        include: {
+          loanInstallments: { orderBy: { number: 'asc' } },
+        },
+      })
+
+      return updated
+    }),
+
   getDashboardMetrics: protectedProcedure.query(async ({ ctx }) => {
     const [activeLoans, mepRate] = await Promise.all([
       ctx.prisma.loan.findMany({
