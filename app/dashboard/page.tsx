@@ -34,6 +34,7 @@ import {
   DollarSign,
   ArrowRight,
   Banknote,
+  Target,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -100,6 +101,7 @@ export default function DashboardPage() {
   const { data: cardBalances, isLoading: loadingCardBalances } = trpc.dashboard.getCardBalances.useQuery({ period })
   const { data: upcomingPayments, isLoading: loadingPayments } = trpc.dashboard.getUpcomingPayments.useQuery()
   const { data: loanMetrics } = trpc.loans.getDashboardMetrics.useQuery()
+  const { data: budgetProgress } = trpc.budget.getProgress.useQuery({ period })
 
   const isLoading = isLoadingBalance || loadingCardBalances || loadingPayments
 
@@ -351,7 +353,62 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* === ROW 5: Préstamos Activos (full width) === */}
+      {/* === ROW 5: Presupuesto Widget === */}
+      {budgetProgress && budgetProgress.length > 0 && (() => {
+        const top3 = [...budgetProgress]
+          .sort((a, b) => b.percentage - a.percentage)
+          .slice(0, 3)
+        return (
+          <Card>
+            <CardHeader className="py-2.5 px-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-xs font-semibold flex items-center gap-1.5">
+                <Target className="h-3.5 w-3.5" /> Presupuesto
+              </CardTitle>
+              <Link href="/dashboard/budget">
+                <Button variant="ghost" size="sm" className="h-6 text-xs">
+                  Ver todo <ArrowRight className="h-3 w-3 ml-1" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="px-3 pb-3 pt-0">
+              <div className="space-y-2.5">
+                {top3.map((item) => {
+                  const barColor = item.percentage > 100
+                    ? 'bg-red-500'
+                    : item.percentage >= 80
+                      ? 'bg-amber-500'
+                      : 'bg-green-500'
+                  return (
+                    <div key={item.categoryId} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-foreground font-medium truncate">{item.categoryName}</span>
+                        <span className={cn(
+                          "font-bold shrink-0 ml-2",
+                          item.percentage > 100 ? 'text-red-400' : item.percentage >= 80 ? 'text-amber-400' : 'text-green-400'
+                        )}>
+                          {Math.round(item.percentage)}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={cn("h-full rounded-full transition-all duration-500", barColor)}
+                          style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>{formatCurrency(item.spent)}</span>
+                        <span>{formatCurrency(item.monthlyLimit)}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
+
+      {/* === ROW 6: Préstamos Activos (full width) === */}
       <Card>
         <CardHeader className="py-4">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">

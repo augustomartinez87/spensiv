@@ -32,6 +32,7 @@ model User {
   loans               Loan[]
   persons             Person[]
   thirdPartyPurchases ThirdPartyPurchase[]
+  budgetLimits        BudgetLimit[]
 
   @@map("users")
 }
@@ -261,6 +262,7 @@ model Category {
   // Relations
   subcategories SubCategory[]
   transactions  Transaction[]
+  budgetLimits  BudgetLimit[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -514,4 +516,24 @@ model ThirdPartyInstallment {
   @@index([thirdPartyPurchaseId, isCollected])
   @@index([dueDate])
   @@map("third_party_installments")
+}
+
+// ============================================================================
+// BUDGET LIMITS
+// ============================================================================
+
+model BudgetLimit {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId   String
+  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  monthlyLimit Decimal  @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, categoryId])
+  @@index([userId])
+  @@map("budget_limits")
 }
