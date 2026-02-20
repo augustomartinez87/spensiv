@@ -23,7 +23,6 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/theme-toggle'
 
 type NavItem = { name: string; href: string; icon: typeof LayoutDashboard }
 type NavSection = { label: string; items: NavItem[] }
@@ -181,7 +180,6 @@ export default function DashboardLayout({
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
           <div className="flex items-center gap-1">
-            <ThemeToggle />
             <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
               <Bell className="h-4 w-4" />
             </Button>
@@ -200,7 +198,6 @@ export default function DashboardLayout({
             <span className="font-bold text-lg text-foreground">Spensiv</span>
           </Link>
           <div className="flex items-center gap-1">
-            <ThemeToggle />
             <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground">
               <Bell className="h-4 w-4" />
             </Button>
@@ -209,7 +206,7 @@ export default function DashboardLayout({
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-7xl">
             {children}
           </div>
         </main>

@@ -98,6 +98,7 @@ export function CategoryPieChart({ data, title, selectedCategory, onCategoryClic
                                         backgroundColor: 'hsl(var(--card))',
                                         border: '1px solid hsl(var(--border))',
                                         borderRadius: '12px',
+                                        boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
                                         color: 'hsl(var(--foreground))',
                                         fontSize: '13px',
                                     }}

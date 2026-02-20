@@ -151,12 +151,12 @@ function LoansDashboardSummary() {
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Esta semana</p>
           <p className={cn(
             'text-xl font-bold mt-1',
-            metrics.thisWeekCount > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'
+            metrics.thisWeekCount > 0 ? 'text-accent-blue' : 'text-muted-foreground'
           )}>
             {metrics.thisWeekCount > 0 ? formatCurrency(metrics.thisWeekAmount) : '-'}
           </p>
           {metrics.thisWeekCount > 0 && (
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{metrics.thisWeekCount} cuota{metrics.thisWeekCount !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-accent-blue mt-0.5">{metrics.thisWeekCount} cuota{metrics.thisWeekCount !== 1 ? 's' : ''}</p>
           )}
         </CardContent>
       </Card>
@@ -165,12 +165,12 @@ function LoansDashboardSummary() {
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Vencidas</p>
           <p className={cn(
             'text-xl font-bold mt-1',
-            metrics.overdueCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+            metrics.overdueCount > 0 ? 'text-accent-danger' : 'text-accent-positive'
           )}>
             {metrics.overdueCount > 0 ? formatCurrency(metrics.overdueAmount) : 'Ninguna'}
           </p>
           {metrics.overdueCount > 0 && (
-            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{metrics.overdueCount} cuota{metrics.overdueCount !== 1 ? 's' : ''} sin cobrar</p>
+            <p className="text-xs text-accent-danger mt-0.5">{metrics.overdueCount} cuota{metrics.overdueCount !== 1 ? 's' : ''} sin cobrar</p>
           )}
         </CardContent>
       </Card>
@@ -292,10 +292,10 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-amber-500" />
-            <h2 className="text-sm font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+            <h2 className="text-sm font-semibold text-accent-warning uppercase tracking-wider">
               Preaprobados
             </h2>
-            <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-600 text-[10px]">
+            <Badge variant="outline" className="text-accent-warning border-amber-600 text-[10px]">
               {preApproved.length}
             </Badge>
           </div>
@@ -429,7 +429,7 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                 <div className={cn(
                   "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
                   isOverdue
-                    ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                    ? "bg-red-500/10 text-red-400"
                     : "bg-muted text-muted-foreground"
                 )}>
                   {isOverdue ? (
@@ -449,8 +449,8 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                 <div className={cn(
                   "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
                   isZeroRate
-                    ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                    ? "bg-green-500/10 text-green-400"
+                    : "bg-blue-500/10 text-blue-400"
                 )}>
                   <Infinity className="h-4 w-4 shrink-0" />
                   <span className="text-xs">
@@ -502,7 +502,7 @@ function PreApprovedLoanCard({
   const isInterestOnly = loan.loanType === 'interest_only'
 
   return (
-    <Card className="border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20">
+    <Card className="border-amber-800/50 bg-amber-950/20">
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -513,7 +513,7 @@ function PreApprovedLoanCard({
               {isInterestOnly ? 'Solo interés' : `${loan.termMonths} meses`}
             </p>
           </div>
-          <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-600 shrink-0">
+          <Badge variant="outline" className="text-accent-warning border-amber-600 shrink-0">
             Preaprobado
           </Badge>
         </div>
@@ -529,7 +529,7 @@ function PreApprovedLoanCard({
         </div>
 
         {expanded ? (
-          <div className="space-y-3 pt-2 border-t border-amber-200 dark:border-amber-800/50">
+          <div className="space-y-3 pt-2 border-t border-amber-800/50">
             <div className="space-y-1.5">
               <Label className="text-xs">Fecha de inicio del préstamo</Label>
               <Input
@@ -852,14 +852,14 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Cobrado</p>
-            <p className="text-xl font-bold text-green-600 dark:text-green-400 mt-1">{formatCurrency(totalCollected, cur)}</p>
+            <p className="text-xl font-bold text-accent-positive mt-1">{formatCurrency(totalCollected, cur)}</p>
           </CardContent>
         </Card>
         {isInterestOnly ? (
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wider">Interés mensual</p>
-              <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1">{formatCurrency(Number(loan.installmentAmount), cur)}</p>
+              <p className="text-xl font-bold text-accent-blue mt-1">{formatCurrency(Number(loan.installmentAmount), cur)}</p>
             </CardContent>
           </Card>
         ) : (
@@ -954,20 +954,20 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                       <td className="py-2.5 px-3 font-medium">{inst.number}</td>
                       <td className={cn(
                         "py-2.5 px-3",
-                        isOverdue && "text-red-600 dark:text-red-400 font-medium",
-                        isUpcoming && "text-amber-600 dark:text-amber-400"
+                        isOverdue && "text-red-400 font-medium",
+                        isUpcoming && "text-amber-400"
                       )}>
                         {format(dueDate, "d MMM yyyy", { locale: es })}
                       </td>
                       <td className="py-2.5 px-3 text-right">{formatCurrency(Number(inst.amount), cur)}</td>
-                      <td className="py-2.5 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(Number(inst.interest), cur)}</td>
+                      <td className="py-2.5 px-3 text-right text-accent-blue">{formatCurrency(Number(inst.interest), cur)}</td>
                       <td className="py-2.5 px-3 text-right">{formatCurrency(Number(inst.principal), cur)}</td>
                       <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(Number(inst.balance), cur)}</td>
                       <td className="py-2.5 px-3 text-center">
                         {inst.isPaid ? (
                           <button
                             onClick={() => unmarkPaid.mutate({ installmentId: inst.id })}
-                            className="inline-flex items-center gap-1.5 text-green-600 dark:text-green-400 hover:opacity-70 transition-opacity"
+                            className="inline-flex items-center gap-1.5 text-accent-positive hover:opacity-70 transition-opacity"
                             title="Desmarcar como cobrada"
                           >
                             <CheckCircle2 className="h-5 w-5" />
@@ -977,7 +977,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                           <button
                             onClick={() => markPaid.mutate({ installmentId: inst.id })}
                             className={cn(
-                              "inline-flex items-center gap-1.5 hover:text-green-600 dark:hover:text-green-400 transition-colors",
+                              "inline-flex items-center gap-1.5 hover:text-green-400 transition-colors",
                               isOverdue ? "text-red-500" : "text-muted-foreground"
                             )}
                             title="Marcar como cobrada"
@@ -1010,7 +1010,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                     className={cn(
                       "shrink-0",
                       inst.isPaid
-                        ? "text-green-600 dark:text-green-400"
+                        ? "text-accent-positive"
                         : isOverdue
                           ? "text-red-500"
                           : "text-muted-foreground"
@@ -1170,7 +1170,7 @@ function InstallmentCalendar({ onSelectLoan }: { onSelectLoan: (id: string) => v
                         className={cn(
                           "w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate transition-opacity hover:opacity-80",
                           hasOverdue && inst.dueDate < now
-                            ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                            ? "bg-red-500/15 text-red-400"
                             : "bg-primary/10 text-primary"
                         )}
                         title={`${inst.borrowerName} - ${formatCurrency(inst.amount, inst.currency)}`}
@@ -1211,7 +1211,7 @@ function InstallmentCalendar({ onSelectLoan }: { onSelectLoan: (id: string) => v
                     >
                       <div className={cn(
                         "flex flex-col items-center justify-center h-10 w-10 rounded-lg shrink-0",
-                        isOverdue ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"
+                        isOverdue ? "bg-red-900/30" : "bg-muted"
                       )}>
                         <span className={cn(
                           "text-[9px] font-bold uppercase leading-none",
@@ -1453,12 +1453,12 @@ function CreateLoanDialog({
                   <div className={cn(
                     'text-xs px-3 py-2 rounded-lg flex items-center gap-2',
                     isCritical
-                      ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                      ? 'bg-red-500/10 text-red-400'
                       : sp.category === 'alto'
-                        ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                        ? 'bg-orange-500/10 text-orange-400'
                         : sp.category === 'medio'
-                          ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
-                          : 'bg-green-500/10 text-green-600 dark:text-green-400'
+                          ? 'bg-yellow-500/10 text-yellow-400'
+                          : 'bg-green-500/10 text-accent-positive'
                   )}>
                     {isCritical ? <ShieldX className="h-3.5 w-3.5" /> : <Shield className="h-3.5 w-3.5" />}
                     <span>
@@ -1596,13 +1596,13 @@ function CreateLoanDialog({
                   required
                 />
                 {suggestedTna !== null && impliedTna === null && parseFloat(tna) === suggestedTna && (
-                  <p className="text-xs flex items-center gap-1 text-green-600 dark:text-green-400">
+                  <p className="text-xs flex items-center gap-1 text-accent-positive">
                     <Zap className="h-3 w-3" />
                     Sugerida desde score ({fciRate}% + spread)
                   </p>
                 )}
                 {impliedTna !== null && (
-                  <p className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                  <p className="text-xs flex items-center gap-1 text-accent-blue">
                     <Zap className="h-3 w-3" />
                     Calculada desde la cuota
                   </p>
@@ -1626,7 +1626,7 @@ function CreateLoanDialog({
 
           {/* Interest-only preview */}
           {loanType === 'interest_only' && interestPreview !== null && interestPreview > 0 && (
-            <div className="bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg px-3 py-2 text-sm">
+            <div className="bg-blue-500/10 text-accent-blue rounded-lg px-3 py-2 text-sm">
               Cuota mensual de interés: <strong>{formatCurrency(interestPreview, currency)}</strong>
             </div>
           )}

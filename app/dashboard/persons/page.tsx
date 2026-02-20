@@ -58,10 +58,10 @@ const INCOME_TYPE_LABELS: Record<string, string> = {
 }
 
 const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: typeof ShieldCheck }> = {
-  bajo: { label: 'Riesgo Bajo', color: 'text-green-600 dark:text-green-400 bg-green-500/10', icon: ShieldCheck },
-  medio: { label: 'Riesgo Medio', color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10', icon: Shield },
-  alto: { label: 'Riesgo Alto', color: 'text-orange-600 dark:text-orange-400 bg-orange-500/10', icon: ShieldAlert },
-  critico: { label: 'Riesgo Crítico', color: 'text-red-600 dark:text-red-400 bg-red-500/10', icon: ShieldX },
+  bajo: { label: 'Riesgo Bajo', color: 'text-green-400 bg-green-500/10', icon: ShieldCheck },
+  medio: { label: 'Riesgo Medio', color: 'text-yellow-400 bg-yellow-500/10', icon: Shield },
+  alto: { label: 'Riesgo Alto', color: 'text-orange-400 bg-orange-500/10', icon: ShieldAlert },
+  critico: { label: 'Riesgo Crítico', color: 'text-red-400 bg-red-500/10', icon: ShieldX },
 }
 
 export default function PersonsPage() {
@@ -252,7 +252,7 @@ function PersonDetail({ personId, onBack }: { personId: string; onBack: () => vo
       </div>
 
       {deleteMutation.error && (
-        <div className="bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg px-3 py-2 text-sm">
+        <div className="bg-red-500/10 text-red-400 rounded-lg px-3 py-2 text-sm">
           {deleteMutation.error.message}
         </div>
       )}
@@ -415,15 +415,15 @@ function PaymentHistory({ loans }: { loans: any[] }) {
           </div>
           <div className="text-center p-3 rounded-lg bg-green-500/10">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">A tiempo</p>
-            <p className="text-lg font-bold text-green-600 dark:text-green-400">{onTime}</p>
+            <p className="text-lg font-bold text-green-400">{onTime}</p>
           </div>
           <div className="text-center p-3 rounded-lg bg-amber-500/10">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Con demora</p>
-            <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{late}</p>
+            <p className="text-lg font-bold text-amber-400">{late}</p>
           </div>
           <div className="text-center p-3 rounded-lg bg-red-500/10">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Vencidas</p>
-            <p className="text-lg font-bold text-red-600 dark:text-red-400">{overdue}</p>
+            <p className="text-lg font-bold text-red-400">{overdue}</p>
           </div>
         </div>
 
@@ -432,10 +432,10 @@ function PaymentHistory({ loans }: { loans: any[] }) {
           <div className={cn(
             'flex items-center gap-2 px-3 py-2 rounded-lg text-sm',
             punctualityRate >= 80
-              ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+              ? 'bg-green-500/10 text-green-400'
               : punctualityRate >= 50
-                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                ? 'bg-amber-500/10 text-amber-400'
+                : 'bg-red-500/10 text-red-400'
           )}>
             {punctualityRate >= 80 ? (
               <TrendingUp className="h-4 w-4" />
@@ -487,7 +487,7 @@ function PaymentHistory({ loans }: { loans: any[] }) {
                     <div>
                       <p className={cn(
                         'text-sm font-medium',
-                        isOverdue ? 'text-red-600 dark:text-red-400' : 'text-foreground'
+                        isOverdue ? 'text-red-400' : 'text-foreground'
                       )}>
                         Cuota {inst.number} · {inst.loanName}
                       </p>
@@ -496,7 +496,7 @@ function PaymentHistory({ loans }: { loans: any[] }) {
                         {isPaid && inst.paidAt && (
                           <span className={cn(
                             'ml-1',
-                            daysLate > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'
+                            daysLate > 0 ? 'text-amber-400' : 'text-green-400'
                           )}>
                             · Pagada {format(inst.paidAt, "d MMM", { locale: es })}
                             {daysLate > 0 && ` (+${daysLate}d)`}
@@ -511,7 +511,7 @@ function PaymentHistory({ loans }: { loans: any[] }) {
                     </div>
                     <span className={cn(
                       'text-sm font-semibold shrink-0',
-                      isPaid ? 'text-foreground' : isOverdue ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
+                      isPaid ? 'text-foreground' : isOverdue ? 'text-red-400' : 'text-muted-foreground'
                     )}>
                       {formatCurrency(inst.amount, inst.currency)}
                     </span>
@@ -533,7 +533,7 @@ function PaymentHistory({ loans }: { loans: any[] }) {
 }
 
 function ScoreCard({ label, value }: { label: string; value: number }) {
-  const color = value >= 4 ? 'text-green-600 dark:text-green-400' : value >= 3 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
+  const color = value >= 4 ? 'text-green-400' : value >= 3 ? 'text-yellow-400' : 'text-red-400'
   return (
     <Card>
       <CardContent className="p-4 text-center">

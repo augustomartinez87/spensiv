@@ -312,13 +312,13 @@ export function CardDetailModal({ cardId, isOpen, onClose }: CardDetailModalProp
                   </div>
                   <div>
                     <p className="text-[10px] text-muted-foreground uppercase">Monto total</p>
-                    <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                    <p className="text-lg font-bold text-purple-400">
                       {formatCurrency(thirdPartySummary.totalAmount)}
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] text-muted-foreground uppercase">Pendiente</p>
-                    <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                    <p className="text-lg font-bold text-orange-400">
                       {formatCurrency(thirdPartySummary.pendingAmount)}
                     </p>
                   </div>

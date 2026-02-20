@@ -89,7 +89,7 @@ export default function InstallmentsPage() {
                 <div className="flex items-center gap-2">
                   <p className="font-semibold text-sm truncate">{p.description}</p>
                   {p.isForThirdParty && (
-                    <Badge className="bg-purple-500/15 text-purple-600 dark:text-purple-400 border-0 text-[10px] shrink-0">
+                    <Badge className="bg-purple-500/15 text-purple-400 border-0 text-[10px] shrink-0">
                       <Users className="h-3 w-3 mr-1" />
                       Tercero
                     </Badge>

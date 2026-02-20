@@ -44,10 +44,10 @@ const PIE_COLORS = [
 ]
 
 const CATEGORY_CONFIG: Record<string, { label: string; color: string; dotColor: string }> = {
-  bajo: { label: 'Bajo', color: 'text-green-600 dark:text-green-400', dotColor: 'bg-green-500' },
-  medio: { label: 'Medio', color: 'text-yellow-600 dark:text-yellow-400', dotColor: 'bg-yellow-500' },
-  alto: { label: 'Alto', color: 'text-orange-600 dark:text-orange-400', dotColor: 'bg-orange-500' },
-  critico: { label: 'Crítico', color: 'text-red-600 dark:text-red-400', dotColor: 'bg-red-500' },
+  bajo: { label: 'Bajo', color: 'text-green-400', dotColor: 'bg-green-500' },
+  medio: { label: 'Medio', color: 'text-yellow-400', dotColor: 'bg-yellow-500' },
+  alto: { label: 'Alto', color: 'text-orange-400', dotColor: 'bg-orange-500' },
+  critico: { label: 'Crítico', color: 'text-red-400', dotColor: 'bg-red-500' },
 }
 
 export default function PortfolioPage() {
@@ -126,7 +126,7 @@ export default function PortfolioPage() {
               <div className="grid grid-cols-2 gap-6">
                 {/* Yield */}
                 <div>
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                  <p className="text-3xl font-bold text-accent-positive">
                     {(yieldMetrics.weightedYield * 100).toFixed(1)}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">TIR anual ponderada</p>
@@ -137,10 +137,10 @@ export default function PortfolioPage() {
                   <p className={cn(
                     'text-3xl font-bold',
                     yieldMetrics.spread > 0.05
-                      ? 'text-green-600 dark:text-green-400'
+                      ? 'text-accent-positive'
                       : yieldMetrics.spread > 0.02
-                        ? 'text-yellow-600 dark:text-yellow-400'
-                        : 'text-red-600 dark:text-red-400'
+                        ? 'text-accent-warning'
+                        : 'text-accent-danger'
                   )}>
                     {yieldMetrics.spread > 0 ? '+' : ''}{(yieldMetrics.spread * 100).toFixed(1)}pp
                   </p>
@@ -175,13 +175,13 @@ export default function PortfolioPage() {
               label="Capital en Mora"
               value={formatCurrency(metrics.overdueCapital)}
               icon={AlertTriangle}
-              color={metrics.overdueCapital > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}
+              color={metrics.overdueCapital > 0 ? 'text-accent-danger' : 'text-foreground'}
             />
             <StatCard
               label="Valor Esperado"
               value={formatCurrency(metrics.totalEV)}
               icon={TrendingUp}
-              color={metrics.totalEV >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
+              color={metrics.totalEV >= 0 ? 'text-accent-positive' : 'text-accent-danger'}
             />
             <StatCard
               label="Eficiencia de Capital"
@@ -262,8 +262,8 @@ export default function PortfolioPage() {
                     <span className="text-muted-foreground">Top 1:</span>
                     <span className={cn(
                       'font-bold',
-                      metrics.top1Percentage > 30 ? 'text-red-600 dark:text-red-400'
-                        : metrics.top1Percentage > 20 ? 'text-amber-600 dark:text-amber-400'
+                      metrics.top1Percentage > 30 ? 'text-red-400'
+                        : metrics.top1Percentage > 20 ? 'text-amber-400'
                           : 'text-foreground'
                     )}>
                       {metrics.top1Percentage.toFixed(1)}%
@@ -273,8 +273,8 @@ export default function PortfolioPage() {
                     <span className="text-muted-foreground">Top 3:</span>
                     <span className={cn(
                       'font-bold',
-                      metrics.top3Percentage > 70 ? 'text-red-600 dark:text-red-400'
-                        : metrics.top3Percentage > 50 ? 'text-amber-600 dark:text-amber-400'
+                      metrics.top3Percentage > 70 ? 'text-red-400'
+                        : metrics.top3Percentage > 50 ? 'text-amber-400'
                           : 'text-foreground'
                     )}>
                       {metrics.top3Percentage.toFixed(1)}%
@@ -308,8 +308,9 @@ export default function PortfolioPage() {
                       contentStyle={{
                         backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
+                        borderRadius: '12px',
                         fontSize: '12px',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
                       }}
                     />
                   </PieChart>
@@ -421,8 +422,8 @@ function AlertsPanel({
             className={cn(
               'flex items-center gap-3 p-3 rounded-lg',
               alert.severity === 'critical'
-                ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                ? 'bg-red-500/10 text-red-400'
+                : 'bg-amber-500/10 text-amber-400'
             )}
           >
             <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -435,7 +436,7 @@ function AlertsPanel({
         {criticalPersons.map((person) => (
           <div
             key={person.name}
-            className="flex items-center gap-3 p-3 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400"
+            className="flex items-center gap-3 p-3 rounded-lg bg-red-500/10 text-red-400"
           >
             <ShieldX className="h-4 w-4 shrink-0" />
             <span className="text-sm">

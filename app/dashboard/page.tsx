@@ -227,7 +227,7 @@ export default function DashboardPage() {
                               <span className={cn(
                                 "text-[9px] font-medium px-1 py-0.5 rounded-full shrink-0",
                                 days <= 3
-                                  ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                                  ? "bg-orange-500/15 text-orange-400"
                                   : "bg-muted text-muted-foreground"
                               )}>
                                 {days}d
@@ -237,7 +237,7 @@ export default function DashboardPage() {
                           return null
                         })()}
                         {card.thirdPartyAmount > 0 && (
-                          <span className="text-[9px] font-medium px-1 py-0.5 rounded-full shrink-0 bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                          <span className="text-[9px] font-medium px-1 py-0.5 rounded-full shrink-0 bg-purple-500/15 text-purple-400">
                             {formatCurrency(card.thirdPartyAmount)} terceros
                           </span>
                         )}
@@ -280,11 +280,11 @@ export default function DashboardPage() {
                     <div key={p.card.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-accent transition-all duration-200">
                       <div className={cn(
                         "flex flex-col items-center justify-center h-9 w-9 rounded-lg shrink-0",
-                        isOverdue ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"
+                        isOverdue ? "bg-red-900/30" : "bg-muted"
                       )}>
                         <span className={cn(
                           "text-[8px] font-bold uppercase leading-none",
-                          isOverdue ? "text-red-600 dark:text-red-400" : "text-red-500"
+                          isOverdue ? "text-red-400" : "text-red-500"
                         )}>
                           {format(dueDate, 'MMM', { locale: es })}
                         </span>
@@ -296,7 +296,7 @@ export default function DashboardPage() {
                         <p className="text-xs font-medium text-foreground truncate">{p.card.name}</p>
                         <p className="text-[10px] text-muted-foreground">
                           {isOverdue ? (
-                            <span className="text-red-600 dark:text-red-400 font-medium">VENCIDO</span>
+                            <span className="text-red-400 font-medium">VENCIDO</span>
                           ) : (
                             <>En {p.daysUntil} {p.daysUntil === 1 ? 'día' : 'días'}</>
                           )}
@@ -304,7 +304,7 @@ export default function DashboardPage() {
                       </div>
                       <p className={cn(
                         "text-xs font-bold shrink-0",
-                        isOverdue ? "text-red-600 dark:text-red-400" : "text-foreground"
+                        isOverdue ? "text-red-400" : "text-foreground"
                       )}>{formatCurrency(p.amount)}</p>
                     </div>
                   )
@@ -372,8 +372,8 @@ export default function DashboardPage() {
                 </div>
                 {loanMetrics.overdueCount > 0 && (
                   <div className="bg-red-500/10 rounded-lg p-2.5">
-                    <p className="text-[10px] text-red-600 dark:text-red-400 uppercase font-medium">En mora</p>
-                    <p className="text-sm font-bold text-red-600 dark:text-red-400">{formatCurrency(loanMetrics.overdueAmount)}</p>
+                    <p className="text-[10px] text-red-400 uppercase font-medium">En mora</p>
+                    <p className="text-sm font-bold text-red-400">{formatCurrency(loanMetrics.overdueAmount)}</p>
                   </div>
                 )}
               </div>
@@ -519,7 +519,7 @@ function RecentMovements({
                       'h-8 w-8 rounded-xl flex items-center justify-center shrink-0',
                       filter === 'income' ? 'bg-green-500/10' : 'bg-muted'
                     )}>
-                      <CatIcon className={cn('h-4 w-4', filter === 'income' ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground')} />
+                      <CatIcon className={cn('h-4 w-4', filter === 'income' ? 'text-accent-positive' : 'text-muted-foreground')} />
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-sm text-foreground truncate">{m.description}</p>
@@ -533,7 +533,7 @@ function RecentMovements({
                     className={cn(
                       'font-semibold text-sm shrink-0 ml-2',
                       filter === 'income'
-                        ? 'text-green-600 dark:text-green-400'
+                        ? 'text-accent-positive'
                         : 'text-foreground'
                     )}
                   >

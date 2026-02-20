@@ -28,7 +28,7 @@ export function CompactProjection({
         message: 'Estás en déficit',
         icon: AlertTriangle,
         color: 'text-red-200',
-        bgColor: 'from-red-900/80 to-red-700/60 dark:from-red-950 dark:to-red-800/50',
+        bgColor: 'from-red-950 to-red-800/50',
         borderColor: 'border-red-700/30',
       }
     }
@@ -37,7 +37,7 @@ export function CompactProjection({
         message: 'Cuidado con los gastos',
         icon: AlertTriangle,
         color: 'text-yellow-200',
-        bgColor: 'from-yellow-900/80 to-yellow-700/60 dark:from-yellow-950 dark:to-yellow-800/50',
+        bgColor: 'from-yellow-950 to-yellow-800/50',
         borderColor: 'border-yellow-700/30',
       }
     }
@@ -47,7 +47,7 @@ export function CompactProjection({
         : 'Vas por buen camino',
       icon: CheckCircle2,
       color: 'text-emerald-200',
-      bgColor: 'from-emerald-900/80 to-emerald-700/60 dark:from-emerald-950 dark:to-emerald-800/50',
+      bgColor: 'from-emerald-950 to-emerald-800/50',
       borderColor: 'border-emerald-700/30',
     }
   }

@@ -48,9 +48,9 @@ const initialFormData: TransactionFormData = {
 }
 
 const expenseTypeOptions = [
-  { value: 'structural', label: 'Estructural', color: 'bg-blue-500', textColor: 'text-blue-600 dark:text-blue-400' },
-  { value: 'emotional_recurrent', label: 'Emocional Recurrente', color: 'bg-orange-500', textColor: 'text-orange-600 dark:text-orange-400' },
-  { value: 'emotional_impulsive', label: 'Emocional Impulsivo', color: 'bg-red-500', textColor: 'text-red-600 dark:text-red-400' },
+  { value: 'structural', label: 'Estructural', color: 'bg-blue-500', textColor: 'text-blue-400' },
+  { value: 'emotional_recurrent', label: 'Emocional Recurrente', color: 'bg-orange-500', textColor: 'text-orange-400' },
+  { value: 'emotional_impulsive', label: 'Emocional Impulsivo', color: 'bg-red-500', textColor: 'text-red-400' },
 ] as const
 
 interface TransactionFormProps {

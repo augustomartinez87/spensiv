@@ -26,23 +26,23 @@ export function StatCard({ title, value, count, type, previousValue }: StatCardP
                 : TrendingDown
 
     const iconBg = isBalance
-        ? isPositive ? 'bg-cyan-500/10' : 'bg-red-500/10'
+        ? isPositive ? 'bg-accent-positive/10' : 'bg-accent-danger/10'
         : type === 'income'
-            ? 'bg-green-500/10'
-            : 'bg-orange-500/10'
+            ? 'bg-accent-positive/10'
+            : 'bg-accent-warning/10'
 
     const iconColor = isBalance
-        ? isPositive ? 'text-cyan-600 dark:text-cyan-400' : 'text-red-600 dark:text-red-400'
+        ? isPositive ? 'text-accent-positive' : 'text-accent-danger'
         : type === 'income'
-            ? 'text-green-600 dark:text-green-400'
-            : 'text-orange-600 dark:text-orange-400'
+            ? 'text-accent-positive'
+            : 'text-accent-warning'
 
     const valueColor = isBalance
         ? isPositive
-            ? 'text-green-600 dark:text-green-400'
-            : 'text-red-600 dark:text-red-400'
+            ? 'text-accent-positive'
+            : 'text-accent-danger'
         : type === 'income'
-            ? 'text-green-600 dark:text-green-400'
+            ? 'text-accent-positive'
             : 'text-foreground'
 
     const variation = previousValue !== undefined && previousValue !== 0
@@ -62,8 +62,8 @@ export function StatCard({ title, value, count, type, previousValue }: StatCardP
                         <span className={cn(
                             'text-xs font-semibold px-2 py-0.5 rounded-full',
                             variation !== null && variation >= 0
-                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                ? 'bg-[hsl(var(--accent-positive))]/15 text-accent-positive'
+                                : 'bg-[hsl(var(--accent-danger))]/15 text-accent-danger'
                         )}>
                             {variation !== null && variation >= 0 ? '+' : ''}{variation?.toFixed(1) || 0}%
                         </span>
@@ -85,7 +85,7 @@ export function StatCard({ title, value, count, type, previousValue }: StatCardP
                     </p>
                 )}
                 {isBalance && (
-                    <p className={cn('text-xs font-medium mt-2', isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
+                    <p className={cn('text-xs font-medium mt-2', isPositive ? 'text-accent-positive' : 'text-accent-danger')}>
                         {isPositive ? 'Superavit' : 'Deficit'}
                     </p>
                 )}

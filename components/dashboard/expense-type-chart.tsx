@@ -141,7 +141,8 @@ export function ExpenseTypeChart({ data, title, previousData }: ExpenseTypeChart
                                     contentStyle={{
                                         backgroundColor: 'hsl(var(--card))',
                                         border: '1px solid hsl(var(--border))',
-                                        borderRadius: '8px',
+                                        borderRadius: '12px',
+                                        boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
                                         color: 'hsl(var(--foreground))',
                                     }}
                                 />
@@ -162,7 +163,7 @@ export function ExpenseTypeChart({ data, title, previousData }: ExpenseTypeChart
                                     {variation !== null && (
                                         <span className={cn(
                                             "text-xs font-medium flex items-center gap-0.5",
-                                            variation > 0 ? "text-red-600" : "text-green-600"
+                                            variation > 0 ? "text-accent-danger" : "text-accent-positive"
                                         )}>
                                             {variation > 0 ? (
                                                 <TrendingUp className="h-3 w-3" />

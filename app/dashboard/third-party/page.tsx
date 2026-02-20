@@ -212,7 +212,7 @@ export default function ThirdPartyPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center shrink-0">
-                            <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                            <Users className="h-5 w-5 text-purple-400" />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">

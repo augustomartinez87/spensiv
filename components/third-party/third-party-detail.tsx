@@ -111,16 +111,16 @@ export function ThirdPartyDetail({ purchaseId, isOpen, onClose }: ThirdPartyDeta
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
-                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase">Cobrado</p>
-                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                <p className="text-[10px] text-emerald-400 uppercase">Cobrado</p>
+                <p className="text-lg font-bold text-emerald-400">
                   {formatCurrency(purchase.collectedAmount, purchase.currency)}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
-                <p className="text-[10px] text-orange-600 dark:text-orange-400 uppercase">Pendiente</p>
-                <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                <p className="text-[10px] text-orange-400 uppercase">Pendiente</p>
+                <p className="text-lg font-bold text-orange-400">
                   {formatCurrency(purchase.pendingAmount, purchase.currency)}
                 </p>
               </CardContent>
@@ -145,7 +145,7 @@ export function ThirdPartyDetail({ purchaseId, isOpen, onClose }: ThirdPartyDeta
                         </p>
                         <p className={cn(
                           "text-xs",
-                          isOverdue ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"
+                          isOverdue ? "text-red-400 font-medium" : "text-muted-foreground"
                         )}>
                           {format(new Date(inst.dueDate), "d MMM yyyy", { locale: es })}
                           {isOverdue && ' (vencida)'}

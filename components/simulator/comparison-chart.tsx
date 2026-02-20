@@ -53,7 +53,8 @@ export function ComparisonChart({ amortizedCurve, bulletCurve }: ComparisonChart
           contentStyle={{
             backgroundColor: 'hsl(var(--card))',
             border: '1px solid hsl(var(--border))',
-            borderRadius: '8px',
+            borderRadius: '12px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
             color: 'hsl(var(--foreground))',
           }}
           itemStyle={{ color: 'hsl(var(--foreground))' }}

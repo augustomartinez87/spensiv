@@ -92,12 +92,12 @@ export default function ProjectionsPage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {p.hasProjectedIncome && (
-                                            <span className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                            <span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded flex items-center gap-1">
                                                 <Sparkles className="h-3 w-3" />
                                                 Proyectado
                                             </span>
                                         )}
-                                        <span className="font-semibold text-green-600 dark:text-green-400">
+                                        <span className="font-semibold text-green-400">
                                             {formatCurrency(p.totalIncomeWithProjection)}
                                         </span>
                                     </div>
@@ -112,11 +112,11 @@ export default function ProjectionsPage() {
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <CreditCard className="h-4 w-4" /> Tarjetas
                                     </div>
-                                    <span className="font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(p.totalExpense)}</span>
+                                    <span className="font-semibold text-blue-400">{formatCurrency(p.totalExpense)}</span>
                                 </div>
                                 <div className="pt-3 border-t flex justify-between items-center">
                                     <span className="text-sm font-bold text-foreground">Saldo Final</span>
-                                    <span className={cn("text-lg font-black", isDeficit ? "text-red-600 dark:text-red-400" : "text-foreground")}>
+                                    <span className={cn("text-lg font-black", isDeficit ? "text-red-400" : "text-foreground")}>
                                         {formatCurrency(p.balanceWithProjection)}
                                     </span>
                                 </div>

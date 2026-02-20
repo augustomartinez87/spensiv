@@ -391,7 +391,7 @@ export default function SimulatorPage() {
                   placeholder="Dejar vacío para calcular"
                 />
                 {impliedTna !== null && (
-                  <p className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                  <p className="text-xs flex items-center gap-1 text-accent-blue">
                     <Zap className="h-3 w-3" />
                     TNA implícita: {(impliedTna * 100).toFixed(2)}% (aplicada arriba)
                   </p>
@@ -583,7 +583,7 @@ export default function SimulatorPage() {
               </div>
             )}
             {isPreApprove && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-2 rounded-lg">
+              <p className="text-xs text-amber-400 bg-amber-500/10 px-3 py-2 rounded-lg">
                 El préstamo se guardará como preaprobado. Cuando se transfiera el dinero, confirmalo desde la página de préstamos para activarlo.
               </p>
             )}
@@ -591,7 +591,7 @@ export default function SimulatorPage() {
               <p className="text-sm text-red-500">{(createLoanMutation.error || preApproveMutation.error)?.message}</p>
             )}
             {(createLoanMutation.isSuccess || preApproveMutation.isSuccess) && (
-              <p className="text-sm text-green-600 dark:text-green-400">
+              <p className="text-sm text-accent-positive">
                 {isPreApprove ? 'Préstamo preaprobado guardado' : 'Préstamo creado exitosamente'}
               </p>
             )}
@@ -629,9 +629,9 @@ function MetricCard({
 }) {
   const colors = {
     default: 'text-foreground',
-    success: 'text-green-600 dark:text-green-400',
-    danger: 'text-red-600 dark:text-red-400',
-    warning: 'text-amber-600 dark:text-amber-400',
+    success: 'text-accent-positive',
+    danger: 'text-accent-danger',
+    warning: 'text-accent-warning',
   }
 
   return (
@@ -648,8 +648,8 @@ function ConvenienceIndicator({ isConvenient, spread }: { isConvenient: boolean;
     <div className={cn(
       "flex items-center gap-2 px-4 py-3 rounded-xl border",
       isConvenient
-        ? "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400"
-        : "bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400"
+        ? "bg-green-500/10 border-green-500/20 text-green-400"
+        : "bg-red-500/10 border-red-500/20 text-red-400"
     )}>
       {isConvenient ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
       <div>
@@ -797,10 +797,10 @@ function AmortizationTable({ result, title }: { result: SimulationResult; title:
                   <td className="py-2 px-3 font-medium">{row.month}</td>
                   <td className="py-2 px-3 text-muted-foreground">{row.date}</td>
                   <td className="py-2 px-3 text-right">{formatCurrency(row.installment)}</td>
-                  <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(row.interest)}</td>
+                  <td className="py-2 px-3 text-right text-accent-blue">{formatCurrency(row.interest)}</td>
                   <td className="py-2 px-3 text-right">{formatCurrency(row.principal)}</td>
                   <td className="py-2 px-3 text-right font-medium">{formatCurrency(row.balance)}</td>
-                  <td className="py-2 px-3 text-right text-green-600 dark:text-green-400">{formatCurrency(row.accruedReturn)}</td>
+                  <td className="py-2 px-3 text-right text-accent-positive">{formatCurrency(row.accruedReturn)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1188,8 +1188,8 @@ function BulletTable({ result, title }: { result: SimulationResult; title: strin
                   <td className="py-2 px-3 font-medium">{row.month}</td>
                   <td className="py-2 px-3 text-muted-foreground">{row.date}</td>
                   <td className="py-2 px-3 text-right font-medium">{formatCurrency(row.accruedValue)}</td>
-                  <td className="py-2 px-3 text-right text-amber-600 dark:text-amber-400">{formatCurrency(row.monthlyAccrual)}</td>
-                  <td className="py-2 px-3 text-right text-green-600 dark:text-green-400">{formatCurrency(row.accruedReturn)}</td>
+                  <td className="py-2 px-3 text-right text-accent-warning">{formatCurrency(row.monthlyAccrual)}</td>
+                  <td className="py-2 px-3 text-right text-accent-positive">{formatCurrency(row.accruedReturn)}</td>
                 </tr>
               ))}
             </tbody>

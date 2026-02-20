@@ -334,8 +334,8 @@ export default function CardsPage() {
                         <span className={cn(
                           "text-xs font-medium px-2 py-0.5 rounded-full",
                           card.holderType === 'primary'
-                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                            : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                            ? "bg-blue-900/30 text-blue-400"
+                            : "bg-purple-900/30 text-purple-400"
                         )}>
                           {card.holderType === 'primary' ? 'Titular' : 'Adicional'}
                         </span>
@@ -393,7 +393,7 @@ export default function CardsPage() {
                     const daysUntil = getDaysUntilClosing(card.closingDay)
                     if (daysUntil <= 3) {
                       return (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 text-xs font-medium">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-500/10 text-orange-400 text-xs font-medium">
                           <AlertCircle className="h-3.5 w-3.5" />
                           Cierra en {daysUntil} {daysUntil === 1 ? 'día' : 'días'}
                         </div>
@@ -427,7 +427,7 @@ export default function CardsPage() {
                           <span className="text-muted-foreground">Utilización</span>
                           <span className={cn(
                             'font-medium',
-                            utilization > 75 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'
+                            utilization > 75 ? 'text-orange-400' : 'text-muted-foreground'
                           )}>
                             {utilization.toFixed(0)}%
                           </span>

@@ -20,12 +20,12 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider>
-      <html lang="es" suppressHydrationWarning>
+      <html lang="es" className="dark" suppressHydrationWarning>
         <body className={inter.className}>
           <ThemeProvider
             attribute="class"
-            defaultTheme="light"
-            enableSystem
+            defaultTheme="dark"
+            forcedTheme="dark"
             disableTransitionOnChange
           >
             <TRPCProvider>
