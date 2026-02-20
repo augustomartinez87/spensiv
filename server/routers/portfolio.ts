@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { calculatePersonScore, calculateExpectedValue } from '@/lib/loan-scoring'
 import { getDolarMep, pesify } from '@/lib/dolar'
+import { calculateIRR, monthlyToAnnualRate } from '@/lib/loan-calculator'
 
 export const portfolioRouter = router({
   getMetrics: protectedProcedure
@@ -47,6 +48,10 @@ export const portfolioRouter = router({
           percentage: totalCapital > 0 ? (e.capital / totalCapital) * 100 : 0,
         }))
         .sort((a, b) => b.capital - a.capital)
+
+      // Top 1 / Top 3 concentration
+      const top1Percentage = exposures.length > 0 ? exposures[0].percentage : 0
+      const top3Percentage = exposures.slice(0, 3).reduce((s, e) => s + e.percentage, 0)
 
       // High risk capital
       const persons = await ctx.prisma.person.findMany({
@@ -101,11 +106,154 @@ export const portfolioRouter = router({
         overdueCapital,
         totalEV,
         exposures,
+        top1Percentage,
+        top3Percentage,
         highRiskCapital,
         highRiskPercentage: totalCapital > 0 ? (highRiskCapital / totalCapital) * 100 : 0,
         mepRate,
       }
     }),
+
+  getYieldMetrics: protectedProcedure
+    .input(z.object({ fciRate: z.number().min(0).default(0.40) }))
+    .query(async ({ ctx, input }) => {
+      const [loans, mepRate] = await Promise.all([
+        ctx.prisma.loan.findMany({
+          where: { userId: ctx.user.id, status: 'active' },
+          include: {
+            loanInstallments: {
+              select: {
+                amount: true,
+                interest: true,
+                principal: true,
+                isPaid: true,
+                dueDate: true,
+                number: true,
+              },
+              orderBy: { number: 'asc' },
+            },
+          },
+        }),
+        getDolarMep(),
+      ])
+
+      if (loans.length === 0) {
+        return {
+          weightedYield: 0,
+          spread: 0,
+          interestCollected: 0,
+          interestProjected: 0,
+          interestRatio: 0,
+          weightedDuration: 0,
+          activeLoansCount: 0,
+        }
+      }
+
+      let totalWeightedIRR = 0
+      let totalWeightForIRR = 0
+      let totalWeightedDuration = 0
+      let totalWeightForDuration = 0
+      let interestCollected = 0
+      let interestProjected = 0
+
+      for (const loan of loans) {
+        const capital = pesify(Number(loan.capital), loan.currency, mepRate)
+        const installments = loan.loanInstallments
+
+        // Interest collected vs projected
+        for (const inst of installments) {
+          const intArs = pesify(Number(inst.interest), loan.currency, mepRate)
+          interestProjected += intArs
+          if (inst.isPaid) interestCollected += intArs
+        }
+
+        // IRR: cash flows = [-capital, payment1, payment2, ...]
+        // Use actual paid amounts for past, scheduled for future
+        const cashFlows = [-capital]
+        for (const inst of installments) {
+          cashFlows.push(pesify(Number(inst.amount), loan.currency, mepRate))
+        }
+
+        if (cashFlows.length > 1) {
+          const monthlyIRR = calculateIRR(cashFlows)
+          if (isFinite(monthlyIRR) && monthlyIRR > -1) {
+            const annualIRR = monthlyToAnnualRate(monthlyIRR)
+            totalWeightedIRR += annualIRR * capital
+            totalWeightForIRR += capital
+          }
+        }
+
+        // Weighted duration (term in months)
+        const termMonths = installments.length
+        totalWeightedDuration += termMonths * capital
+        totalWeightForDuration += capital
+      }
+
+      const weightedYield = totalWeightForIRR > 0 ? totalWeightedIRR / totalWeightForIRR : 0
+      const spread = weightedYield - input.fciRate
+      const weightedDuration = totalWeightForDuration > 0 ? totalWeightedDuration / totalWeightForDuration : 0
+
+      return {
+        weightedYield,
+        spread,
+        interestCollected,
+        interestProjected,
+        interestRatio: interestProjected > 0 ? interestCollected / interestProjected : 0,
+        weightedDuration,
+        activeLoansCount: loans.length,
+      }
+    }),
+
+  getCashFlowProjection: protectedProcedure.query(async ({ ctx }) => {
+    const [loans, mepRate] = await Promise.all([
+      ctx.prisma.loan.findMany({
+        where: { userId: ctx.user.id, status: 'active' },
+        include: {
+          loanInstallments: {
+            where: { isPaid: false },
+            select: {
+              amount: true,
+              interest: true,
+              principal: true,
+              dueDate: true,
+            },
+          },
+        },
+      }),
+      getDolarMep(),
+    ])
+
+    const byMonth = new Map<string, { principal: number; interest: number }>()
+
+    // Generate next 12 months as keys
+    const now = new Date()
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      byMonth.set(key, { principal: 0, interest: 0 })
+    }
+
+    for (const loan of loans) {
+      for (const inst of loan.loanInstallments) {
+        const due = new Date(inst.dueDate)
+        const key = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}`
+        const bucket = byMonth.get(key)
+        if (bucket) {
+          bucket.principal += pesify(Number(inst.principal), loan.currency, mepRate)
+          bucket.interest += pesify(Number(inst.interest), loan.currency, mepRate)
+        }
+      }
+    }
+
+    return [...byMonth.entries()]
+      .map(([month, data]) => ({
+        month,
+        principal: data.principal,
+        interest: data.interest,
+        total: data.principal + data.interest,
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+  }),
 
   getConcentrationAlerts: protectedProcedure.query(async ({ ctx }) => {
     const [loans, mepRate] = await Promise.all([
@@ -132,11 +280,15 @@ export const portfolioRouter = router({
     }
 
     return [...capitalByPerson.values()]
-      .map((e) => ({
-        ...e,
-        percentage: (e.capital / totalCapital) * 100,
-      }))
-      .filter((e) => e.percentage > 12)
+      .map((e) => {
+        const percentage = (e.capital / totalCapital) * 100
+        return {
+          ...e,
+          percentage,
+          severity: percentage > 30 ? 'critical' as const : 'warning' as const,
+        }
+      })
+      .filter((e) => e.percentage >= 20)
       .sort((a, b) => b.percentage - a.percentage)
   }),
 
