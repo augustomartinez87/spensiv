@@ -30,7 +30,7 @@ type NavSection = { label: string; items: NavItem[] }
 
 const navigation: NavSection[] = [
   {
-    label: 'General',
+    label: 'Inicio',
     items: [
       { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     ],
@@ -38,19 +38,19 @@ const navigation: NavSection[] = [
   {
     label: 'Finanzas',
     items: [
-      { name: 'Tarjetas', href: '/dashboard/cards', icon: CardsIcon },
-      { name: 'Compras Terceros', href: '/dashboard/third-party', icon: Users },
-      { name: 'Cuotas', href: '/dashboard/installments', icon: Layers },
       { name: 'Movimientos', href: '/dashboard/transactions', icon: ListOrdered },
+      { name: 'Tarjetas', href: '/dashboard/cards', icon: CardsIcon },
+      { name: 'Cuotas', href: '/dashboard/installments', icon: Layers },
+      { name: 'Compras Terceros', href: '/dashboard/third-party', icon: Users },
       { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
     ],
   },
   {
     label: 'Préstamos',
     items: [
+      { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
       { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
       { name: 'Personas', href: '/dashboard/persons', icon: Users },
-      { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
       { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
     ],
   },
