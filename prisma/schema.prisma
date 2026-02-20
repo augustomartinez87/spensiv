@@ -401,6 +401,7 @@ model Loan {
 
   // Relations
   loanInstallments LoanInstallment[]
+  activityLogs     LoanActivityLog[]
 
   @@index([userId])
   @@index([userId, status])
@@ -516,6 +517,25 @@ model ThirdPartyInstallment {
   @@index([thirdPartyPurchaseId, isCollected])
   @@index([dueDate])
   @@map("third_party_installments")
+}
+
+// ============================================================================
+// LOAN ACTIVITY LOGS
+// ============================================================================
+
+model LoanActivityLog {
+  id        String   @id @default(cuid())
+  loanId    String
+  loan      Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  userId    String
+  note      String
+  tag       String   @default("otro") // "llamada" | "pago" | "acuerdo" | "otro"
+  logDate   DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  @@index([loanId, logDate])
+  @@map("loan_activity_logs")
 }
 
 // ============================================================================

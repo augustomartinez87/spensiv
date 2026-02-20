@@ -368,6 +368,7 @@ export const loansRouter = router({
             select: { id: true, name: true, alias: true },
           },
           loanInstallments: { orderBy: { number: 'asc' } },
+          activityLogs: { orderBy: { logDate: 'desc' } },
         },
       })
 
@@ -376,6 +377,42 @@ export const loansRouter = router({
       }
 
       return loan
+    }),
+
+  addActivityLog: protectedProcedure
+    .input(z.object({
+      loanId: z.string(),
+      note: z.string().min(1),
+      tag: z.enum(['llamada', 'pago', 'acuerdo', 'otro']).default('otro'),
+      logDate: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.loanId, userId: ctx.user.id },
+      })
+      if (!loan) throw new Error('Préstamo no encontrado')
+
+      return ctx.prisma.loanActivityLog.create({
+        data: {
+          loanId: input.loanId,
+          userId: ctx.user.id,
+          note: input.note,
+          tag: input.tag,
+          logDate: input.logDate ? new Date(input.logDate) : new Date(),
+        },
+      })
+    }),
+
+  deleteActivityLog: protectedProcedure
+    .input(z.object({ logId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const log = await ctx.prisma.loanActivityLog.findFirst({
+        where: { id: input.logId, userId: ctx.user.id },
+      })
+      if (!log) throw new Error('Log no encontrado')
+
+      await ctx.prisma.loanActivityLog.delete({ where: { id: input.logId } })
+      return { success: true }
     }),
 
   markInstallmentPaid: protectedProcedure
