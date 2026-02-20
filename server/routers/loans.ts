@@ -131,11 +131,22 @@ export const loansRouter = router({
       if (!input.termMonths) throw new Error('El plazo es requerido para prestamos amortizados')
       if (input.tna === undefined || input.tna === null) throw new Error('La TNA es requerida para prestamos amortizados')
 
-      const monthlyRate = tnaToMonthlyRate(input.tna)
+      let monthlyRate = tnaToMonthlyRate(input.tna)
       const exactInstallment = frenchInstallment(input.capital, monthlyRate, input.termMonths)
       const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
         ? strategicRoundInstallment(input.capital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
         : exactInstallment
+
+      // If rounding changed the installment, recalculate the real TNA/rate
+      let tna = input.tna
+      if (installmentAmount !== exactInstallment) {
+        const real = reverseFromInstallment(input.capital, input.termMonths, installmentAmount)
+        if (real) {
+          tna = real.tna
+          monthlyRate = real.monthlyRate
+        }
+      }
+
       const totalAmount = installmentAmount * input.termMonths
 
       const table = generateAmortizationTable(
@@ -153,7 +164,7 @@ export const loansRouter = router({
           capital: input.capital,
           currency: input.currency,
           loanType: 'amortized',
-          tna: input.tna,
+          tna,
           termMonths: input.termMonths,
           monthlyRate,
           installmentAmount,
@@ -470,11 +481,22 @@ export const loansRouter = router({
       if (!input.termMonths) throw new Error('El plazo es requerido para prestamos amortizados')
       if (input.tna === undefined || input.tna === null) throw new Error('La TNA es requerida para prestamos amortizados')
 
-      const monthlyRate = tnaToMonthlyRate(input.tna)
+      let monthlyRate = tnaToMonthlyRate(input.tna)
       const exactInstallment = frenchInstallment(input.capital, monthlyRate, input.termMonths)
       const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
         ? strategicRoundInstallment(input.capital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
         : exactInstallment
+
+      // If rounding changed the installment, recalculate the real TNA/rate
+      let tna = input.tna
+      if (installmentAmount !== exactInstallment) {
+        const real = reverseFromInstallment(input.capital, input.termMonths, installmentAmount)
+        if (real) {
+          tna = real.tna
+          monthlyRate = real.monthlyRate
+        }
+      }
+
       const totalAmount = installmentAmount * input.termMonths
 
       const loan = await ctx.prisma.loan.create({
@@ -484,7 +506,7 @@ export const loansRouter = router({
           capital: input.capital,
           currency: input.currency,
           loanType: 'amortized',
-          tna: input.tna,
+          tna,
           termMonths: input.termMonths,
           monthlyRate,
           installmentAmount,
