@@ -621,6 +621,109 @@ export const loansRouter = router({
       return updated
     }),
 
+  refinanceLoan: protectedProcedure
+    .input(z.object({
+      loanId: z.string(),
+      capitalizeInterest: z.boolean().default(false),
+      tna: z.number().min(0),
+      termMonths: z.number().int().min(1).max(360),
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      note: z.string().optional(),
+      roundingMultiple: z.number().int().min(0).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.loanId, userId: ctx.user.id, status: 'active' },
+        include: {
+          loanInstallments: { where: { isPaid: false }, orderBy: { number: 'asc' } },
+        },
+      })
+      if (!loan) throw new Error('Préstamo activo no encontrado')
+
+      // Calculate new capital: sum of unpaid principal, optionally + unpaid interest
+      let newCapital = loan.loanInstallments.reduce(
+        (sum, i) => sum + Number(i.principal), 0
+      )
+      if (input.capitalizeInterest) {
+        newCapital += loan.loanInstallments.reduce(
+          (sum, i) => sum + Number(i.interest), 0
+        )
+      }
+
+      const startDate = new Date(input.startDate + 'T00:00:00')
+      let monthlyRate = tnaToMonthlyRate(input.tna)
+      const exactInstallment = frenchInstallment(newCapital, monthlyRate, input.termMonths)
+      const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
+        ? strategicRoundInstallment(newCapital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
+        : exactInstallment
+
+      let tna = input.tna
+      if (installmentAmount !== exactInstallment) {
+        const real = reverseFromInstallment(newCapital, input.termMonths, installmentAmount)
+        if (real) {
+          tna = real.tna
+          monthlyRate = real.monthlyRate
+        }
+      }
+
+      const totalAmount = installmentAmount * input.termMonths
+      const table = generateAmortizationTable(newCapital, monthlyRate, input.termMonths, installmentAmount, input.startDate)
+
+      const noteText = input.note || 'Préstamo refinanciado'
+
+      // Transaction: update original + create new
+      const [, newLoan] = await ctx.prisma.$transaction([
+        ctx.prisma.loan.update({
+          where: { id: loan.id },
+          data: { status: 'refinanced' },
+        }),
+        ctx.prisma.loan.create({
+          data: {
+            userId: ctx.user.id,
+            borrowerName: loan.borrowerName,
+            capital: newCapital,
+            currency: loan.currency,
+            loanType: 'amortized',
+            tna,
+            termMonths: input.termMonths,
+            monthlyRate,
+            installmentAmount,
+            totalAmount,
+            startDate,
+            status: 'active',
+            personId: loan.personId,
+            originalLoanId: loan.id,
+            loanInstallments: {
+              create: table.map((row) => ({
+                number: row.month,
+                dueDate: addMonths(startDate, row.month),
+                amount: row.installment,
+                interest: row.interest,
+                principal: row.principal,
+                balance: row.balance,
+              })),
+            },
+          },
+        }),
+      ])
+
+      // Update original with reference to new loan
+      await ctx.prisma.loan.update({
+        where: { id: loan.id },
+        data: { refinancedByLoanId: newLoan.id },
+      })
+
+      // Auto-create activity logs
+      await ctx.prisma.loanActivityLog.createMany({
+        data: [
+          { loanId: loan.id, userId: ctx.user.id, tag: 'acuerdo', note: `Refinanciado → nuevo préstamo` },
+          { loanId: newLoan.id, userId: ctx.user.id, tag: 'acuerdo', note: `Refinanciamiento de préstamo anterior. ${noteText}` },
+        ],
+      })
+
+      return newLoan
+    }),
+
   getDashboardMetrics: protectedProcedure.query(async ({ ctx }) => {
     const [activeLoans, mepRate] = await Promise.all([
       ctx.prisma.loan.findMany({

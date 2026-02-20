@@ -394,7 +394,11 @@ model Loan {
   installmentAmount Decimal @db.Decimal(12, 2)
   totalAmount     Decimal? @db.Decimal(12, 2) // null for interest_only loans
   startDate       DateTime
-  status          String   @default("active") // "active" | "completed" | "defaulted" | "pre_approved"
+  status          String   @default("active") // "active" | "completed" | "defaulted" | "pre_approved" | "refinanced"
+
+  // Refinancing
+  refinancedByLoanId String? // ID del nuevo préstamo que reemplaza a este
+  originalLoanId     String? // ID del préstamo original que fue refinanciado
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -53,10 +53,14 @@ import {
   Handshake,
   MessageCircle,
   Copy,
+  RefreshCw,
+  Link2,
 } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { calculatePersonScore } from '@/lib/loan-scoring'
+import { tnaToMonthlyRate, frenchInstallment, generateAmortizationTable } from '@/lib/loan-calculator'
 
 export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
@@ -383,12 +387,14 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
                 <Badge
                   variant={
                     loan.status === 'active' ? 'default' :
-                    loan.status === 'completed' ? 'secondary' : 'destructive'
+                    loan.status === 'completed' ? 'secondary' :
+                    loan.status === 'refinanced' ? 'secondary' : 'destructive'
                   }
                   className="shrink-0"
                 >
                   {loan.status === 'active' ? 'Activo' :
-                   loan.status === 'completed' ? 'Completado' : 'Moroso'}
+                   loan.status === 'completed' ? 'Completado' :
+                   loan.status === 'refinanced' ? 'Refinanciado' : 'Moroso'}
                 </Badge>
               </div>
 
@@ -886,9 +892,40 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         )}
       </div>
 
-      {/* Collection message + action buttons */}
+      {/* Refinance banner for refinanced loans */}
+      {loan.status === 'refinanced' && loan.refinancedByLoanId && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted text-sm">
+          <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span>Este préstamo fue refinanciado.</span>
+          <button
+            className="text-primary font-medium hover:underline"
+            onClick={() => {
+              onBack()
+              setTimeout(() => {
+                // Will trigger re-render with new loan
+                window.dispatchEvent(new CustomEvent('navigate-loan', { detail: loan.refinancedByLoanId }))
+              }, 100)
+            }}
+          >
+            Ver nuevo préstamo
+          </button>
+        </div>
+      )}
+
+      {/* Original loan reference */}
+      {loan.originalLoanId && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 text-sm text-blue-400">
+          <RefreshCw className="h-4 w-4 shrink-0" />
+          <span>Este préstamo es un refinanciamiento.</span>
+        </div>
+      )}
+
+      {/* Action buttons */}
       {loan.status === 'active' && unpaidCount > 0 && (
-        <CopyCollectionMessage loan={loan} />
+        <div className="flex flex-wrap gap-2">
+          <CopyCollectionMessage loan={loan} />
+          <RefinanceDialog loan={loan} onBack={onBack} />
+        </div>
       )}
 
       {/* Interest-only action buttons */}
@@ -1056,6 +1093,167 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
       {/* Activity Timeline */}
       <LoanActivityTimeline loanId={loanId} logs={loan.activityLogs || []} />
     </div>
+  )
+}
+
+// ─── Refinance Dialog ───────────────────────────────────────────────
+
+function RefinanceDialog({ loan, onBack }: { loan: any; onBack: () => void }) {
+  const utils = trpc.useUtils()
+  const [open, setOpen] = useState(false)
+  const cur = loan.currency
+
+  // Calculate unpaid capital and interest
+  const unpaidInstallments = loan.loanInstallments.filter((i: any) => !i.isPaid)
+  const unpaidPrincipal = unpaidInstallments.reduce((s: number, i: any) => s + Number(i.principal), 0)
+  const unpaidInterest = unpaidInstallments.reduce((s: number, i: any) => s + Number(i.interest), 0)
+
+  const [capitalizeInterest, setCapitalizeInterest] = useState(false)
+  const [tna, setTna] = useState((Number(loan.tna) * 100).toFixed(1))
+  const [termMonths, setTermMonths] = useState(String(loan.termMonths || 6))
+  const [startDate, setStartDate] = useState(formatDateToInput(new Date()))
+  const [note, setNote] = useState('')
+
+  const newCapital = capitalizeInterest ? unpaidPrincipal + unpaidInterest : unpaidPrincipal
+
+  // Client-side preview
+  const previewTable = (() => {
+    try {
+      const t = parseInt(termMonths)
+      const tnaVal = parseFloat(tna) / 100
+      if (!t || t <= 0 || !tnaVal || newCapital <= 0) return []
+      const rate = tnaToMonthlyRate(tnaVal)
+      const inst = frenchInstallment(newCapital, rate, t)
+      return generateAmortizationTable(newCapital, rate, t, inst, startDate)
+    } catch {
+      return []
+    }
+  })()
+
+  const refinanceMutation = trpc.loans.refinanceLoan.useMutation({
+    onSuccess: (newLoan) => {
+      utils.loans.list.invalidate()
+      utils.loans.getDashboardMetrics.invalidate()
+      utils.loans.getById.invalidate({ id: loan.id })
+      setOpen(false)
+      onBack()
+    },
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refinanciar
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Refinanciar préstamo</DialogTitle>
+        </DialogHeader>
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Left: Form */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Capital impago</Label>
+              <div className="text-lg font-bold text-foreground">{formatCurrency(unpaidPrincipal, cur)}</div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Capitalizar intereses</Label>
+                <p className="text-xs text-muted-foreground">
+                  Sumar {formatCurrency(unpaidInterest, cur)} de intereses al capital
+                </p>
+              </div>
+              <Switch checked={capitalizeInterest} onCheckedChange={setCapitalizeInterest} />
+            </div>
+
+            {capitalizeInterest && (
+              <div className="bg-amber-500/10 text-amber-400 rounded-lg px-3 py-2 text-sm">
+                Nuevo capital: <strong>{formatCurrency(newCapital, cur)}</strong>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>TNA (%)</Label>
+                <Input type="number" value={tna} onChange={(e) => setTna(e.target.value)} step="0.5" />
+              </div>
+              <div className="space-y-2">
+                <Label>Plazo (meses)</Label>
+                <Input type="number" value={termMonths} onChange={(e) => setTermMonths(e.target.value)} min="1" max="360" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Fecha de inicio</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Nota (opcional)</Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Motivo del refinanciamiento" />
+            </div>
+
+            <Button
+              className="w-full"
+              disabled={refinanceMutation.isPending || newCapital <= 0}
+              onClick={() => refinanceMutation.mutate({
+                loanId: loan.id,
+                capitalizeInterest,
+                tna: parseFloat(tna) / 100,
+                termMonths: parseInt(termMonths),
+                startDate,
+                note: note || undefined,
+              })}
+            >
+              {refinanceMutation.isPending ? 'Refinanciando...' : 'Confirmar refinanciamiento'}
+            </Button>
+
+            {refinanceMutation.error && (
+              <p className="text-sm text-red-500">{refinanceMutation.error.message}</p>
+            )}
+          </div>
+
+          {/* Right: Preview table */}
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-2">Preview nueva tabla</p>
+            {previewTable.length > 0 ? (
+              <div className="max-h-[400px] overflow-y-auto border rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-background">
+                    <tr className="border-b text-muted-foreground">
+                      <th className="py-1.5 px-2 text-left">#</th>
+                      <th className="py-1.5 px-2 text-right">Cuota</th>
+                      <th className="py-1.5 px-2 text-right">Interés</th>
+                      <th className="py-1.5 px-2 text-right">Capital</th>
+                      <th className="py-1.5 px-2 text-right">Saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewTable.map((row: any) => (
+                      <tr key={row.month} className="border-b border-border/50">
+                        <td className="py-1 px-2">{row.month}</td>
+                        <td className="py-1 px-2 text-right">{formatCurrency(row.installment, cur)}</td>
+                        <td className="py-1 px-2 text-right text-blue-400">{formatCurrency(row.interest, cur)}</td>
+                        <td className="py-1 px-2 text-right">{formatCurrency(row.principal, cur)}</td>
+                        <td className="py-1 px-2 text-right">{formatCurrency(row.balance, cur)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic text-center py-8">
+                Completá los datos para ver la preview
+              </p>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
