@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Switch } from '@/components/ui/switch'
 import { ToastAction } from '@/components/ui/toast'
 import { useRouter } from 'next/navigation'
-import { Plus, CreditCard, Banknote, ArrowRightLeft, Users } from 'lucide-react'
+import { Plus, CreditCard, Banknote, ArrowRightLeft, Users, Check } from 'lucide-react'
 import { formatDateToInput, parseInputDate, formatCurrency, cn } from '@/lib/utils'
 
 type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'transfer'
@@ -27,7 +27,7 @@ interface TransactionFormData {
   cardId: string
   installments: string
   categoryId: string
-  subcategory: string
+  subcategoryId: string
   expenseType: ExpenseType
   notes: string
   isForThirdParty: boolean
@@ -41,7 +41,7 @@ const initialFormData: TransactionFormData = {
   cardId: '',
   installments: '1',
   categoryId: '',
-  subcategory: '',
+  subcategoryId: '',
   expenseType: 'structural',
   notes: '',
   isForThirdParty: false,
@@ -72,9 +72,21 @@ export function TransactionForm({
   const router = useRouter()
 
   const [formData, setFormData] = useState<TransactionFormData>(initialFormData)
+  const [newSubcategoryName, setNewSubcategoryName] = useState('')
 
   const { data: cards } = trpc.cards.list.useQuery()
   const { data: categories } = trpc.transactions.getCategories.useQuery()
+
+  const selectedCategory = categories?.find((c) => c.id === formData.categoryId)
+  const subcategories = selectedCategory?.subcategories ?? []
+
+  const createSubcategoryMutation = trpc.transactions.createSubcategory.useMutation({
+    onSuccess: (created) => {
+      setFormData({ ...formData, subcategoryId: created.id })
+      setNewSubcategoryName('')
+      utils.transactions.getCategories.invalidate()
+    },
+  })
 
   const createMutation = trpc.transactions.create.useMutation({
     onSuccess: () => {
@@ -142,6 +154,7 @@ export function TransactionForm({
       cardId: (formData.paymentMethod === 'credit_card' || formData.paymentMethod === 'debit_card') ? formData.cardId : undefined,
       installments: formData.paymentMethod === 'credit_card' ? parseInt(formData.installments) : 1,
       categoryId: formData.categoryId || undefined,
+      subcategoryId: formData.subcategoryId || undefined,
       expenseType: formData.expenseType,
       notes: formData.notes || undefined,
       isForThirdParty: formData.isForThirdParty || undefined,
@@ -343,13 +356,13 @@ export function TransactionForm({
             <Label htmlFor="category">Categoría</Label>
             <Select
               value={formData.categoryId}
-              onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+              onValueChange={(value) => setFormData({ ...formData, categoryId: value, subcategoryId: '' })}
             >
               <SelectTrigger id="category">
                 <SelectValue placeholder="Seleccionar categoría" />
               </SelectTrigger>
               <SelectContent>
-                {categories?.map((category: { id: string; name: string }) => (
+                {categories?.map((category) => (
                   <SelectItem key={category.id} value={category.id}>
                     {category.name}
                   </SelectItem>
@@ -361,12 +374,64 @@ export function TransactionForm({
           {/* Subcategoría */}
           <div className="space-y-2">
             <Label htmlFor="subcategory">Subcategoría</Label>
-            <Input
-              id="subcategory"
-              value={formData.subcategory}
-              onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
-              placeholder="Ej: Transporte, Consumo, Servicios..."
-            />
+            {formData.categoryId ? (
+              <>
+                <Select
+                  value={formData.subcategoryId}
+                  onValueChange={(value) => setFormData({ ...formData, subcategoryId: value })}
+                >
+                  <SelectTrigger id="subcategory">
+                    <SelectValue placeholder="Seleccionar subcategoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subcategories.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id}>
+                        {sub.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex gap-2">
+                  <Input
+                    value={newSubcategoryName}
+                    onChange={(e) => setNewSubcategoryName(e.target.value)}
+                    placeholder="Nueva subcategoría..."
+                    className="text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newSubcategoryName.trim()) {
+                        e.preventDefault()
+                        createSubcategoryMutation.mutate({
+                          categoryId: formData.categoryId,
+                          name: newSubcategoryName.trim(),
+                        })
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    disabled={!newSubcategoryName.trim() || createSubcategoryMutation.isPending}
+                    onClick={() => {
+                      createSubcategoryMutation.mutate({
+                        categoryId: formData.categoryId,
+                        name: newSubcategoryName.trim(),
+                      })
+                    }}
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <Select disabled>
+                <SelectTrigger id="subcategory">
+                  <SelectValue placeholder="Seleccioná una categoría primero" />
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
+            )}
           </div>
 
           {/* Tipo de gasto con indicadores de color */}

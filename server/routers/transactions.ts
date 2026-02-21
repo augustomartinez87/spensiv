@@ -22,6 +22,7 @@ export const transactionsRouter = router({
         purchaseDate: z.date(),
         installments: z.number().min(1).max(60).default(1), // Solo aplica a credit_card
         categoryId: z.string().optional(),
+        subcategoryId: z.string().optional(),
         expenseType: z
           .enum(['structural', 'emotional_recurrent', 'emotional_impulsive'])
           .optional(),
@@ -83,6 +84,7 @@ export const transactionsRouter = router({
         include: {
           card: true,
           category: true,
+          subcategory: true,
           installmentsList: {
             include: {
               billingCycle: true,
@@ -108,6 +110,7 @@ export const transactionsRouter = router({
       include: {
         card: true,
         category: true,
+        subcategory: true,
         installmentsList: {
           include: {
             billingCycle: true,
@@ -177,6 +180,7 @@ export const transactionsRouter = router({
         id: z.string(),
         description: z.string().min(1).optional(),
         categoryId: z.string().optional().nullable(),
+        subcategoryId: z.string().optional().nullable(),
         expenseType: z
           .enum(['structural', 'emotional_recurrent', 'emotional_impulsive'])
           .optional()
@@ -203,6 +207,7 @@ export const transactionsRouter = router({
         data: {
           description: data.description,
           categoryId: data.categoryId,
+          subcategoryId: data.subcategoryId,
           expenseType: data.expenseType,
           notes: data.notes,
         },
@@ -250,6 +255,11 @@ export const transactionsRouter = router({
     return ctx.prisma.category.findMany({
       where: {
         userId: ctx.user.id,
+      },
+      include: {
+        subcategories: {
+          orderBy: { name: 'asc' },
+        },
       },
       orderBy: {
         name: 'asc',
@@ -406,6 +416,7 @@ export const transactionsRouter = router({
         },
         include: {
           category: true,
+          subcategory: true,
           card: true,
         },
       })
@@ -444,12 +455,128 @@ export const transactionsRouter = router({
         {} as Record<string, number>
       )
 
+      const bySubcategory = transactions.reduce(
+        (acc, t) => {
+          if (t.subcategory) {
+            const catName = t.category?.name || 'Sin categoría'
+            const key = `${catName} > ${t.subcategory.name}`
+            acc[key] = (acc[key] || 0) + Number(t.totalAmount)
+          }
+          return acc
+        },
+        {} as Record<string, number>
+      )
+
       return {
         total,
         count: transactions.length,
         byCategory,
         byCard,
         byExpenseType,
+        bySubcategory,
       }
+    }),
+
+  /**
+   * Crear subcategoría
+   */
+  createSubcategory: protectedProcedure
+    .input(
+      z.object({
+        categoryId: z.string(),
+        name: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verificar que la categoría pertenezca al usuario
+      const category = await ctx.prisma.category.findFirst({
+        where: { id: input.categoryId, userId: ctx.user.id },
+      })
+
+      if (!category) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Categoría no encontrada',
+        })
+      }
+
+      return ctx.prisma.subCategory.create({
+        data: {
+          categoryId: input.categoryId,
+          name: input.name,
+        },
+      })
+    }),
+
+  /**
+   * Eliminar subcategoría (las transacciones quedan con subcategoryId: null)
+   */
+  deleteSubcategory: protectedProcedure
+    .input(z.string())
+    .mutation(async ({ ctx, input }) => {
+      const subcategory = await ctx.prisma.subCategory.findFirst({
+        where: {
+          id: input,
+          category: { userId: ctx.user.id },
+        },
+      })
+
+      if (!subcategory) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Subcategoría no encontrada',
+        })
+      }
+
+      // Desvincular transacciones
+      await ctx.prisma.transaction.updateMany({
+        where: { subcategoryId: input },
+        data: { subcategoryId: null },
+      })
+
+      return ctx.prisma.subCategory.delete({
+        where: { id: input },
+      })
+    }),
+
+  /**
+   * Buscar o crear subcategoría por nombre (para importer)
+   */
+  getOrCreateSubcategory: protectedProcedure
+    .input(
+      z.object({
+        categoryId: z.string(),
+        name: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const category = await ctx.prisma.category.findFirst({
+        where: { id: input.categoryId, userId: ctx.user.id },
+      })
+
+      if (!category) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Categoría no encontrada',
+        })
+      }
+
+      const existing = await ctx.prisma.subCategory.findUnique({
+        where: {
+          categoryId_name: {
+            categoryId: input.categoryId,
+            name: input.name,
+          },
+        },
+      })
+
+      if (existing) return existing
+
+      return ctx.prisma.subCategory.create({
+        data: {
+          categoryId: input.categoryId,
+          name: input.name,
+        },
+      })
     }),
 })

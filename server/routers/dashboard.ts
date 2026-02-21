@@ -76,6 +76,7 @@ export const dashboardRouter = router({
             include: {
               card: true,
               category: true,
+              subcategory: true,
             },
           },
         },
@@ -110,6 +111,18 @@ export const dashboardRouter = router({
       {} as Record<string, number>
     )
 
+    const bySubcategory = installments.reduce(
+      (acc, inst) => {
+        if (inst.transaction.subcategory) {
+          const catName = inst.transaction.category?.name || 'Sin categoría'
+          const key = `${catName} > ${inst.transaction.subcategory.name}`
+          acc[key] = (acc[key] || 0) + Number(inst.amount)
+        }
+        return acc
+      },
+      {} as Record<string, number>
+    )
+
     return {
       period,
       totalSpent, // Compras del mes
@@ -118,6 +131,7 @@ export const dashboardRouter = router({
       installmentCount: installments.length,
       byCard,
       byCategory,
+      bySubcategory,
     }
   }),
 

@@ -19,6 +19,7 @@ export interface CreateTransactionInput {
   purchaseDate: Date
   installments: number // Solo aplica a credit_card
   categoryId?: string
+  subcategoryId?: string
   expenseType?: string
   isForThirdParty?: boolean
   thirdPartyId?: string
@@ -188,6 +189,7 @@ export async function createTransactionWithInstallments(
         purchaseDate: input.purchaseDate,
         installments: 1, // Siempre 1 para efectivo/transferencia/débito
         categoryId: input.categoryId,
+        subcategoryId: input.subcategoryId,
         expenseType: input.expenseType,
         isForThirdParty: input.isForThirdParty || false,
         thirdPartyId: input.thirdPartyId,
@@ -243,6 +245,7 @@ export async function createTransactionWithInstallments(
       purchaseDate: input.purchaseDate,
       installments: input.installments,
       categoryId: input.categoryId,
+      subcategoryId: input.subcategoryId,
       expenseType: input.expenseType,
       isForThirdParty: input.isForThirdParty || false,
       thirdPartyId: input.thirdPartyId,

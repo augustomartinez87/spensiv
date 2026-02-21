@@ -162,6 +162,9 @@ model Transaction {
   categoryId    String?
   category      Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
+  subcategoryId String?
+  subcategory   SubCategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
+
   // Tipo de gasto customizado (tu clasificación única)
   expenseType   String?    // "structural" | "emotional_recurrent" | "emotional_impulsive"
 
@@ -275,8 +278,11 @@ model SubCategory {
   category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   name        String
-  
+
   createdAt DateTime @default(now())
+
+  // Relations
+  transactions Transaction[]
 
   @@unique([categoryId, name])
   @@index([categoryId])
@@ -399,6 +405,10 @@ model Loan {
   // Refinancing
   refinancedByLoanId String? // ID del nuevo préstamo que reemplaza a este
   originalLoanId     String? // ID del préstamo original que fue refinanciado
+
+  // Direction: lender (soy prestamista) or borrower (soy deudor)
+  direction    String  @default("lender") // "lender" | "borrower"
+  creditorName String? // Nombre del acreedor (cuando direction=borrower)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
