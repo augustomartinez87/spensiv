@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
@@ -65,6 +66,7 @@ import { tnaToMonthlyRate, frenchInstallment, generateAmortizationTable } from '
 export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
   const [view, setView] = useState<'list' | 'calendar'>('list')
+  const [tab, setTab] = useState<'lender' | 'borrower'>('lender')
 
   if (selectedLoanId) {
     return <LoanDetail loanId={selectedLoanId} onBack={() => setSelectedLoanId(null)} />
@@ -72,32 +74,51 @@ export default function LoansPage() {
 
   return (
     <div className="space-y-8">
-      <LoanListHeader view={view} onViewChange={setView} />
-      <LoansDashboardSummary />
-      <div className="grid gap-6 md:grid-cols-[1fr_280px]">
-        <div>
-          {view === 'list' ? (
-            <LoanListContent onSelect={setSelectedLoanId} />
-          ) : (
-            <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
-          )}
-        </div>
-        <UpcomingInstallmentsGadget />
-      </div>
+      <LoanListHeader view={view} onViewChange={setView} direction={tab} />
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+        <TabsList className="grid w-full max-w-xs grid-cols-2">
+          <TabsTrigger value="lender">Soy prestamista</TabsTrigger>
+          <TabsTrigger value="borrower">Soy deudor</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="lender" className="space-y-6 mt-6">
+          <LoansDashboardSummary />
+          <div className="grid gap-6 md:grid-cols-[1fr_280px]">
+            <div>
+              {view === 'list' ? (
+                <LoanListContent onSelect={setSelectedLoanId} direction="lender" />
+              ) : (
+                <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
+              )}
+            </div>
+            <UpcomingInstallmentsGadget />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="borrower" className="space-y-6 mt-6">
+          <DebtsDashboardSummary />
+          <LoanListContent onSelect={setSelectedLoanId} direction="borrower" />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
 
 // ─── Loan List Header ────────────────────────────────────────────────
 
-function LoanListHeader({ view, onViewChange }: { view: 'list' | 'calendar'; onViewChange: (v: 'list' | 'calendar') => void }) {
+function LoanListHeader({ view, onViewChange, direction }: { view: 'list' | 'calendar'; onViewChange: (v: 'list' | 'calendar') => void; direction: 'lender' | 'borrower' }) {
   const [createOpen, setCreateOpen] = useState(false)
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground tracking-tight">Préstamos</h1>
-        <p className="text-muted-foreground mt-1">Gestioná tus préstamos personales</p>
+        <h1 className="text-3xl font-bold text-foreground tracking-tight">
+          {direction === 'lender' ? 'Préstamos' : 'Mis Deudas'}
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          {direction === 'lender' ? 'Gestioná tus préstamos personales' : 'Controlá lo que debés'}
+        </p>
       </div>
       <div className="flex items-center gap-2">
         <div className="flex bg-muted rounded-lg p-0.5">
@@ -188,6 +209,71 @@ function LoansDashboardSummary() {
   )
 }
 
+// ─── Debts Dashboard Summary ─────────────────────────────────────────
+
+function DebtsDashboardSummary() {
+  const { data: metrics, isLoading } = trpc.loans.getDashboardMetricsDebtor.useQuery()
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20" />)}
+      </div>
+    )
+  }
+
+  if (!metrics || metrics.activeDebtsCount === 0) return null
+
+  return (
+    <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Deuda total</p>
+          <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalDebt)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{metrics.activeDebtsCount} deuda{metrics.activeDebtsCount !== 1 ? 's' : ''}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pendiente pago</p>
+          <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalPending)}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Próxima cuota</p>
+          {metrics.nextInstallment ? (
+            <>
+              <p className="text-xl font-bold text-accent-blue mt-1">
+                {formatCurrency(metrics.nextInstallment.amountArs)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {format(new Date(metrics.nextInstallment.dueDate), "d 'de' MMM", { locale: es })}
+              </p>
+            </>
+          ) : (
+            <p className="text-xl font-bold text-muted-foreground mt-1">-</p>
+          )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Vencidas</p>
+          <p className={cn(
+            'text-xl font-bold mt-1',
+            metrics.overdueCount > 0 ? 'text-accent-danger' : 'text-accent-positive'
+          )}>
+            {metrics.overdueCount > 0 ? formatCurrency(metrics.overdueAmount) : 'Ninguna'}
+          </p>
+          {metrics.overdueCount > 0 && (
+            <p className="text-xs text-accent-danger mt-0.5">{metrics.overdueCount} cuota{metrics.overdueCount !== 1 ? 's' : ''} sin pagar</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // ─── Upcoming Installments Gadget ───────────────────────────────────
 
 function UpcomingInstallmentsGadget() {
@@ -249,9 +335,9 @@ function UpcomingInstallmentsGadget() {
 
 // ─── Loan List Content ───────────────────────────────────────────────
 
-function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
+function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => void; direction: 'lender' | 'borrower' }) {
   const utils = trpc.useUtils()
-  const { data: loans, isLoading } = trpc.loans.list.useQuery()
+  const { data: loans, isLoading } = trpc.loans.list.useQuery({ direction })
   const [createOpen, setCreateOpen] = useState(false)
 
   const confirmMutation = trpc.loans.confirmPreApproved.useMutation({
@@ -282,11 +368,13 @@ function LoanListContent({ onSelect }: { onSelect: (id: string) => void }) {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
           <Banknote className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-lg font-medium text-foreground">Sin préstamos</p>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">
-            Creá tu primer préstamo o usa el simulador
+          <p className="text-lg font-medium text-foreground">
+            {direction === 'lender' ? 'Sin préstamos' : 'Sin deudas'}
           </p>
-          <CreateLoanDialog open={createOpen} onOpenChange={setCreateOpen} />
+          <p className="text-sm text-muted-foreground mt-1 mb-4">
+            {direction === 'lender' ? 'Creá tu primer préstamo o usa el simulador' : 'Registrá una deuda que tengas con alguien'}
+          </p>
+          <CreateLoanDialog open={createOpen} onOpenChange={setCreateOpen} direction={direction} />
         </CardContent>
       </Card>
     )
@@ -1646,6 +1734,7 @@ function CreateLoanDialog({
   open,
   onOpenChange,
   defaultValues,
+  direction = 'lender',
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -1655,6 +1744,7 @@ function CreateLoanDialog({
     termMonths?: string
     startDate?: string
   }
+  direction?: 'lender' | 'borrower'
 }) {
   const utils = trpc.useUtils()
   const [borrowerName, setBorrowerName] = useState('')
@@ -1668,6 +1758,7 @@ function CreateLoanDialog({
   const [customInstallment, setCustomInstallment] = useState('')
   const [impliedTna, setImpliedTna] = useState<number | null>(null)
   const [selectedPersonId, setSelectedPersonId] = useState<string>('')
+  const [creditorName, setCreditorName] = useState('')
   const [fciRate, setFciRate] = useState('40')
   const [suggestedTna, setSuggestedTna] = useState<number | null>(null)
 
@@ -1733,6 +1824,7 @@ function CreateLoanDialog({
     onSuccess: () => {
       utils.loans.list.invalidate()
       utils.loans.getDashboardMetrics.invalidate()
+      utils.loans.getDashboardMetricsDebtor.invalidate()
       onOpenChange(false)
       setBorrowerName('')
       setCapital('')
@@ -1744,6 +1836,7 @@ function CreateLoanDialog({
       setCustomInstallment('')
       setImpliedTna(null)
       setSelectedPersonId('')
+      setCreditorName('')
       setSuggestedTna(null)
       setFciRate('40')
     },
@@ -1760,6 +1853,8 @@ function CreateLoanDialog({
         monthlyInterestRate: parseFloat(monthlyRate) / 100,
         startDate,
         personId: selectedPersonId || undefined,
+        direction,
+        creditorName: direction === 'borrower' ? creditorName || undefined : undefined,
       })
     } else {
       createMutation.mutate({
@@ -1771,6 +1866,8 @@ function CreateLoanDialog({
         termMonths: parseInt(termMonths),
         startDate,
         personId: selectedPersonId || undefined,
+        direction,
+        creditorName: direction === 'borrower' ? creditorName || undefined : undefined,
       })
     }
   }
@@ -1785,19 +1882,33 @@ function CreateLoanDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Crear Préstamo</DialogTitle>
+          <DialogTitle>{direction === 'lender' ? 'Crear Préstamo' : 'Registrar Deuda'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="borrowerName">Nombre del Deudor</Label>
+            <Label htmlFor="borrowerName">
+              {direction === 'lender' ? 'Nombre del Deudor' : 'Descripción'}
+            </Label>
             <Input
               id="borrowerName"
               value={borrowerName}
               onChange={(e) => setBorrowerName(e.target.value)}
-              placeholder="Ej: Juan Perez"
+              placeholder={direction === 'lender' ? 'Ej: Juan Perez' : 'Ej: Tarjeta Visa - Cuotas celular'}
               required
             />
           </div>
+
+          {direction === 'borrower' && (
+            <div className="space-y-2">
+              <Label htmlFor="creditorName">Acreedor</Label>
+              <Input
+                id="creditorName"
+                value={creditorName}
+                onChange={(e) => setCreditorName(e.target.value)}
+                placeholder="Ej: Banco Galicia, Mercado Crédito"
+              />
+            </div>
+          )}
 
           {/* Person selector */}
           {persons && persons.length > 0 && (

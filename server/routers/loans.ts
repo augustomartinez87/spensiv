@@ -38,6 +38,8 @@ const createLoanInput = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   personId: z.string().optional(),
   roundingMultiple: z.number().int().min(0).optional(),
+  direction: z.enum(['lender', 'borrower']).default('lender'),
+  creditorName: z.string().optional(),
 })
 
 export const loansRouter = router({
@@ -117,6 +119,8 @@ export const loansRouter = router({
             startDate,
             status: 'active',
             personId: input.personId ?? null,
+            direction: input.direction,
+            creditorName: input.creditorName ?? null,
             loanInstallments: { create: installments },
           },
           include: {
@@ -172,6 +176,8 @@ export const loansRouter = router({
           startDate,
           status: 'active',
           personId: input.personId ?? null,
+          direction: input.direction,
+          creditorName: input.creditorName ?? null,
           loanInstallments: {
             create: table.map((row) => ({
               number: row.month,
@@ -240,9 +246,16 @@ export const loansRouter = router({
       })
     }),
 
-  list: protectedProcedure.query(async ({ ctx }) => {
+  list: protectedProcedure
+    .input(z.object({
+      direction: z.enum(['lender', 'borrower']).optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
     const loans = await ctx.prisma.loan.findMany({
-      where: { userId: ctx.user.id },
+      where: {
+        userId: ctx.user.id,
+        ...(input?.direction ? { direction: input.direction } : {}),
+      },
       include: {
         person: {
           select: {
@@ -508,6 +521,8 @@ export const loansRouter = router({
             startDate,
             status: 'pre_approved',
             personId: input.personId ?? null,
+            direction: input.direction,
+            creditorName: input.creditorName ?? null,
           },
         })
 
@@ -551,6 +566,8 @@ export const loansRouter = router({
           startDate,
           status: 'pre_approved',
           personId: input.personId ?? null,
+          direction: input.direction,
+          creditorName: input.creditorName ?? null,
         },
       })
 
@@ -727,7 +744,7 @@ export const loansRouter = router({
   getDashboardMetrics: protectedProcedure.query(async ({ ctx }) => {
     const [activeLoans, mepRate] = await Promise.all([
       ctx.prisma.loan.findMany({
-        where: { userId: ctx.user.id, status: 'active' },
+        where: { userId: ctx.user.id, status: 'active', direction: 'lender' },
         include: {
           loanInstallments: {
             where: { isPaid: false },
@@ -797,6 +814,59 @@ export const loansRouter = router({
       thisWeekCount: thisWeek.length,
       thisWeekAmount: thisWeek.reduce((s, i) => s + i.amountArs, 0),
       upcomingInstallments,
+    }
+  }),
+
+  getDashboardMetricsDebtor: protectedProcedure.query(async ({ ctx }) => {
+    const [activeDebts, mepRate] = await Promise.all([
+      ctx.prisma.loan.findMany({
+        where: { userId: ctx.user.id, status: 'active', direction: 'borrower' },
+        include: {
+          loanInstallments: {
+            where: { isPaid: false },
+            orderBy: { dueDate: 'asc' },
+            select: { id: true, number: true, dueDate: true, amount: true },
+          },
+        },
+      }),
+      getDolarMep(),
+    ])
+
+    const totalDebt = activeDebts.reduce(
+      (sum, loan) => sum + pesify(Number(loan.capital), loan.currency, mepRate), 0
+    )
+    const totalPending = activeDebts.reduce(
+      (sum, loan) => sum + loan.loanInstallments.reduce(
+        (s, i) => s + pesify(Number(i.amount), loan.currency, mepRate), 0
+      ), 0
+    )
+
+    const now = new Date()
+    const allUnpaid = activeDebts.flatMap((loan) =>
+      loan.loanInstallments.map((i) => ({
+        ...i,
+        amount: Number(i.amount),
+        amountArs: pesify(Number(i.amount), loan.currency, mepRate),
+        creditorName: loan.creditorName || loan.borrowerName,
+        loanId: loan.id,
+        currency: loan.currency,
+      }))
+    )
+
+    const overdueCount = allUnpaid.filter((i) => i.dueDate < now).length
+    const overdueAmount = allUnpaid.filter((i) => i.dueDate < now).reduce((s, i) => s + i.amountArs, 0)
+
+    const nextInstallment = allUnpaid
+      .filter((i) => i.dueDate >= now)
+      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0] || null
+
+    return {
+      activeDebtsCount: activeDebts.length,
+      totalDebt,
+      totalPending,
+      overdueCount,
+      overdueAmount,
+      nextInstallment,
     }
   }),
 })
