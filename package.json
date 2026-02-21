@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:financial": "npx tsc lib/financial-engine.ts tests/financial-engine.test.ts --module commonjs --target ES2020 --esModuleInterop --skipLibCheck --outDir .financial-test-dist && node --test .financial-test-dist/tests/financial-engine.test.js",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
