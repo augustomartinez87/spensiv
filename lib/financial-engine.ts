@@ -47,6 +47,7 @@ export interface BuildFrenchLoanResult {
 
 const DEFAULT_EPSILON = 1e-8
 const SAFETY_MARGIN = 1e-5
+const IRR_NUMERIC_TOLERANCE = 1e-10
 
 export function tnaNominalToMonthlyRate(tnaNominal: number): number {
   if (!Number.isFinite(tnaNominal) || tnaNominal < 0) {
@@ -134,8 +135,14 @@ export function buildFrenchLoanWithMinimumTna(input: BuildFrenchLoanInput): Buil
 
   const step = roundingMultiple > 0 ? roundingMultiple : 0
   let iterations = 0
+  const visitedInstallments = new Set<number>()
 
   while (iterations <= maxSteps) {
+    if (visitedInstallments.has(currentInstallment)) {
+      throw new Error('Unable to satisfy contractual term with current rounding multiple')
+    }
+    visitedInstallments.add(currentInstallment)
+
     let schedule: FrenchScheduleResult
     try {
       schedule = generateFrenchScheduleExact(
@@ -148,6 +155,15 @@ export function buildFrenchLoanWithMinimumTna(input: BuildFrenchLoanInput): Buil
     } catch (error) {
       if (step <= 0) throw error
       const message = error instanceof Error ? error.message : ''
+      if (message.includes('early payoff before contractual maturity')) {
+        const nextInstallment = currentInstallment - step
+        if (nextInstallment <= 0) {
+          throw new Error('Unable to satisfy contractual term with current rounding multiple')
+        }
+        currentInstallment = nextInstallment
+        iterations++
+        continue
+      }
       if (message.includes('does not amortize principal')) {
         currentInstallment += step
         iterations++
@@ -167,7 +183,7 @@ export function buildFrenchLoanWithMinimumTna(input: BuildFrenchLoanInput): Buil
       enforceMinimumTna: false,
     })
 
-    if (irrTnaNominal >= input.tnaMinima + SAFETY_MARGIN) {
+    if (irrTnaNominal + IRR_NUMERIC_TOLERANCE >= input.tnaMinima + SAFETY_MARGIN) {
       validateFrenchInvariants({
         capital: input.capital,
         schedule,
@@ -213,6 +229,7 @@ export function generateFrenchScheduleExact(
   const start = parseIsoDate(startDate)
   const baseInstallment = new Decimal(fixedInstallment)
   const rate = new Decimal(monthlyRate)
+  const periodTolerance = new Decimal(Math.max(DEFAULT_EPSILON, capital * 1e-12))
   let balance = new Decimal(capital)
   let totalInterest = new Decimal(0)
   let totalPaid = new Decimal(0)
@@ -230,7 +247,11 @@ export function generateFrenchScheduleExact(
       throw new Error(`Installment does not amortize principal at period ${period}`)
     }
 
-    if (principal.greaterThan(balance) || period === termMonths) {
+    if (period < termMonths && principal.plus(periodTolerance).greaterThanOrEqualTo(balance)) {
+      throw new Error(`Installment causes early payoff before contractual maturity (period ${period})`)
+    }
+
+    if (period === termMonths) {
       principal = balance
       installment = interest.plus(principal)
     }
@@ -252,9 +273,11 @@ export function generateFrenchScheduleExact(
       balance: balance.toNumber(),
     })
 
-    if (balance.lte(DEFAULT_EPSILON)) {
+    if (period < termMonths && balance.lte(periodTolerance)) {
+      throw new Error(`Installment causes early payoff before contractual maturity (period ${period})`)
+    }
+    if (period === termMonths && balance.abs().lte(periodTolerance)) {
       balance = new Decimal(0)
-      break
     }
   }
 

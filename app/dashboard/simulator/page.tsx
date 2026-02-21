@@ -317,7 +317,7 @@ export default function SimulatorPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="tnaTarget">TNA Objetivo (%)</Label>
+              <Label htmlFor="tnaTarget">TNA Mínima (%)</Label>
               <Input
                 id="tnaTarget"
                 type="number"

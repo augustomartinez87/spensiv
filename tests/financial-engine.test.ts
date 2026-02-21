@@ -55,26 +55,27 @@ test('360 cuotas - 0.01% TNA - multiple 1', () => {
 })
 
 test('360 cuotas - 300% TNA - multiple 1', () => {
-  const result = buildFrenchLoanWithMinimumTna({
-    capital: 100000,
-    termMonths: 360,
-    tnaMinima: 3.0,
-    startDate: '2026-01-15',
-    roundingMultiple: 1,
+  assert.throws(() => {
+    buildFrenchLoanWithMinimumTna({
+      capital: 100000,
+      termMonths: 360,
+      tnaMinima: 3.0,
+      startDate: '2026-01-15',
+      roundingMultiple: 1,
+    })
   })
-  validateInvariants(result, 100000, 3.0)
 })
 
 test('360 cuotas - multiple 1000', () => {
-  const result = buildFrenchLoanWithMinimumTna({
-    capital: 1_000_000,
-    termMonths: 360,
-    tnaMinima: 0.55,
-    startDate: '2026-01-15',
-    roundingMultiple: 1000,
+  assert.throws(() => {
+    buildFrenchLoanWithMinimumTna({
+      capital: 1_000_000,
+      termMonths: 360,
+      tnaMinima: 0.55,
+      startDate: '2026-01-15',
+      roundingMultiple: 1000,
+    })
   })
-  validateInvariants(result, 1_000_000, 0.55)
-  assert.equal(result.roundedInstallment % 1000, 0)
 })
 
 test('EOM policy - start 31/01', () => {
@@ -89,3 +90,28 @@ test('EOM policy - start 29/02 leap year', () => {
   assert.equal(addMonthsEOM(d, 12).toISOString().slice(0, 10), '2025-02-28')
 })
 
+test('fixed-term regression: 6/9/12 months must not collapse to same flow', () => {
+  const terms = [6, 9, 12] as const
+  const results = terms.map((term) =>
+    buildFrenchLoanWithMinimumTna({
+      capital: 50_000,
+      termMonths: term,
+      tnaMinima: 0.9,
+      startDate: '2026-01-15',
+      roundingMultiple: 1000,
+    })
+  )
+
+  for (let i = 0; i < results.length; i++) {
+    const term = terms[i]
+    const result = results[i]
+    assert.equal(result.schedule.periods, term)
+    assert.equal(result.schedule.schedule.length, term)
+    assert.equal(result.schedule.schedule[result.schedule.schedule.length - 1].period, term)
+    assert.ok(Math.abs(result.schedule.schedule[result.schedule.schedule.length - 1].balance) <= EPS)
+  }
+
+  const totals = results.map((r) => r.schedule.totalPaid)
+  assert.ok(totals[0] < totals[1], `Expected total(6) < total(9), got ${totals[0]} vs ${totals[1]}`)
+  assert.ok(totals[1] < totals[2], `Expected total(9) < total(12), got ${totals[1]} vs ${totals[2]}`)
+})
