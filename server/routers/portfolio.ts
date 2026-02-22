@@ -158,11 +158,15 @@ export const portfolioRouter = router({
 
       for (const loan of loans) {
         const capital = pesify(Number(loan.capital), loan.currency, mepRate)
+        if (!Number.isFinite(capital) || capital <= 0) {
+          continue
+        }
         const installments = loan.loanInstallments
 
         // Interest collected vs projected
         for (const inst of installments) {
           const intArs = pesify(Number(inst.interest), loan.currency, mepRate)
+          if (!Number.isFinite(intArs)) continue
           interestProjected += intArs
           if (inst.isPaid) interestCollected += intArs
         }
@@ -171,15 +175,24 @@ export const portfolioRouter = router({
         // Use actual paid amounts for past, scheduled for future
         const cashFlows = [-capital]
         for (const inst of installments) {
-          cashFlows.push(pesify(Number(inst.amount), loan.currency, mepRate))
+          const payment = pesify(Number(inst.amount), loan.currency, mepRate)
+          if (Number.isFinite(payment)) cashFlows.push(payment)
         }
 
         if (cashFlows.length > 1) {
-          const monthlyIRR = calculateIRR(cashFlows)
-          if (isFinite(monthlyIRR) && monthlyIRR > -1) {
-            const annualIRR = monthlyToAnnualRate(monthlyIRR)
-            totalWeightedIRR += annualIRR * capital
-            totalWeightForIRR += capital
+          const hasPositive = cashFlows.some((value) => value > 0)
+          const hasNegative = cashFlows.some((value) => value < 0)
+          if (hasPositive && hasNegative) {
+            try {
+              const monthlyIRR = calculateIRR(cashFlows)
+              if (isFinite(monthlyIRR) && monthlyIRR > -1) {
+                const annualIRR = monthlyToAnnualRate(monthlyIRR)
+                totalWeightedIRR += annualIRR * capital
+                totalWeightForIRR += capital
+              }
+            } catch {
+              // Skip loans with non-solvable IRR instead of failing the entire endpoint.
+            }
           }
         }
 

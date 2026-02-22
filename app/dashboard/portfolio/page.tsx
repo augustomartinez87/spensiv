@@ -54,11 +54,11 @@ export default function PortfolioPage() {
   const [fciRate, setFciRate] = useState('40')
   const fciRateDecimal = parseFloat(fciRate || '0') / 100
 
-  const { data: metrics, isLoading: metricsLoading } = trpc.portfolio.getMetrics.useQuery(
+  const { data: metrics, isLoading: metricsLoading, error: metricsError } = trpc.portfolio.getMetrics.useQuery(
     { fciRate: fciRateDecimal },
     { enabled: !isNaN(fciRateDecimal) }
   )
-  const { data: yieldMetrics, isLoading: yieldLoading } = trpc.portfolio.getYieldMetrics.useQuery(
+  const { data: yieldMetrics, isLoading: yieldLoading, error: yieldError } = trpc.portfolio.getYieldMetrics.useQuery(
     { fciRate: fciRateDecimal },
     { enabled: !isNaN(fciRateDecimal) }
   )
@@ -113,6 +113,17 @@ export default function PortfolioPage() {
             {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-[88px]" />)}
           </div>
         </div>
+      ) : metricsError || yieldError ? (
+        <Card className="border-red-500/30 bg-red-500/5">
+          <CardContent className="py-6">
+            <div className="flex items-center gap-2 text-red-400">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <p className="text-sm">
+                No se pudieron calcular las métricas de rendimiento. Revisá préstamos activos con montos o cuotas inválidas.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       ) : yieldMetrics && metrics ? (
         <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
           {/* Yield Hero Card */}
