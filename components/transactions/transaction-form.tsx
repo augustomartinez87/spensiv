@@ -161,7 +161,7 @@ export function TransactionForm({
         utils.budget.getProgress.invalidate()
         toast({
           title: 'Categorias normalizadas',
-          description: `Migradas: ${result.migratedCategories} categorias, ${result.migratedTransactions} transacciones`,
+          description: `Migradas: ${result.migratedCategories} categorias, ${result.migratedTransactions} transacciones, ${result.removedSubcategories ?? 0} subcategorias limpias`,
         })
       },
       onError: (error) => {
@@ -443,6 +443,15 @@ export function TransactionForm({
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="category">Categoría</Label>
               <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => router.push('/dashboard/categories')}
+                >
+                  Gestionar
+                </Button>
                 <Button
                   type="button"
                   variant="outline"

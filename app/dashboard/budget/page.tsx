@@ -75,7 +75,7 @@ export default function BudgetPage() {
       utils.transactions.list.invalidate()
       toast({
         title: 'Categorias normalizadas',
-        description: `Migradas ${result.migratedCategories} categorias y ${result.migratedTransactions} transacciones`,
+        description: `Migradas ${result.migratedCategories} categorias, ${result.migratedTransactions} transacciones y ${result.removedSubcategories ?? 0} subcategorias`,
       })
     },
     onError: (error) => {

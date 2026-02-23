@@ -12,11 +12,119 @@ import {
   getCanonicalExpenseCategoryName,
   getCanonicalExpenseSubcategoryName,
   getExpenseCategoryMappingByName,
+  getExpenseSubcategoryCandidatesByName,
   isMasterExpenseCategory,
+  isMasterExpenseSubcategory,
   normalizeExpenseCategoryText,
   sortCategoriesByExpenseTaxonomy,
   sortSubcategoriesByExpenseTaxonomy,
 } from '@/lib/expense-categories'
+
+const categoryNameInputSchema = z.string().min(1).max(80)
+const subcategoryNameInputSchema = z.string().min(1).max(80)
+
+function sameNormalizedValue(a: string, b: string): boolean {
+  return normalizeExpenseCategoryText(a) === normalizeExpenseCategoryText(b)
+}
+
+function resolveSubcategoryNormalizationTarget(
+  rawCategoryName: string,
+  rawSubcategoryName: string
+): { category: string; subcategory: string } | null {
+  const categoryName = rawCategoryName.trim()
+  const subcategoryName = rawSubcategoryName.trim()
+
+  if (!categoryName || !subcategoryName) return null
+
+  const canonicalCategoryName = getCanonicalExpenseCategoryName(categoryName)
+  const canonicalSubcategoryInCurrentCategory = getCanonicalExpenseSubcategoryName(
+    canonicalCategoryName,
+    subcategoryName
+  )
+
+  if (
+    isMasterExpenseSubcategory(canonicalCategoryName, canonicalSubcategoryInCurrentCategory)
+  ) {
+    return {
+      category: canonicalCategoryName,
+      subcategory: canonicalSubcategoryInCurrentCategory,
+    }
+  }
+
+  const mappedBySubcategoryName = getExpenseCategoryMappingByName(subcategoryName)
+  if (mappedBySubcategoryName?.subcategory) {
+    const mappedCategoryName = getCanonicalExpenseCategoryName(
+      mappedBySubcategoryName.category
+    )
+
+    return {
+      category: mappedCategoryName,
+      subcategory: getCanonicalExpenseSubcategoryName(
+        mappedCategoryName,
+        mappedBySubcategoryName.subcategory
+      ),
+    }
+  }
+
+  const mappedByCategoryName = getExpenseCategoryMappingByName(categoryName)
+  if (!mappedByCategoryName) return null
+
+  const mappedCategoryName = getCanonicalExpenseCategoryName(mappedByCategoryName.category)
+  const canonicalInMappedCategory = getCanonicalExpenseSubcategoryName(
+    mappedCategoryName,
+    subcategoryName
+  )
+
+  if (isMasterExpenseSubcategory(mappedCategoryName, canonicalInMappedCategory)) {
+    return {
+      category: mappedCategoryName,
+      subcategory: canonicalInMappedCategory,
+    }
+  }
+
+  const subcategoryCandidates = getExpenseSubcategoryCandidatesByName(subcategoryName)
+
+  if (subcategoryCandidates.length === 1) {
+    const candidate = subcategoryCandidates[0]
+    const candidateCategoryName = getCanonicalExpenseCategoryName(candidate.category)
+
+    return {
+      category: candidateCategoryName,
+      subcategory: getCanonicalExpenseSubcategoryName(
+        candidateCategoryName,
+        candidate.subcategory
+      ),
+    }
+  }
+
+  const preferredCandidate = subcategoryCandidates.find((candidate) =>
+    sameNormalizedValue(candidate.category, mappedCategoryName)
+  )
+
+  if (preferredCandidate) {
+    const preferredCategoryName = getCanonicalExpenseCategoryName(preferredCandidate.category)
+
+    return {
+      category: preferredCategoryName,
+      subcategory: getCanonicalExpenseSubcategoryName(
+        preferredCategoryName,
+        preferredCandidate.subcategory
+      ),
+    }
+  }
+
+  if (mappedByCategoryName.subcategory) {
+    return {
+      category: mappedCategoryName,
+      subcategory: getCanonicalExpenseSubcategoryName(
+        mappedCategoryName,
+        mappedByCategoryName.subcategory
+      ),
+    }
+  }
+
+  return null
+}
 
 export const transactionsRouter = router({
   /**
@@ -300,7 +408,7 @@ export const transactionsRouter = router({
   createCategory: protectedProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(80),
+        name: categoryNameInputSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -334,6 +442,221 @@ export const transactionsRouter = router({
     }),
 
   /**
+   * Editar categoría de gasto
+   */
+  updateCategory: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: categoryNameInputSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const category = await ctx.prisma.category.findFirst({
+        where: {
+          id: input.id,
+          userId: ctx.user.id,
+        },
+      })
+
+      if (!category) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Categoría no encontrada',
+        })
+      }
+
+      const rawName = input.name.trim()
+      if (!rawName) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Nombre de categoría inválido',
+        })
+      }
+
+      const name = getCanonicalExpenseCategoryName(rawName)
+      const normalizedName = normalizeExpenseCategoryText(name)
+
+      const existingCategories = await ctx.prisma.category.findMany({
+        where: { userId: ctx.user.id },
+        select: { id: true, name: true },
+      })
+
+      const duplicated = existingCategories.find(
+        (existing) =>
+          existing.id !== category.id &&
+          normalizeExpenseCategoryText(existing.name) === normalizedName
+      )
+
+      if (duplicated) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Ya existe una categoría con ese nombre',
+        })
+      }
+
+      return ctx.prisma.category.update({
+        where: { id: category.id },
+        data: { name },
+      })
+    }),
+
+  /**
+   * Eliminar categoría de gasto
+   * Opcionalmente permite mover transacciones a otra categoría.
+   */
+  deleteCategory: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        replacementCategoryId: z.string().optional(),
+        replacementSubcategoryId: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const category = await ctx.prisma.category.findFirst({
+        where: {
+          id: input.id,
+          userId: ctx.user.id,
+        },
+        include: {
+          budgetLimits: true,
+        },
+      })
+
+      if (!category) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Categoría no encontrada',
+        })
+      }
+
+      if (
+        input.replacementCategoryId &&
+        input.replacementCategoryId === category.id
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'La categoría destino debe ser diferente',
+        })
+      }
+
+      let replacementCategory:
+        | {
+            id: string
+            subcategories: Array<{ id: string }>
+          }
+        | null = null
+
+      if (input.replacementCategoryId) {
+        replacementCategory = await ctx.prisma.category.findFirst({
+          where: {
+            id: input.replacementCategoryId,
+            userId: ctx.user.id,
+          },
+          select: {
+            id: true,
+            subcategories: {
+              select: { id: true },
+            },
+          },
+        })
+
+        if (!replacementCategory) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Categoría destino no encontrada',
+          })
+        }
+      }
+
+      let replacementSubcategoryId: string | undefined
+
+      if (input.replacementSubcategoryId) {
+        if (!replacementCategory) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Selecciona primero una categoría destino',
+          })
+        }
+
+        const subcategoryExists = replacementCategory.subcategories.some(
+          (subcategory) => subcategory.id === input.replacementSubcategoryId
+        )
+
+        if (!subcategoryExists) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'La subcategoría destino no pertenece a la categoría seleccionada',
+          })
+        }
+
+        replacementSubcategoryId = input.replacementSubcategoryId
+      }
+
+      if (replacementCategory) {
+        await ctx.prisma.transaction.updateMany({
+          where: {
+            userId: ctx.user.id,
+            categoryId: category.id,
+          },
+          data: {
+            categoryId: replacementCategory.id,
+            subcategoryId: replacementSubcategoryId ?? null,
+          },
+        })
+
+        for (const oldLimit of category.budgetLimits) {
+          const existingTargetLimit = await ctx.prisma.budgetLimit.findUnique({
+            where: {
+              userId_categoryId: {
+                userId: ctx.user.id,
+                categoryId: replacementCategory.id,
+              },
+            },
+          })
+
+          const nextValue =
+            Number(oldLimit.monthlyLimit) + Number(existingTargetLimit?.monthlyLimit || 0)
+
+          if (existingTargetLimit) {
+            await ctx.prisma.budgetLimit.update({
+              where: { id: existingTargetLimit.id },
+              data: { monthlyLimit: nextValue },
+            })
+          } else {
+            await ctx.prisma.budgetLimit.create({
+              data: {
+                userId: ctx.user.id,
+                categoryId: replacementCategory.id,
+                monthlyLimit: Number(oldLimit.monthlyLimit),
+              },
+            })
+          }
+        }
+      } else {
+        await ctx.prisma.transaction.updateMany({
+          where: {
+            userId: ctx.user.id,
+            categoryId: category.id,
+          },
+          data: {
+            categoryId: null,
+            subcategoryId: null,
+          },
+        })
+      }
+
+      await ctx.prisma.category.delete({
+        where: {
+          id: category.id,
+        },
+      })
+
+      return { success: true }
+    }),
+
+  /**
    * Crear estructura base de categorías + subcategorías maestras
    */
   seedExpenseCategories: protectedProcedure.mutation(async ({ ctx }) => {
@@ -343,9 +666,10 @@ export const transactionsRouter = router({
   /**
    * Normalizar categorías existentes hacia la estructura maestra
    * - Migra categorías legacy conocidas a categoría/subcategoría destino
+   * - Reasigna subcategorías mal ubicadas según la taxonomía recomendada
    * - Transfiere límites de presupuesto
    * - Elimina categorías legacy migradas
-   * - Limpia categorías no maestras sin uso
+   * - Limpia categorías/subcategorías no maestras sin uso
    */
   normalizeExpenseCategories: protectedProcedure.mutation(async ({ ctx }) => {
     const taxonomySeed = await ensureExpenseTaxonomyForUser(ctx.prisma, ctx.user.id)
@@ -376,6 +700,8 @@ export const transactionsRouter = router({
     const migratedCategoryIds = new Set<string>()
     let migratedTransactions = 0
     let transferredBudgetLimits = 0
+    let normalizedSubcategoryTransactions = 0
+    let removedSubcategories = 0
 
     for (const category of categories) {
       if (isMasterExpenseCategory(category.name)) continue
@@ -520,12 +846,145 @@ export const transactionsRouter = router({
       removedCategories += deletedUnused.count
     }
 
+    const refreshedCategories = await ctx.prisma.category.findMany({
+      where: { userId: ctx.user.id },
+      include: {
+        subcategories: true,
+      },
+    })
+
+    const refreshedCategoriesByNormalizedName = new Map(
+      refreshedCategories.map((category) => [
+        normalizeExpenseCategoryText(category.name),
+        category,
+      ])
+    )
+
+    const transactionsWithSubcategory = await ctx.prisma.transaction.findMany({
+      where: {
+        userId: ctx.user.id,
+        subcategoryId: { not: null },
+      },
+      select: {
+        id: true,
+        categoryId: true,
+        subcategoryId: true,
+        category: {
+          select: {
+            name: true,
+          },
+        },
+        subcategory: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    })
+
+    for (const transaction of transactionsWithSubcategory) {
+      if (!transaction.subcategory) continue
+
+      const normalizationTarget = resolveSubcategoryNormalizationTarget(
+        transaction.category?.name || '',
+        transaction.subcategory.name
+      )
+
+      if (!normalizationTarget) continue
+
+      const targetCategory = refreshedCategoriesByNormalizedName.get(
+        normalizeExpenseCategoryText(normalizationTarget.category)
+      )
+
+      if (!targetCategory) continue
+
+      const canonicalTargetSubcategoryName = getCanonicalExpenseSubcategoryName(
+        targetCategory.name,
+        normalizationTarget.subcategory
+      )
+
+      let targetSubcategory = targetCategory.subcategories.find((subcategory) =>
+        sameNormalizedValue(subcategory.name, canonicalTargetSubcategoryName)
+      )
+
+      if (!targetSubcategory) {
+        targetSubcategory = await ctx.prisma.subCategory.create({
+          data: {
+            categoryId: targetCategory.id,
+            name: canonicalTargetSubcategoryName,
+          },
+        })
+        targetCategory.subcategories.push(targetSubcategory)
+      }
+
+      const shouldUpdateCategory = transaction.categoryId !== targetCategory.id
+      const shouldUpdateSubcategory = transaction.subcategoryId !== targetSubcategory.id
+
+      if (!shouldUpdateCategory && !shouldUpdateSubcategory) continue
+
+      await ctx.prisma.transaction.update({
+        where: { id: transaction.id },
+        data: {
+          categoryId: targetCategory.id,
+          subcategoryId: targetSubcategory.id,
+        },
+      })
+
+      normalizedSubcategoryTransactions += 1
+    }
+
+    if (normalizedSubcategoryTransactions > 0) {
+      migratedTransactions += normalizedSubcategoryTransactions
+    }
+
+    const subcategoriesForCleanup = await ctx.prisma.subCategory.findMany({
+      where: {
+        category: {
+          userId: ctx.user.id,
+        },
+      },
+      include: {
+        category: {
+          select: {
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            transactions: true,
+          },
+        },
+      },
+    })
+
+    const subcategoryIdsToDelete = subcategoriesForCleanup
+      .filter(
+        (subcategory) =>
+          isMasterExpenseCategory(subcategory.category.name) &&
+          !isMasterExpenseSubcategory(subcategory.category.name, subcategory.name) &&
+          subcategory._count.transactions === 0
+      )
+      .map((subcategory) => subcategory.id)
+
+    if (subcategoryIdsToDelete.length > 0) {
+      const deletedSubcategories = await ctx.prisma.subCategory.deleteMany({
+        where: {
+          id: {
+            in: subcategoryIdsToDelete,
+          },
+        },
+      })
+      removedSubcategories += deletedSubcategories.count
+    }
+
     return {
       ...taxonomySeed,
       migratedCategories: migratedCategoryIds.size,
       migratedTransactions,
       transferredBudgetLimits,
       removedCategories,
+      normalizedSubcategoryTransactions,
+      removedSubcategories,
     }
   }),
 
@@ -768,7 +1227,7 @@ export const transactionsRouter = router({
     .input(
       z.object({
         categoryId: z.string(),
-        name: z.string().min(1),
+        name: subcategoryNameInputSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -814,15 +1273,170 @@ export const transactionsRouter = router({
     }),
 
   /**
-   * Eliminar subcategoría (las transacciones quedan con subcategoryId: null)
+   * Editar o mover subcategoría
+   */
+  updateSubcategory: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: subcategoryNameInputSchema,
+        categoryId: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const currentSubcategory = await ctx.prisma.subCategory.findFirst({
+        where: {
+          id: input.id,
+          category: { userId: ctx.user.id },
+        },
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      })
+
+      if (!currentSubcategory) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Subcategoría no encontrada',
+        })
+      }
+
+      let targetCategory = currentSubcategory.category
+
+      if (input.categoryId && input.categoryId !== currentSubcategory.categoryId) {
+        const requestedCategory = await ctx.prisma.category.findFirst({
+          where: {
+            id: input.categoryId,
+            userId: ctx.user.id,
+          },
+          select: {
+            id: true,
+            name: true,
+          },
+        })
+
+        if (!requestedCategory) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Categoría destino no encontrada',
+          })
+        }
+
+        targetCategory = requestedCategory
+      }
+
+      const rawName = input.name.trim()
+      if (!rawName) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Nombre de subcategoría inválido',
+        })
+      }
+
+      const targetName = getCanonicalExpenseSubcategoryName(targetCategory.name, rawName)
+      const normalizedTargetName = normalizeExpenseCategoryText(targetName)
+
+      const existingSubcategories = await ctx.prisma.subCategory.findMany({
+        where: {
+          categoryId: targetCategory.id,
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      })
+
+      const duplicate = existingSubcategories.find(
+        (subcategory) =>
+          subcategory.id !== currentSubcategory.id &&
+          normalizeExpenseCategoryText(subcategory.name) === normalizedTargetName
+      )
+
+      if (duplicate) {
+        await ctx.prisma.transaction.updateMany({
+          where: {
+            userId: ctx.user.id,
+            subcategoryId: currentSubcategory.id,
+          },
+          data: {
+            categoryId: targetCategory.id,
+            subcategoryId: duplicate.id,
+          },
+        })
+
+        await ctx.prisma.subCategory.delete({
+          where: {
+            id: currentSubcategory.id,
+          },
+        })
+
+        const merged = await ctx.prisma.subCategory.findUnique({
+          where: {
+            id: duplicate.id,
+          },
+        })
+
+        if (!merged) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'No se pudo resolver la subcategoría resultante',
+          })
+        }
+
+        return merged
+      }
+
+      const movedCategory = targetCategory.id !== currentSubcategory.categoryId
+
+      const updated = await ctx.prisma.subCategory.update({
+        where: {
+          id: currentSubcategory.id,
+        },
+        data: {
+          name: targetName,
+          categoryId: targetCategory.id,
+        },
+      })
+
+      if (movedCategory) {
+        await ctx.prisma.transaction.updateMany({
+          where: {
+            userId: ctx.user.id,
+            subcategoryId: currentSubcategory.id,
+          },
+          data: {
+            categoryId: targetCategory.id,
+          },
+        })
+      }
+
+      return updated
+    }),
+
+  /**
+   * Eliminar subcategoría (con opción de reasignar transacciones)
    */
   deleteSubcategory: protectedProcedure
-    .input(z.string())
+    .input(
+      z.object({
+        id: z.string(),
+        replacementSubcategoryId: z.string().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const subcategory = await ctx.prisma.subCategory.findFirst({
         where: {
-          id: input,
+          id: input.id,
           category: { userId: ctx.user.id },
+        },
+        select: {
+          id: true,
+          categoryId: true,
         },
       })
 
@@ -833,14 +1447,59 @@ export const transactionsRouter = router({
         })
       }
 
-      // Desvincular transacciones
-      await ctx.prisma.transaction.updateMany({
-        where: { subcategoryId: input },
-        data: { subcategoryId: null },
-      })
+      if (
+        input.replacementSubcategoryId &&
+        input.replacementSubcategoryId === subcategory.id
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'La subcategoría destino debe ser diferente',
+        })
+      }
+
+      if (input.replacementSubcategoryId) {
+        const replacementSubcategory = await ctx.prisma.subCategory.findFirst({
+          where: {
+            id: input.replacementSubcategoryId,
+            category: { userId: ctx.user.id },
+          },
+          select: {
+            id: true,
+            categoryId: true,
+          },
+        })
+
+        if (!replacementSubcategory) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Subcategoría destino no encontrada',
+          })
+        }
+
+        await ctx.prisma.transaction.updateMany({
+          where: {
+            userId: ctx.user.id,
+            subcategoryId: subcategory.id,
+          },
+          data: {
+            categoryId: replacementSubcategory.categoryId,
+            subcategoryId: replacementSubcategory.id,
+          },
+        })
+      } else {
+        await ctx.prisma.transaction.updateMany({
+          where: {
+            userId: ctx.user.id,
+            subcategoryId: subcategory.id,
+          },
+          data: {
+            subcategoryId: null,
+          },
+        })
+      }
 
       return ctx.prisma.subCategory.delete({
-        where: { id: input },
+        where: { id: subcategory.id },
       })
     }),
 
@@ -851,7 +1510,7 @@ export const transactionsRouter = router({
     .input(
       z.object({
         categoryId: z.string(),
-        name: z.string().min(1),
+        name: subcategoryNameInputSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {

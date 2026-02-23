@@ -29,6 +29,9 @@ import {
 type TabType = 'gastos' | 'ingresos'
 type SortOrder = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
 
+const PENDING_CLASSIFICATION_FILTER = '__pending_classification__'
+const PENDING_CLASSIFICATION_LABEL = 'Pendiente de clasificar'
+
 export default function TransactionsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('gastos')
   const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null)
@@ -38,6 +41,7 @@ export default function TransactionsPage() {
   const [editFormData, setEditFormData] = useState({
     description: '',
     categoryId: '',
+    subcategoryId: '',
     expenseType: '',
     notes: '',
   })
@@ -216,6 +220,18 @@ export default function TransactionsPage() {
     return 'bg-secondary text-muted-foreground'
   }
 
+  const isTransactionPendingClassification = (transaction: any) => {
+    return !transaction.categoryId && !transaction.subcategoryId
+  }
+
+  const getTransactionCategoryLabel = (transaction: any) => {
+    if (isTransactionPendingClassification(transaction)) {
+      return PENDING_CLASSIFICATION_LABEL
+    }
+
+    return transaction.category?.name || 'Sin categoría'
+  }
+
   if (isLoadingTransactions || isLoadingIncomes) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -226,14 +242,23 @@ export default function TransactionsPage() {
 
   // Filtrar transacciones
   const filteredTransactions = transactions?.filter((tx: any) => {
-    if (filters.categoryId && tx.categoryId !== filters.categoryId) return false
+    if (filters.categoryId) {
+      if (filters.categoryId === PENDING_CLASSIFICATION_FILTER) {
+        if (!isTransactionPendingClassification(tx)) return false
+      } else if (tx.categoryId !== filters.categoryId) {
+        return false
+      }
+    }
     if (filters.expenseType && tx.expenseType !== filters.expenseType) return false
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase()
       const matchesDescription = tx.description.toLowerCase().includes(query)
-      const matchesCategory = tx.category?.name?.toLowerCase().includes(query)
+      const matchesCategory = getTransactionCategoryLabel(tx).toLowerCase().includes(query)
+      const matchesSubcategory = tx.subcategory?.name?.toLowerCase().includes(query)
       const matchesAmount = tx.totalAmount.toString().includes(query)
-      if (!matchesDescription && !matchesCategory && !matchesAmount) return false
+      if (!matchesDescription && !matchesCategory && !matchesSubcategory && !matchesAmount) {
+        return false
+      }
     }
     return true
   })
@@ -275,6 +300,10 @@ export default function TransactionsPage() {
     (category) => normalizeIncomeCategoryText(category.name) === normalizedEditCategory
   )
   const editIncomeSubcategoryOptions = editIncomeCategoryOption?.subcategories ?? []
+  const editExpenseCategoryOption = (categories ?? []).find(
+    (category: any) => category.id === editFormData.categoryId
+  )
+  const editExpenseSubcategoryOptions = editExpenseCategoryOption?.subcategories ?? []
 
   const displayedTransactions = sortedTransactions?.slice(0, visibleCount)
   const remainingCount = (sortedTransactions?.length || 0) - visibleCount
@@ -288,7 +317,7 @@ export default function TransactionsPage() {
     const rows = sortedTransactions.map((tx: any) => [
       format(new Date(tx.purchaseDate), 'yyyy-MM-dd'),
       `"${tx.description.replace(/"/g, '""')}"`,
-      tx.category?.name || '',
+      getTransactionCategoryLabel(tx),
       getExpenseTypeLabel(tx.expenseType),
       getPaymentMethodLabel((tx as any).paymentMethod || 'credit_card'),
       Number(tx.totalAmount).toFixed(2),
@@ -404,6 +433,9 @@ export default function TransactionsPage() {
                 className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
               >
                 <option value="">Todas las categorías</option>
+                <option value={PENDING_CLASSIFICATION_FILTER}>
+                  {PENDING_CLASSIFICATION_LABEL}
+                </option>
                 {categories?.map((cat: any) => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
@@ -529,8 +561,23 @@ export default function TransactionsPage() {
                               {transaction.description}
                               {transaction.isVoided && <span className="ml-1 text-red-500 text-xs">ANULADO</span>}
                             </td>
-                            <td className="py-2.5 px-4 text-muted-foreground">
-                              {transaction.category?.name || '-'}
+                            <td className="py-2.5 px-4">
+                              {isTransactionPendingClassification(transaction) ? (
+                                <span className="text-xs bg-yellow-500/15 text-yellow-400 px-2 py-0.5 rounded">
+                                  {PENDING_CLASSIFICATION_LABEL}
+                                </span>
+                              ) : (
+                                <div className="flex flex-col">
+                                  <span className="text-foreground">
+                                    {transaction.category?.name || 'Sin categoría'}
+                                  </span>
+                                  {transaction.subcategory?.name && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {transaction.subcategory.name}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </td>
                             <td className="py-2.5 px-4">
                               <span className={cn('text-xs px-1.5 py-0.5 rounded', getExpenseTypeColor(transaction.expenseType))}>
@@ -555,6 +602,7 @@ export default function TransactionsPage() {
                                     setEditFormData({
                                       description: transaction.description,
                                       categoryId: transaction.categoryId || '',
+                                      subcategoryId: transaction.subcategoryId || '',
                                       expenseType: transaction.expenseType || '',
                                       notes: transaction.notes || '',
                                     })
@@ -643,6 +691,22 @@ export default function TransactionsPage() {
                           <span className={`text-xs px-2 py-0.5 rounded ${getExpenseTypeColor(transaction.expenseType)}`}>
                             {getExpenseTypeLabel(transaction.expenseType)}
                           </span>
+                          <span
+                            className={cn(
+                              'text-xs px-2 py-0.5 rounded',
+                              isTransactionPendingClassification(transaction)
+                                ? 'bg-yellow-500/15 text-yellow-400'
+                                : 'bg-secondary text-muted-foreground'
+                            )}
+                          >
+                            {getTransactionCategoryLabel(transaction)}
+                          </span>
+                          {!isTransactionPendingClassification(transaction) &&
+                            transaction.subcategory?.name && (
+                              <span className="text-xs text-muted-foreground">
+                                {transaction.subcategory.name}
+                              </span>
+                            )}
                           {transaction.notes && (
                             <span className="text-xs text-muted-foreground">
                               {transaction.notes}
@@ -660,6 +724,7 @@ export default function TransactionsPage() {
                                   setEditFormData({
                                     description: transaction.description,
                                     categoryId: transaction.categoryId || '',
+                                    subcategoryId: transaction.subcategoryId || '',
                                     expenseType: transaction.expenseType || '',
                                     notes: transaction.notes || '',
                                   })
@@ -1000,12 +1065,36 @@ export default function TransactionsPage() {
               <select
                 id="edit-category"
                 value={editFormData.categoryId}
-                onChange={(e) => setEditFormData({ ...editFormData, categoryId: e.target.value })}
+                onChange={(e) =>
+                  setEditFormData({
+                    ...editFormData,
+                    categoryId: e.target.value,
+                    subcategoryId: '',
+                  })
+                }
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Sin categoría</option>
                 {categories?.map((cat: any) => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="edit-subcategory">Subcategoría</Label>
+              <select
+                id="edit-subcategory"
+                value={editFormData.subcategoryId}
+                onChange={(e) => setEditFormData({ ...editFormData, subcategoryId: e.target.value })}
+                disabled={!editFormData.categoryId}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Sin subcategoría</option>
+                {editExpenseSubcategoryOptions.map((subcategory: any) => (
+                  <option key={subcategory.id} value={subcategory.id}>
+                    {subcategory.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -1046,6 +1135,7 @@ export default function TransactionsPage() {
                     id: editingTransaction.id,
                     description: editFormData.description,
                     categoryId: editFormData.categoryId || null,
+                    subcategoryId: editFormData.subcategoryId || null,
                     expenseType: (editFormData.expenseType as any) || null,
                     notes: editFormData.notes || null,
                   })

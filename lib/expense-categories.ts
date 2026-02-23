@@ -178,6 +178,38 @@ const UNIQUE_SUBCATEGORY_MAPPINGS = (() => {
   return unique
 })()
 
+const SUBCATEGORY_CANDIDATES = (() => {
+  const byNormalizedSubcategory = new Map<
+    string,
+    Array<{ category: string; subcategory: string }>
+  >()
+
+  for (const entry of EXPENSE_CATEGORY_TAXONOMY) {
+    for (const subcategory of entry.subcategories) {
+      const normalizedSubcategory = normalizeExpenseCategoryText(subcategory)
+      const current = byNormalizedSubcategory.get(normalizedSubcategory) || []
+      current.push({ category: entry.name, subcategory })
+      byNormalizedSubcategory.set(normalizedSubcategory, current)
+    }
+  }
+
+  return byNormalizedSubcategory
+})()
+
+const MASTER_SUBCATEGORY_SET_BY_CATEGORY = new Map(
+  EXPENSE_CATEGORY_TAXONOMY.map((entry) => [
+    normalizeExpenseCategoryText(entry.name),
+    new Set(entry.subcategories.map((subcategory) => normalizeExpenseCategoryText(subcategory))),
+  ])
+)
+
+const MASTER_SUBCATEGORIES_BY_CATEGORY = new Map(
+  EXPENSE_CATEGORY_TAXONOMY.map((entry) => [
+    normalizeExpenseCategoryText(entry.name),
+    [...entry.subcategories],
+  ])
+)
+
 export function normalizeExpenseCategoryText(value: string): string {
   return value
     .trim()
@@ -246,6 +278,30 @@ export function getCanonicalExpenseSubcategoryName(
     ?.get(normalizedSubcategory)
 
   return canonicalSubcategory ?? rawSubcategoryName.trim()
+}
+
+export function isMasterExpenseSubcategory(
+  categoryName: string,
+  subcategoryName: string
+): boolean {
+  const normalizedCategory = normalizeExpenseCategoryText(categoryName)
+  const normalizedSubcategory = normalizeExpenseCategoryText(subcategoryName)
+  return (
+    MASTER_SUBCATEGORY_SET_BY_CATEGORY.get(normalizedCategory)?.has(normalizedSubcategory) ??
+    false
+  )
+}
+
+export function getMasterExpenseSubcategories(categoryName: string): string[] {
+  const normalizedCategory = normalizeExpenseCategoryText(categoryName)
+  return MASTER_SUBCATEGORIES_BY_CATEGORY.get(normalizedCategory) || []
+}
+
+export function getExpenseSubcategoryCandidatesByName(
+  rawSubcategoryName: string
+): Array<{ category: string; subcategory: string }> {
+  const normalizedSubcategory = normalizeExpenseCategoryText(rawSubcategoryName)
+  return SUBCATEGORY_CANDIDATES.get(normalizedSubcategory) || []
 }
 
 export function sortSubcategoriesByExpenseTaxonomy<T extends { name: string }>(
