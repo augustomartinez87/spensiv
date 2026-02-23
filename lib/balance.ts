@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { formatPeriod } from './periods'
+import { getNonCreditPaymentMethodLabel } from './payment-methods'
 
 /**
  * Obtener balance mensual (Ingresos - Egresos)
@@ -145,7 +146,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
     )
     // Sumar transacciones no-crédito agrupadas por medio de pago
     for (const tx of cashTransactions) {
-        const label = (tx as any).paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia'
+        const label = getNonCreditPaymentMethodLabel((tx as any).paymentMethod)
         expensesByCard[label] = (expensesByCard[label] || 0) + Number(tx.totalAmount)
     }
 
@@ -235,3 +236,4 @@ export async function getCashFlowProjection(
 
     return projections
 }
+

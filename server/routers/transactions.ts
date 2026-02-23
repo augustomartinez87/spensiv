@@ -3,9 +3,20 @@ import { router, protectedProcedure } from '@/lib/trpc'
 import { TRPCError } from '@trpc/server'
 import {
   createTransactionWithInstallments,
+  recalculateBillingCycleTotals,
   voidTransaction,
   unvoidTransaction,
 } from '@/lib/installment-engine'
+import { ensureExpenseTaxonomyForUser } from '@/lib/expense-category-seeding'
+import {
+  getCanonicalExpenseCategoryName,
+  getCanonicalExpenseSubcategoryName,
+  getExpenseCategoryMappingByName,
+  isMasterExpenseCategory,
+  normalizeExpenseCategoryText,
+  sortCategoriesByExpenseTaxonomy,
+  sortSubcategoriesByExpenseTaxonomy,
+} from '@/lib/expense-categories'
 
 export const transactionsRouter = router({
   /**
@@ -243,16 +254,24 @@ export const transactionsRouter = router({
       }
 
       // Luego eliminar la transacción
-      return ctx.prisma.transaction.delete({
+      const deleted = await ctx.prisma.transaction.delete({
         where: { id: input },
       })
+
+      if (transaction.cardId) {
+        await recalculateBillingCycleTotals(transaction.cardId)
+      }
+
+      return deleted
     }),
 
   /**
    * Obtener categorías del usuario
    */
   getCategories: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.prisma.category.findMany({
+    await ensureExpenseTaxonomyForUser(ctx.prisma, ctx.user.id)
+
+    const categories = await ctx.prisma.category.findMany({
       where: {
         userId: ctx.user.id,
       },
@@ -265,6 +284,249 @@ export const transactionsRouter = router({
         name: 'asc',
       },
     })
+
+    return sortCategoriesByExpenseTaxonomy(categories).map((category) => ({
+      ...category,
+      subcategories: sortSubcategoriesByExpenseTaxonomy(
+        category.name,
+        category.subcategories
+      ),
+    }))
+  }),
+
+  /**
+   * Crear categoría de gasto
+   */
+  createCategory: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(80),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const rawName = input.name.trim()
+      if (!rawName) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Nombre de categoría inválido',
+        })
+      }
+
+      const name = getCanonicalExpenseCategoryName(rawName)
+      const normalizedName = normalizeExpenseCategoryText(name)
+
+      const existingCategories = await ctx.prisma.category.findMany({
+        where: { userId: ctx.user.id },
+        select: { id: true, name: true },
+      })
+
+      const existing = existingCategories.find(
+        (category) => normalizeExpenseCategoryText(category.name) === normalizedName
+      )
+      if (existing) return existing
+
+      return ctx.prisma.category.create({
+        data: {
+          userId: ctx.user.id,
+          name,
+        },
+      })
+    }),
+
+  /**
+   * Crear estructura base de categorías + subcategorías maestras
+   */
+  seedExpenseCategories: protectedProcedure.mutation(async ({ ctx }) => {
+    return ensureExpenseTaxonomyForUser(ctx.prisma, ctx.user.id)
+  }),
+
+  /**
+   * Normalizar categorías existentes hacia la estructura maestra
+   * - Migra categorías legacy conocidas a categoría/subcategoría destino
+   * - Transfiere límites de presupuesto
+   * - Elimina categorías legacy migradas
+   * - Limpia categorías no maestras sin uso
+   */
+  normalizeExpenseCategories: protectedProcedure.mutation(async ({ ctx }) => {
+    const taxonomySeed = await ensureExpenseTaxonomyForUser(ctx.prisma, ctx.user.id)
+
+    const categories = await ctx.prisma.category.findMany({
+      where: {
+        userId: ctx.user.id,
+      },
+      include: {
+        subcategories: true,
+        budgetLimits: true,
+        _count: {
+          select: {
+            transactions: true,
+            budgetLimits: true,
+          },
+        },
+      },
+    })
+
+    const categoriesByNormalizedName = new Map(
+      categories.map((category) => [
+        normalizeExpenseCategoryText(category.name),
+        category,
+      ])
+    )
+
+    const migratedCategoryIds = new Set<string>()
+    let migratedTransactions = 0
+    let transferredBudgetLimits = 0
+
+    for (const category of categories) {
+      if (isMasterExpenseCategory(category.name)) continue
+
+      const mappedByName = getExpenseCategoryMappingByName(category.name)
+      const mapping =
+        mappedByName ??
+        (category._count.transactions > 0 || category._count.budgetLimits > 0
+          ? {
+              category: 'Lujos',
+              subcategory: category.name.trim() || 'Gastos Generales',
+            }
+          : null)
+
+      if (!mapping) continue
+
+      const targetCategory = categoriesByNormalizedName.get(
+        normalizeExpenseCategoryText(mapping.category)
+      )
+
+      if (!targetCategory || targetCategory.id === category.id) continue
+
+      let targetSubcategoryId: string | null = null
+      if (mapping.subcategory) {
+        const canonicalSubcategoryName = getCanonicalExpenseSubcategoryName(
+          targetCategory.name,
+          mapping.subcategory
+        )
+        let subcategory = targetCategory.subcategories.find(
+          (sub) =>
+            normalizeExpenseCategoryText(sub.name) ===
+            normalizeExpenseCategoryText(canonicalSubcategoryName)
+        )
+
+        if (!subcategory) {
+          subcategory = await ctx.prisma.subCategory.create({
+            data: {
+              categoryId: targetCategory.id,
+              name: canonicalSubcategoryName,
+            },
+          })
+          targetCategory.subcategories.push(subcategory)
+        }
+
+        targetSubcategoryId = subcategory.id
+      }
+
+      const txUpdate = await ctx.prisma.transaction.updateMany({
+        where: {
+          userId: ctx.user.id,
+          categoryId: category.id,
+        },
+        data: {
+          categoryId: targetCategory.id,
+          subcategoryId: targetSubcategoryId,
+        },
+      })
+
+      migratedTransactions += txUpdate.count
+      migratedCategoryIds.add(category.id)
+
+      for (const oldLimit of category.budgetLimits) {
+        const existingTargetLimit = await ctx.prisma.budgetLimit.findUnique({
+          where: {
+            userId_categoryId: {
+              userId: ctx.user.id,
+              categoryId: targetCategory.id,
+            },
+          },
+        })
+
+        const mergedMonthlyLimit =
+          Number(oldLimit.monthlyLimit) + Number(existingTargetLimit?.monthlyLimit || 0)
+
+        if (existingTargetLimit) {
+          await ctx.prisma.budgetLimit.update({
+            where: { id: existingTargetLimit.id },
+            data: { monthlyLimit: mergedMonthlyLimit },
+          })
+        } else {
+          await ctx.prisma.budgetLimit.create({
+            data: {
+              userId: ctx.user.id,
+              categoryId: targetCategory.id,
+              monthlyLimit: Number(oldLimit.monthlyLimit),
+            },
+          })
+        }
+
+        await ctx.prisma.budgetLimit.delete({
+          where: { id: oldLimit.id },
+        })
+
+        transferredBudgetLimits += 1
+      }
+    }
+
+    let removedCategories = 0
+
+    if (migratedCategoryIds.size > 0) {
+      const deletedMigrated = await ctx.prisma.category.deleteMany({
+        where: {
+          userId: ctx.user.id,
+          id: {
+            in: Array.from(migratedCategoryIds),
+          },
+        },
+      })
+      removedCategories += deletedMigrated.count
+    }
+
+    const remainingCategories = await ctx.prisma.category.findMany({
+      where: {
+        userId: ctx.user.id,
+      },
+      include: {
+        _count: {
+          select: {
+            transactions: true,
+            budgetLimits: true,
+          },
+        },
+      },
+    })
+
+    const unusedNonMasterIds = remainingCategories
+      .filter(
+        (category) =>
+          !isMasterExpenseCategory(category.name) &&
+          category._count.transactions === 0 &&
+          category._count.budgetLimits === 0
+      )
+      .map((category) => category.id)
+
+    if (unusedNonMasterIds.length > 0) {
+      const deletedUnused = await ctx.prisma.category.deleteMany({
+        where: {
+          userId: ctx.user.id,
+          id: { in: unusedNonMasterIds },
+        },
+      })
+      removedCategories += deletedUnused.count
+    }
+
+    return {
+      ...taxonomySeed,
+      migratedCategories: migratedCategoryIds.size,
+      migratedTransactions,
+      transferredBudgetLimits,
+      removedCategories,
+    }
   }),
 
   /**
@@ -353,6 +615,11 @@ export const transactionsRouter = router({
           id: input.installmentId,
           transaction: { userId: ctx.user.id },
         },
+        include: {
+          transaction: {
+            select: { cardId: true },
+          },
+        },
       })
 
       if (!installment) {
@@ -362,10 +629,16 @@ export const transactionsRouter = router({
         })
       }
 
-      return ctx.prisma.installment.update({
+      const updated = await ctx.prisma.installment.update({
         where: { id: input.installmentId },
         data: { isPaid: true, paidAt: new Date() },
       })
+
+      if (installment.transaction.cardId) {
+        await recalculateBillingCycleTotals(installment.transaction.cardId)
+      }
+
+      return updated
     }),
 
   /**
@@ -379,6 +652,11 @@ export const transactionsRouter = router({
           id: input.installmentId,
           transaction: { userId: ctx.user.id },
         },
+        include: {
+          transaction: {
+            select: { cardId: true },
+          },
+        },
       })
 
       if (!installment) {
@@ -388,10 +666,16 @@ export const transactionsRouter = router({
         })
       }
 
-      return ctx.prisma.installment.update({
+      const updated = await ctx.prisma.installment.update({
         where: { id: input.installmentId },
         data: { isPaid: false, paidAt: null },
       })
+
+      if (installment.transaction.cardId) {
+        await recalculateBillingCycleTotals(installment.transaction.cardId)
+      }
+
+      return updated
     }),
 
   /**
@@ -500,10 +784,31 @@ export const transactionsRouter = router({
         })
       }
 
+      const rawName = input.name.trim()
+      if (!rawName) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Nombre de subcategoría inválido',
+        })
+      }
+
+      const name = getCanonicalExpenseSubcategoryName(category.name, rawName)
+      const normalizedName = normalizeExpenseCategoryText(name)
+
+      const existingSubcategories = await ctx.prisma.subCategory.findMany({
+        where: { categoryId: input.categoryId },
+        select: { id: true, name: true },
+      })
+
+      const existing = existingSubcategories.find(
+        (subcategory) => normalizeExpenseCategoryText(subcategory.name) === normalizedName
+      )
+      if (existing) return existing
+
       return ctx.prisma.subCategory.create({
         data: {
           categoryId: input.categoryId,
-          name: input.name,
+          name,
         },
       })
     }),
@@ -561,21 +866,31 @@ export const transactionsRouter = router({
         })
       }
 
-      const existing = await ctx.prisma.subCategory.findUnique({
-        where: {
-          categoryId_name: {
-            categoryId: input.categoryId,
-            name: input.name,
-          },
-        },
+      const rawName = input.name.trim()
+      if (!rawName) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Nombre de subcategoría inválido',
+        })
+      }
+
+      const name = getCanonicalExpenseSubcategoryName(category.name, rawName)
+      const normalizedName = normalizeExpenseCategoryText(name)
+
+      const existingSubcategories = await ctx.prisma.subCategory.findMany({
+        where: { categoryId: input.categoryId },
+        select: { id: true, name: true },
       })
 
+      const existing = existingSubcategories.find(
+        (subcategory) => normalizeExpenseCategoryText(subcategory.name) === normalizedName
+      )
       if (existing) return existing
 
       return ctx.prisma.subCategory.create({
         data: {
           categoryId: input.categoryId,
-          name: input.name,
+          name,
         },
       })
     }),

@@ -13,7 +13,16 @@ import { useToast } from '@/hooks/use-toast'
 import { Switch } from '@/components/ui/switch'
 import { ToastAction } from '@/components/ui/toast'
 import { useRouter } from 'next/navigation'
-import { Plus, CreditCard, Banknote, ArrowRightLeft, Users, Check } from 'lucide-react'
+import {
+  Plus,
+  CreditCard,
+  Banknote,
+  ArrowRightLeft,
+  Users,
+  Check,
+  Sparkles,
+  RefreshCcw,
+} from 'lucide-react'
 import { formatDateToInput, parseInputDate, formatCurrency, cn } from '@/lib/utils'
 
 type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'transfer'
@@ -72,6 +81,7 @@ export function TransactionForm({
   const router = useRouter()
 
   const [formData, setFormData] = useState<TransactionFormData>(initialFormData)
+  const [newCategoryName, setNewCategoryName] = useState('')
   const [newSubcategoryName, setNewSubcategoryName] = useState('')
 
   const { data: cards } = trpc.cards.list.useQuery()
@@ -80,19 +90,96 @@ export function TransactionForm({
   const selectedCategory = categories?.find((c) => c.id === formData.categoryId)
   const subcategories = selectedCategory?.subcategories ?? []
 
-  const createSubcategoryMutation = trpc.transactions.createSubcategory.useMutation({
+  const createCategoryMutation = trpc.transactions.createCategory.useMutation({
     onSuccess: (created) => {
-      setFormData({ ...formData, subcategoryId: created.id })
-      setNewSubcategoryName('')
+      setFormData((prev) => ({
+        ...prev,
+        categoryId: created.id,
+        subcategoryId: '',
+      }))
+      setNewCategoryName('')
       utils.transactions.getCategories.invalidate()
+      utils.budget.listCategories.invalidate()
+      toast({
+        title: 'Categoria creada',
+        description: `Se agrego "${created.name}"`,
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
     },
   })
+
+  const createSubcategoryMutation = trpc.transactions.createSubcategory.useMutation({
+    onSuccess: (created) => {
+      setFormData((prev) => ({ ...prev, subcategoryId: created.id }))
+      setNewSubcategoryName('')
+      utils.transactions.getCategories.invalidate()
+      toast({
+        title: 'Subcategoria creada',
+        description: `Se agrego "${created.name}"`,
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const seedExpenseCategoriesMutation =
+    trpc.transactions.seedExpenseCategories.useMutation({
+      onSuccess: (result) => {
+        utils.transactions.getCategories.invalidate()
+        utils.budget.listCategories.invalidate()
+        toast({
+          title: 'Categorias base sincronizadas',
+          description: `${result.totalCategories} categorias y ${result.totalSubcategories} subcategorias disponibles`,
+        })
+      },
+      onError: (error) => {
+        toast({
+          title: 'Error',
+          description: error.message,
+          variant: 'destructive',
+        })
+      },
+    })
+
+  const normalizeExpenseCategoriesMutation =
+    trpc.transactions.normalizeExpenseCategories.useMutation({
+      onSuccess: (result) => {
+        utils.transactions.getCategories.invalidate()
+        utils.transactions.list.invalidate()
+        utils.budget.listCategories.invalidate()
+        utils.budget.getProgress.invalidate()
+        toast({
+          title: 'Categorias normalizadas',
+          description: `Migradas: ${result.migratedCategories} categorias, ${result.migratedTransactions} transacciones`,
+        })
+      },
+      onError: (error) => {
+        toast({
+          title: 'Error',
+          description: error.message,
+          variant: 'destructive',
+        })
+      },
+    })
 
   const createMutation = trpc.transactions.create.useMutation({
     onSuccess: () => {
       const wasForThirdParty = formData.isForThirdParty
       setOpen(false)
       setFormData(initialFormData)
+      setNewCategoryName('')
+      setNewSubcategoryName('')
       utils.dashboard.getMonthlyBalance.invalidate()
       utils.transactions.list.invalidate()
       utils.dashboard.getCardBalances.invalidate()
@@ -137,7 +224,7 @@ export function TransactionForm({
       return
     }
 
-    if ((formData.paymentMethod === 'credit_card' || formData.paymentMethod === 'debit_card') && !formData.cardId) {
+    if (formData.paymentMethod === 'credit_card' && !formData.cardId) {
       toast({
         title: 'Error',
         description: 'Seleccioná una tarjeta',
@@ -151,7 +238,7 @@ export function TransactionForm({
       totalAmount: amount,
       purchaseDate: parseInputDate(formData.purchaseDate),
       paymentMethod: formData.paymentMethod,
-      cardId: (formData.paymentMethod === 'credit_card' || formData.paymentMethod === 'debit_card') ? formData.cardId : undefined,
+      cardId: formData.paymentMethod === 'credit_card' ? formData.cardId : undefined,
       installments: formData.paymentMethod === 'credit_card' ? parseInt(formData.installments) : 1,
       categoryId: formData.categoryId || undefined,
       subcategoryId: formData.subcategoryId || undefined,
@@ -161,7 +248,7 @@ export function TransactionForm({
     })
   }
 
-  const isCardPayment = formData.paymentMethod === 'credit_card' || formData.paymentMethod === 'debit_card'
+  const isCardPayment = formData.paymentMethod === 'credit_card'
   const isCreditCard = formData.paymentMethod === 'credit_card'
   const monthlyInstallment = isCreditCard && formData.totalAmount && formData.installments
     ? parseFloat(formData.totalAmount.replace(',', '.')) / parseInt(formData.installments || '1')
@@ -353,10 +440,39 @@ export function TransactionForm({
 
           {/* Categoría */}
           <div className="space-y-2">
-            <Label htmlFor="category">Categoría</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="category">Categoría</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => seedExpenseCategoriesMutation.mutate()}
+                  disabled={seedExpenseCategoriesMutation.isPending}
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-1" />
+                  Base
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => normalizeExpenseCategoriesMutation.mutate()}
+                  disabled={normalizeExpenseCategoriesMutation.isPending || !categories?.length}
+                >
+                  <RefreshCcw className="h-3.5 w-3.5 mr-1" />
+                  Normalizar
+                </Button>
+              </div>
+            </div>
+
             <Select
               value={formData.categoryId}
-              onValueChange={(value) => setFormData({ ...formData, categoryId: value, subcategoryId: '' })}
+              onValueChange={(value) =>
+                setFormData({ ...formData, categoryId: value, subcategoryId: '' })
+              }
             >
               <SelectTrigger id="category">
                 <SelectValue placeholder="Seleccionar categoría" />
@@ -369,6 +485,31 @@ export function TransactionForm({
                 ))}
               </SelectContent>
             </Select>
+
+            <div className="flex gap-2">
+              <Input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Nueva categoría..."
+                className="text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newCategoryName.trim()) {
+                    e.preventDefault()
+                    createCategoryMutation.mutate({ name: newCategoryName.trim() })
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                onClick={() => createCategoryMutation.mutate({ name: newCategoryName.trim() })}
+              >
+                <Check className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Subcategoría */}

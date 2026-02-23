@@ -19,7 +19,7 @@ export const dashboardRouter = router({
     }),
 
   /**
-   * Proyección de flujo de caja
+   * Proyeccion de flujo de caja
    */
   getBalanceProjection: protectedProcedure
     .input(
@@ -44,8 +44,6 @@ export const dashboardRouter = router({
     const now = new Date()
     const startDate = startOfMonth(now)
     const endDate = endOfMonth(now)
-
-    // Obtener transacciones y cuotas en paralelo
     const period = formatPeriod(now) // "2025-01"
 
     const [transactions, installments] = await Promise.all([
@@ -80,7 +78,7 @@ export const dashboardRouter = router({
             },
           },
         },
-      })
+      }),
     ])
 
     const totalSpent = transactions.reduce(
@@ -104,7 +102,7 @@ export const dashboardRouter = router({
 
     const byCategory = installments.reduce(
       (acc, inst) => {
-        const catName = inst.transaction.category?.name || 'Sin categoría'
+        const catName = inst.transaction.category?.name || 'Sin categoria'
         acc[catName] = (acc[catName] || 0) + Number(inst.amount)
         return acc
       },
@@ -114,7 +112,7 @@ export const dashboardRouter = router({
     const bySubcategory = installments.reduce(
       (acc, inst) => {
         if (inst.transaction.subcategory) {
-          const catName = inst.transaction.category?.name || 'Sin categoría'
+          const catName = inst.transaction.category?.name || 'Sin categoria'
           const key = `${catName} > ${inst.transaction.subcategory.name}`
           acc[key] = (acc[key] || 0) + Number(inst.amount)
         }
@@ -136,8 +134,7 @@ export const dashboardRouter = router({
   }),
 
   /**
-   * Deuda total - Calcula la suma REAL de todas las cuotas pendientes de todas las tarjetas
-   * Incluye: cuotas pendientes del período actual + cuotas futuras pendientes
+   * Deuda total: suma real de cuotas pendientes no anuladas.
    */
   getTotalDebt: protectedProcedure.query(async ({ ctx }) => {
     const cards = await ctx.prisma.creditCard.findMany({
@@ -154,6 +151,12 @@ export const dashboardRouter = router({
             installments: {
               where: {
                 isPaid: false,
+                transaction: {
+                  isVoided: false,
+                },
+              },
+              select: {
+                amount: true,
               },
             },
           },
@@ -164,10 +167,13 @@ export const dashboardRouter = router({
     const totalDebt = cards.reduce((sum, card) => {
       return (
         sum +
-        card.billingCycles.reduce(
-          (cycleSum, cycle) => cycleSum + Number(cycle.totalAmount || 0),
-          0
-        )
+        card.billingCycles.reduce((cycleSum, cycle) => {
+          const cyclePending = cycle.installments.reduce(
+            (installmentSum, installment) => installmentSum + Number(installment.amount),
+            0
+          )
+          return cycleSum + cyclePending
+        }, 0)
       )
     }, 0)
 
@@ -178,8 +184,7 @@ export const dashboardRouter = router({
   }),
 
   /**
-   * Balances por tarjeta - Devuelve el balance real de cada tarjeta (todas las cuotas pendientes)
-   * y el balance del período actual (solo cuotas de este mes)
+   * Balances por tarjeta.
    */
   getCardBalances: protectedProcedure
     .input(
@@ -200,33 +205,42 @@ export const dashboardRouter = router({
             where: {
               status: { in: ['open', 'closed'] },
             },
-            // Only select fields we need — no installments include
-            select: {
-              id: true,
-              period: true,
-              totalAmount: true,
-              dueDate: true,
-              status: true,
+            include: {
+              installments: {
+                where: {
+                  isPaid: false,
+                  transaction: {
+                    isVoided: false,
+                  },
+                },
+                select: {
+                  amount: true,
+                },
+              },
             },
           },
         },
       })
 
       const cardBalances = cards.map((card) => {
-        // Balance total: todas las cuotas pendientes (uses cached totalAmount)
+        const cyclePendingAmount = (cycle: (typeof card.billingCycles)[number]) =>
+          cycle.installments.reduce((sum, installment) => sum + Number(installment.amount), 0)
+
         const totalBalance = card.billingCycles.reduce(
-          (sum, cycle) => sum + Number(cycle.totalAmount || 0),
+          (sum, cycle) => sum + cyclePendingAmount(cycle),
           0
         )
 
-        // Balance del período actual: solo cuotas de este mes
         const currentPeriodBalance = card.billingCycles
           .filter((cycle) => cycle.period === currentPeriod)
-          .reduce((sum, cycle) => sum + Number(cycle.totalAmount || 0), 0)
+          .reduce((sum, cycle) => sum + cyclePendingAmount(cycle), 0)
 
-        // Próximo vencimiento
         const nextDueCycle = card.billingCycles
-          .filter((cycle) => cycle.status === 'open' || cycle.status === 'closed')
+          .filter(
+            (cycle) =>
+              (cycle.status === 'open' || cycle.status === 'closed') &&
+              cyclePendingAmount(cycle) > 0
+          )
           .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0]
 
         return {
@@ -241,15 +255,13 @@ export const dashboardRouter = router({
           totalBalance,
           currentPeriodBalance,
           nextDueDate: nextDueCycle?.dueDate || null,
-          nextDueAmount: nextDueCycle ? Number(nextDueCycle.totalAmount || 0) : 0,
+          nextDueAmount: nextDueCycle ? cyclePendingAmount(nextDueCycle) : 0,
           cycleCount: card.billingCycles.length,
         }
       })
 
-      // Calcular deuda total real (suma de todos los balances)
       const totalDebt = cardBalances.reduce((sum, card) => sum + card.totalBalance, 0)
 
-      // Get third-party amounts per card
       const thirdPartyByCard = await ctx.prisma.thirdPartyPurchase.groupBy({
         by: ['cardId'],
         where: {
@@ -276,7 +288,7 @@ export const dashboardRouter = router({
     }),
 
   /**
-   * Próximos vencimientos
+   * Proximos vencimientos.
    */
   getUpcomingPayments: protectedProcedure.query(async ({ ctx }) => {
     const now = new Date()
@@ -291,9 +303,28 @@ export const dashboardRouter = router({
           gte: now,
         },
         status: { in: ['open', 'closed'] },
+        installments: {
+          some: {
+            isPaid: false,
+            transaction: {
+              isVoided: false,
+            },
+          },
+        },
       },
       include: {
         card: true,
+        installments: {
+          where: {
+            isPaid: false,
+            transaction: {
+              isVoided: false,
+            },
+          },
+          select: {
+            amount: true,
+          },
+        },
       },
       orderBy: {
         dueDate: 'asc',
@@ -303,7 +334,7 @@ export const dashboardRouter = router({
 
     return cycles.map((cycle) => ({
       card: cycle.card,
-      amount: Number(cycle.totalAmount || 0),
+      amount: cycle.installments.reduce((sum, installment) => sum + Number(installment.amount), 0),
       dueDate: cycle.dueDate,
       period: cycle.period,
       daysUntil: Math.ceil(
@@ -313,7 +344,7 @@ export const dashboardRouter = router({
   }),
 
   /**
-   * Proyección de cashflow (próximos N meses)
+   * Proyeccion de cashflow (proximos N meses).
    */
   getCashflowProjection: protectedProcedure
     .input(
@@ -325,12 +356,10 @@ export const dashboardRouter = router({
       const months = input?.months || 6
       const now = new Date()
 
-      // Build all period strings upfront
       const periods = Array.from({ length: months }, (_, i) =>
         formatPeriod(addMonths(now, i))
       )
 
-      // Single query for all periods instead of N+1 loop
       const allInstallments = await ctx.prisma.installment.findMany({
         where: {
           billingCycle: {
@@ -355,7 +384,6 @@ export const dashboardRouter = router({
         },
       })
 
-      // Group by period in JS
       const byPeriod = new Map<string, typeof allInstallments>()
       for (const period of periods) {
         byPeriod.set(period, [])

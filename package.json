@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "npm run test:unit",
+    "test:unit": "npx tsc lib/financial-engine.ts lib/budget-utils.ts lib/payment-methods.ts lib/income-categories.ts tests/financial-engine.test.ts tests/budget-utils.test.ts tests/income-categories.test.ts --module commonjs --target ES2020 --esModuleInterop --skipLibCheck --outDir .financial-test-dist && node --test .financial-test-dist/tests/financial-engine.test.js .financial-test-dist/tests/budget-utils.test.js .financial-test-dist/tests/income-categories.test.js",
     "test:financial": "npx tsc lib/financial-engine.ts tests/financial-engine.test.ts --module commonjs --target ES2020 --esModuleInterop --skipLibCheck --outDir .financial-test-dist && node --test .financial-test-dist/tests/financial-engine.test.js",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",

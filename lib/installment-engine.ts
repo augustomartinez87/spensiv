@@ -285,12 +285,13 @@ export async function createTransactionWithInstallments(
 /**
  * Recalcular totales de billing cycles
  */
-async function recalculateBillingCycleTotals(cardId: string) {
+export async function recalculateBillingCycleTotals(cardId: string) {
   const cycles = await prisma.billingCycle.findMany({
     where: { cardId },
     include: {
       installments: {
         where: {
+          isPaid: false,
           transaction: {
             isVoided: false,
           },

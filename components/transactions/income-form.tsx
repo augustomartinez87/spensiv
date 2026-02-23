@@ -1,16 +1,32 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { trpc } from '@/lib/trpc-client'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/hooks/use-toast'
-import { Plus } from 'lucide-react'
+import { Plus, Check, Sparkles, RefreshCcw } from 'lucide-react'
 import { formatDateToInput, parseInputDate } from '@/lib/utils'
+import {
+  normalizeIncomeCategoryText,
+  sortIncomeCategoriesByTaxonomy,
+  sortIncomeSubcategoriesByTaxonomy,
+} from '@/lib/income-categories'
+
+type IncomeCategoryOption = {
+  name: string
+  subcategories: string[]
+}
 
 interface IncomeFormProps {
   variant?: 'default' | 'outline' | 'ghost'
@@ -19,161 +35,478 @@ interface IncomeFormProps {
   triggerText?: string
 }
 
-export function IncomeForm({ 
-  variant = 'outline', 
-  size = 'default',
-  className,
-  triggerText = 'Nuevo Ingreso'
-}: IncomeFormProps) {
-    const [open, setOpen] = useState(false)
-    const { toast } = useToast()
-    const utils = trpc.useUtils()
+type IncomeFormState = {
+  description: string
+  amount: string
+  date: string
+  category: string
+  subcategory: string
+  isRecurring: boolean
+}
 
-    const [formData, setFormData] = useState({
-        description: '',
-        amount: '',
-        date: formatDateToInput(new Date()),
-        category: 'active_income' as 'active_income' | 'other_income',
-        subcategory: '',
-        isRecurring: false,
-    })
+const initialFormData: IncomeFormState = {
+  description: '',
+  amount: '',
+  date: formatDateToInput(new Date()),
+  category: 'Ingresos Activos',
+  subcategory: '',
+  isRecurring: false,
+}
 
-    const createMutation = trpc.incomes.create.useMutation({
-        onSuccess: () => {
-            toast({
-                title: 'Ingreso registrado',
-                description: 'El ingreso se registró exitosamente',
-            })
-            setOpen(false)
-            setFormData({
-                description: '',
-                amount: '',
-                date: formatDateToInput(new Date()),
-                category: 'active_income',
-                subcategory: '',
-                isRecurring: false,
-            })
-            utils.dashboard.getMonthlyBalance.invalidate()
-            utils.incomes.list.invalidate()
-        },
-        onError: (error) => {
-            toast({
-                title: 'Error',
-                description: error.message,
-                variant: 'destructive',
-            })
-        },
-    })
+const EMPTY_SUBCATEGORY_VALUE = '__none__'
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
+function mergeIncomeCategories(
+  baseCategories: IncomeCategoryOption[],
+  extraCategories: IncomeCategoryOption[]
+): IncomeCategoryOption[] {
+  const categoryMap = new Map<string, { name: string; subcategories: Set<string> }>()
 
-        createMutation.mutate({
-            description: formData.description,
-            amount: parseFloat(formData.amount),
-            date: parseInputDate(formData.date),
-            category: formData.category,
-            subcategory: formData.subcategory || undefined,
-            isRecurring: formData.isRecurring,
-        })
+  const addCategory = (category: IncomeCategoryOption) => {
+    const key = normalizeIncomeCategoryText(category.name)
+    const current = categoryMap.get(key) ?? {
+      name: category.name,
+      subcategories: new Set<string>(),
     }
 
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button variant={variant} size={size} className={className}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {triggerText}
+    for (const subcategory of category.subcategories) {
+      if (subcategory.trim()) {
+        current.subcategories.add(subcategory.trim())
+      }
+    }
+
+    if (!current.name.trim()) {
+      current.name = category.name.trim()
+    }
+
+    categoryMap.set(key, current)
+  }
+
+  for (const category of baseCategories) addCategory(category)
+  for (const category of extraCategories) addCategory(category)
+
+  return sortIncomeCategoriesByTaxonomy(
+    Array.from(categoryMap.values()).map((entry) => ({
+      name: entry.name,
+      subcategories: sortIncomeSubcategoriesByTaxonomy(
+        entry.name,
+        Array.from(entry.subcategories).map((subcategory) => ({ name: subcategory }))
+      ).map((subcategory) => subcategory.name),
+    }))
+  )
+}
+
+export function IncomeForm({
+  variant = 'outline',
+  size = 'default',
+  className,
+  triggerText = 'Nuevo Ingreso',
+}: IncomeFormProps) {
+  const [open, setOpen] = useState(false)
+  const { toast } = useToast()
+  const utils = trpc.useUtils()
+
+  const [formData, setFormData] = useState<IncomeFormState>(initialFormData)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newSubcategoryName, setNewSubcategoryName] = useState('')
+  const [manualCategories, setManualCategories] = useState<IncomeCategoryOption[]>([])
+
+  const { data: serverCategories } = trpc.incomes.getCategories.useQuery()
+
+  const categories = useMemo(
+    () => mergeIncomeCategories(serverCategories ?? [], manualCategories),
+    [serverCategories, manualCategories]
+  )
+
+  const selectedCategory = categories.find(
+    (category) =>
+      normalizeIncomeCategoryText(category.name) ===
+      normalizeIncomeCategoryText(formData.category)
+  )
+  const subcategories = selectedCategory?.subcategories ?? []
+
+  const upsertManualCategory = (categoryName: string, subcategoryName?: string) => {
+    setManualCategories((prev) => {
+      const map = new Map(
+        prev.map((category) => [
+          normalizeIncomeCategoryText(category.name),
+          {
+            name: category.name,
+            subcategories: [...category.subcategories],
+          },
+        ])
+      )
+
+      const key = normalizeIncomeCategoryText(categoryName)
+      const current = map.get(key) ?? { name: categoryName, subcategories: [] }
+
+      if (
+        subcategoryName &&
+        !current.subcategories.some(
+          (subcategory) =>
+            normalizeIncomeCategoryText(subcategory) ===
+            normalizeIncomeCategoryText(subcategoryName)
+        )
+      ) {
+        current.subcategories.push(subcategoryName)
+      }
+
+      map.set(key, current)
+      return Array.from(map.values())
+    })
+  }
+
+  const createCategoryMutation = trpc.incomes.createCategory.useMutation({
+    onSuccess: (created) => {
+      upsertManualCategory(created.name)
+      setFormData((prev) => ({
+        ...prev,
+        category: created.name,
+        subcategory: '',
+      }))
+      setNewCategoryName('')
+      toast({
+        title: 'Categoria creada',
+        description: `Se agrego "${created.name}"`,
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const createSubcategoryMutation = trpc.incomes.createSubcategory.useMutation({
+    onSuccess: (created) => {
+      upsertManualCategory(created.category, created.name)
+      setFormData((prev) => ({ ...prev, category: created.category, subcategory: created.name }))
+      setNewSubcategoryName('')
+      toast({
+        title: 'Subcategoria creada',
+        description: `Se agrego "${created.name}"`,
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const seedMutation = trpc.incomes.seedDefaultCategories.useMutation({
+    onSuccess: (result) => {
+      utils.incomes.getCategories.invalidate()
+      toast({
+        title: 'Categorias base listas',
+        description: `${result.totalCategories} categorias y ${result.totalSubcategories} subcategorias`,
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const normalizeMutation = trpc.incomes.normalizeCategories.useMutation({
+    onSuccess: (result) => {
+      utils.incomes.getCategories.invalidate()
+      utils.incomes.list.invalidate()
+      utils.dashboard.getMonthlyBalance.invalidate()
+      toast({
+        title: 'Ingresos normalizados',
+        description: `Ajustados ${result.normalizedIncomes} ingresos`,
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const createMutation = trpc.incomes.create.useMutation({
+    onSuccess: () => {
+      toast({
+        title: 'Ingreso registrado',
+        description: 'El ingreso se registro exitosamente',
+      })
+      setOpen(false)
+      setFormData(initialFormData)
+      setNewCategoryName('')
+      setNewSubcategoryName('')
+      utils.dashboard.getMonthlyBalance.invalidate()
+      utils.incomes.list.invalidate()
+      utils.incomes.getCategories.invalidate()
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const amount = parseFloat(formData.amount.replace(',', '.'))
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: 'Error',
+        description: 'El monto debe ser mayor a 0',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!formData.category.trim()) {
+      toast({
+        title: 'Error',
+        description: 'La categoria es requerida',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    createMutation.mutate({
+      description: formData.description.trim(),
+      amount,
+      date: parseInputDate(formData.date),
+      category: formData.category,
+      subcategory: formData.subcategory.trim() || undefined,
+      isRecurring: formData.isRecurring,
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant={variant} size={size} className={className}>
+          <Plus className="h-4 w-4 mr-2" />
+          {triggerText}
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Registrar Ingreso</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="description">Descripcion</Label>
+            <Input
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Ej: Sueldo Enero"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Monto</Label>
+              <Input
+                id="amount"
+                type="text"
+                inputMode="decimal"
+                value={formData.amount}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    amount: e.target.value.replace(/[^0-9.,]/g, ''),
+                  })
+                }
+                placeholder="Ej: 50000"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="date">Fecha</Label>
+              <DatePicker
+                date={formData.date ? parseInputDate(formData.date) : undefined}
+                onSelect={(date) =>
+                  setFormData({
+                    ...formData,
+                    date: date ? formatDateToInput(date) : formatDateToInput(new Date()),
+                  })
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="category">Categoria</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => seedMutation.mutate()}
+                  disabled={seedMutation.isPending}
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-1" />
+                  Base
                 </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Registrar Ingreso</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Descripción</Label>
-                        <Input
-                            id="description"
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            placeholder="Ej: Sueldo Enero"
-                            required
-                        />
-                    </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => normalizeMutation.mutate()}
+                  disabled={normalizeMutation.isPending}
+                >
+                  <RefreshCcw className="h-3.5 w-3.5 mr-1" />
+                  Normalizar
+                </Button>
+              </div>
+            </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="amount">Monto</Label>
-                            <Input
-                                id="amount"
-                                type="number"
-                                step="0.01"
-                                value={formData.amount}
-                                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                placeholder="Ej: 50000"
-                                required
-                            />
-                        </div>
+            <Select
+              value={formData.category}
+              onValueChange={(value) =>
+                setFormData((prev) => ({ ...prev, category: value, subcategory: '' }))
+              }
+            >
+              <SelectTrigger id="category">
+                <SelectValue placeholder="Seleccionar categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category.name} value={category.name}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="date">Fecha</Label>
-                            <DatePicker
-                                date={formData.date ? parseInputDate(formData.date) : undefined}
-                                onSelect={(date) => setFormData({ ...formData, date: date ? formatDateToInput(date) : formatDateToInput(new Date()) })}
-                            />
-                        </div>
-                    </div>
+            <div className="flex gap-2">
+              <Input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Nueva categoria..."
+                className="text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newCategoryName.trim()) {
+                    e.preventDefault()
+                    createCategoryMutation.mutate({ name: newCategoryName.trim() })
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                onClick={() => createCategoryMutation.mutate({ name: newCategoryName.trim() })}
+              >
+                <Check className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="category">Categoría</Label>
-                        <Select
-                            value={formData.category}
-                            onValueChange={(value: any) => setFormData({ ...formData, category: value })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="active_income">Ingresos Activos</SelectItem>
-                                <SelectItem value="other_income">Otros Ingresos</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+          <div className="space-y-2">
+            <Label htmlFor="subcategory">Subcategoria (opcional)</Label>
+            {formData.category ? (
+              <>
+                <Select
+                  value={formData.subcategory || EMPTY_SUBCATEGORY_VALUE}
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      subcategory: value === EMPTY_SUBCATEGORY_VALUE ? '' : value,
+                    })
+                  }
+                >
+                  <SelectTrigger id="subcategory">
+                    <SelectValue placeholder="Seleccionar subcategoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={EMPTY_SUBCATEGORY_VALUE}>Sin subcategoria</SelectItem>
+                    {subcategories.map((subcategory) => (
+                      <SelectItem key={subcategory} value={subcategory}>
+                        {subcategory}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="subcategory">Subcategoría (opcional)</Label>
-                        <Input
-                            id="subcategory"
-                            value={formData.subcategory}
-                            onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
-                            placeholder="Ej: Sueldo, Freelance, etc."
-                        />
-                    </div>
+                <div className="flex gap-2">
+                  <Input
+                    value={newSubcategoryName}
+                    onChange={(e) => setNewSubcategoryName(e.target.value)}
+                    placeholder="Nueva subcategoria..."
+                    className="text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newSubcategoryName.trim()) {
+                        e.preventDefault()
+                        createSubcategoryMutation.mutate({
+                          category: formData.category,
+                          name: newSubcategoryName.trim(),
+                        })
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    disabled={!newSubcategoryName.trim() || createSubcategoryMutation.isPending}
+                    onClick={() =>
+                      createSubcategoryMutation.mutate({
+                        category: formData.category,
+                        name: newSubcategoryName.trim(),
+                      })
+                    }
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <Input disabled placeholder="Selecciona una categoria primero" />
+            )}
+          </div>
 
-                    <div className="flex items-center space-x-2">
-                        <input
-                            type="checkbox"
-                            id="isRecurring"
-                            checked={formData.isRecurring}
-                            onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
-                            className="rounded"
-                        />
-                        <Label htmlFor="isRecurring" className="cursor-pointer">
-                            Es recurrente (mensual)
-                        </Label>
-                    </div>
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="isRecurring"
+              checked={formData.isRecurring}
+              onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+              className="rounded"
+            />
+            <Label htmlFor="isRecurring" className="cursor-pointer">
+              Es recurrente (mensual)
+            </Label>
+          </div>
 
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                            Cancelar
-                        </Button>
-                        <Button type="submit" disabled={createMutation.isPending}>
-                            {createMutation.isPending ? 'Guardando...' : 'Guardar'}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    )
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
 }

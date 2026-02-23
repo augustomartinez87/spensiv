@@ -82,6 +82,9 @@ function getCategoryIcon(category: string) {
     'Transporte': Car,
     'Servicios': Wifi,
     'Ingresos': DollarSign,
+    'Ingresos Activos': DollarSign,
+    'Ingresos Pasivos': DollarSign,
+    'Otros Ingresos': DollarSign,
   }
   return map[category] || ShoppingBag
 }
@@ -529,9 +532,9 @@ function RecentMovements({
       id: `inc-${inc.id}`,
       date: new Date(inc.date),
       description: inc.description,
-      category: 'Ingresos',
+      category: inc.category || 'Ingresos',
       subcategory: inc.subcategory,
-      method: inc.category === 'active_income' ? 'Sueldo' : 'Otro',
+      method: inc.subcategory || inc.category || 'Ingreso',
       amount: Number(inc.amount),
       type: 'income' as const,
     })),

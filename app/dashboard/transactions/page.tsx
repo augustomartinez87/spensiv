@@ -21,6 +21,10 @@ import { Plus, ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard,
 import { formatCurrency } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import {
+  getIncomeCategoryMappingByName,
+  normalizeIncomeCategoryText,
+} from '@/lib/income-categories'
 
 type TabType = 'gastos' | 'ingresos'
 type SortOrder = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
@@ -65,6 +69,7 @@ export default function TransactionsPage() {
     cardId: filters.cardId || undefined,
   })
   const { data: incomes, isLoading: isLoadingIncomes } = trpc.incomes.list.useQuery()
+  const { data: incomeCategories } = trpc.incomes.getCategories.useQuery()
   const { data: categories } = trpc.transactions.getCategories.useQuery()
   const { data: cards } = trpc.cards.list.useQuery()
 
@@ -192,25 +197,23 @@ export default function TransactionsPage() {
   }
 
   const getIncomeCategoryLabel = (category: string) => {
-    switch (category) {
-      case 'active_income':
-        return 'Ingreso Activo'
-      case 'other_income':
-        return 'Otro Ingreso'
-      default:
-        return category
-    }
+    return getIncomeCategoryMappingByName(category)?.category || category
   }
 
   const getIncomeCategoryColor = (category: string) => {
-    switch (category) {
-      case 'active_income':
-        return 'bg-green-500/15 text-green-400'
-      case 'other_income':
-        return 'bg-blue-500/15 text-blue-400'
-      default:
-        return 'bg-secondary text-muted-foreground'
+    const normalized = normalizeIncomeCategoryText(getIncomeCategoryLabel(category))
+
+    if (normalized === normalizeIncomeCategoryText('Ingresos Activos')) {
+      return 'bg-green-500/15 text-green-400'
     }
+    if (normalized === normalizeIncomeCategoryText('Ingresos Pasivos')) {
+      return 'bg-emerald-500/15 text-emerald-400'
+    }
+    if (normalized === normalizeIncomeCategoryText('Otros Ingresos')) {
+      return 'bg-blue-500/15 text-blue-400'
+    }
+
+    return 'bg-secondary text-muted-foreground'
   }
 
   if (isLoadingTransactions || isLoadingIncomes) {
@@ -266,6 +269,12 @@ export default function TransactionsPage() {
         return 0
     }
   })
+
+  const normalizedEditCategory = normalizeIncomeCategoryText(editIncomeFormData.category || '')
+  const editIncomeCategoryOption = (incomeCategories ?? []).find(
+    (category) => normalizeIncomeCategoryText(category.name) === normalizedEditCategory
+  )
+  const editIncomeSubcategoryOptions = editIncomeCategoryOption?.subcategories ?? []
 
   const displayedTransactions = sortedTransactions?.slice(0, visibleCount)
   const remainingCount = (sortedTransactions?.length || 0) - visibleCount
@@ -825,7 +834,7 @@ export default function TransactionsPage() {
                                   setEditingIncome(income)
                                   setEditIncomeFormData({
                                     description: income.description,
-                                    category: income.category,
+                                    category: getIncomeCategoryLabel(income.category),
                                     subcategory: income.subcategory || '',
                                     isRecurring: income.isRecurring,
                                     notes: income.notes || '',
@@ -903,7 +912,7 @@ export default function TransactionsPage() {
                             setEditingIncome(income)
                             setEditIncomeFormData({
                               description: income.description,
-                              category: income.category,
+                              category: getIncomeCategoryLabel(income.category),
                               subcategory: income.subcategory || '',
                               isRecurring: income.isRecurring,
                               notes: income.notes || '',
@@ -1100,15 +1109,18 @@ export default function TransactionsPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="edit-inc-category">Categoría</Label>
-              <select
+              <Input
                 id="edit-inc-category"
                 value={editIncomeFormData.category}
                 onChange={(e) => setEditIncomeFormData({ ...editIncomeFormData, category: e.target.value })}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="active_income">Ingreso Activo</option>
-                <option value="other_income">Otro Ingreso</option>
-              </select>
+                placeholder="Ej: Ingresos Activos"
+                list="edit-income-category-options"
+              />
+              <datalist id="edit-income-category-options">
+                {(incomeCategories ?? []).map((category) => (
+                  <option key={category.name} value={category.name} />
+                ))}
+              </datalist>
             </div>
 
             <div className="grid gap-2">
@@ -1118,7 +1130,13 @@ export default function TransactionsPage() {
                 value={editIncomeFormData.subcategory}
                 onChange={(e) => setEditIncomeFormData({ ...editIncomeFormData, subcategory: e.target.value })}
                 placeholder="Ej: Sueldo, Freelance..."
+                list="edit-income-subcategory-options"
               />
+              <datalist id="edit-income-subcategory-options">
+                {editIncomeSubcategoryOptions.map((subcategory) => (
+                  <option key={subcategory} value={subcategory} />
+                ))}
+              </datalist>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -1151,11 +1169,16 @@ export default function TransactionsPage() {
             <Button
               onClick={() => {
                 if (editingIncome) {
+                  const description = editIncomeFormData.description.trim()
+                  const category = editIncomeFormData.category.trim()
+
+                  if (!description || !category) return
+
                   incomeUpdateMutation.mutate({
                     id: editingIncome.id,
-                    description: editIncomeFormData.description,
-                    category: (editIncomeFormData.category as any),
-                    subcategory: editIncomeFormData.subcategory || undefined,
+                    description,
+                    category,
+                    subcategory: editIncomeFormData.subcategory.trim() || null,
                     isRecurring: editIncomeFormData.isRecurring,
                     notes: editIncomeFormData.notes || undefined,
                   })

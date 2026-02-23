@@ -5,6 +5,7 @@
 
 # testing
 /coverage
+/.financial-test-dist
 
 # next.js
 /.next/

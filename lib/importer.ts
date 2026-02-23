@@ -1,3 +1,9 @@
+import {
+  getCanonicalIncomeCategoryName,
+  getCanonicalIncomeSubcategoryName,
+  getIncomeCategoryMappingByName,
+} from './income-categories'
+
 /**
  * Parser para el formato de Excel de Augusto
  * Formato esperado (pestaña Movimientos):
@@ -108,17 +114,20 @@ export function parseIncomesPaste(text: string) {
         const date = new Date(year, month - 1, day).toISOString()
 
         // Mapear categoría a valores del schema
-        let incomeCategory = 'other_income'
-        const catLower = category.toLowerCase()
-        if (catLower.includes('sueldo') || catLower.includes('salario') || catLower.includes('activo')) {
-            incomeCategory = 'active_income'
-        }
+        const categoryMapping = getIncomeCategoryMappingByName(category)
+        const incomeCategory =
+            categoryMapping?.category || getCanonicalIncomeCategoryName(category || 'Otros Ingresos')
+        const incomeSubcategory =
+            getCanonicalIncomeSubcategoryName(
+                incomeCategory,
+                subcategory || categoryMapping?.subcategory || ''
+            ) || undefined
 
         results.push({
             date,
             description,
             category: incomeCategory,
-            subcategory,
+            subcategory: incomeSubcategory,
             amount,
             impactMonth,
         })

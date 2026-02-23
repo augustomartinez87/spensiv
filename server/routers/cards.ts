@@ -173,11 +173,19 @@ export const cardsRouter = router({
       }
 
       const totalDebt = card.billingCycles.reduce((sum, cycle) => {
-        return sum + Number(cycle.totalAmount || 0)
+        const cyclePendingAmount = cycle.installments.reduce(
+          (cycleSum, installment) => cycleSum + Number(installment.amount),
+          0
+        )
+        return sum + cyclePendingAmount
       }, 0)
 
       const nextPayment = card.billingCycles
-        .filter((c) => c.status === 'closed' || c.status === 'open')
+        .filter(
+          (c) =>
+            (c.status === 'closed' || c.status === 'open') &&
+            c.installments.length > 0
+        )
         .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0]
 
       return {
@@ -185,7 +193,10 @@ export const cardsRouter = router({
         totalDebt,
         nextPayment: nextPayment
           ? {
-            amount: Number(nextPayment.totalAmount || 0),
+            amount: nextPayment.installments.reduce(
+              (sum, installment) => sum + Number(installment.amount),
+              0
+            ),
             dueDate: nextPayment.dueDate,
           }
           : null,
@@ -210,12 +221,18 @@ export const cardsRouter = router({
               where: {
                 status: { in: ['open', 'closed'] },
               },
-              select: {
-                id: true,
-                period: true,
-                totalAmount: true,
-                dueDate: true,
-                status: true,
+              include: {
+                installments: {
+                  where: {
+                    isPaid: false,
+                    transaction: {
+                      isVoided: false,
+                    },
+                  },
+                  select: {
+                    amount: true,
+                  },
+                },
               },
             },
           },
@@ -240,19 +257,26 @@ export const cardsRouter = router({
         })
       }
 
+      const cyclePendingAmount = (cycle: (typeof card.billingCycles)[number]) =>
+        cycle.installments.reduce((sum, installment) => sum + Number(installment.amount), 0)
+
       // Calcular deuda total
       const totalBalance = card.billingCycles.reduce((sum, cycle) => {
-        return sum + Number(cycle.totalAmount || 0)
+        return sum + cyclePendingAmount(cycle)
       }, 0)
 
       // Calcular deuda del período actual
       const currentPeriodBalance = card.billingCycles
         .filter((cycle) => cycle.period === currentPeriod)
-        .reduce((sum, cycle) => sum + Number(cycle.totalAmount || 0), 0)
+        .reduce((sum, cycle) => sum + cyclePendingAmount(cycle), 0)
 
       // Próximo vencimiento
       const nextDueCycle = card.billingCycles
-        .filter((c) => c.status === 'open' || c.status === 'closed')
+        .filter(
+          (c) =>
+            (c.status === 'open' || c.status === 'closed') &&
+            cyclePendingAmount(c) > 0
+        )
         .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0]
 
       // Calcular porcentaje del límite usado
@@ -265,7 +289,7 @@ export const cardsRouter = router({
         totalBalance,
         currentPeriodBalance,
         nextDueDate: nextDueCycle?.dueDate || null,
-        nextDueAmount: nextDueCycle ? Number(nextDueCycle.totalAmount || 0) : 0,
+        nextDueAmount: nextDueCycle ? cyclePendingAmount(nextDueCycle) : 0,
         limitPercentage,
         recentTransactions,
       }
