@@ -717,6 +717,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   const [assignPersonOpen, setAssignPersonOpen] = useState(false)
   const [assignPersonId, setAssignPersonId] = useState('')
   const { data: allPersons } = trpc.persons.list.useQuery()
+  const { toast } = useToast()
 
   const deleteMutation = trpc.loans.delete.useMutation({
     onSuccess: () => {
@@ -1548,6 +1549,7 @@ function RefinanceDialog({ loan, onBack }: { loan: any; onBack: () => void }) {
 
 function CopyCollectionMessage({ loan }: { loan: any }) {
   const [open, setOpen] = useState(false)
+  const [message, setMessage] = useState('')
   const { toast } = useToast()
   const cur = loan.currency
 
@@ -1565,7 +1567,10 @@ function CopyCollectionMessage({ loan }: { loan: any }) {
 
   const defaultMessage = `Hola ${nombre}! Te recuerdo que el ${fecha} vence tu cuota #${nextInstallment.number} por ${monto} (de un total de ${total} cuotas). Saldo pendiente: ${saldo}. Cualquier consulta avisame. 🙌`
 
-  const [message, setMessage] = useState(defaultMessage)
+  // Initialize message if empty
+  if (message === '' && defaultMessage !== '') {
+    setMessage(defaultMessage)
+  }
 
   // Reset message when dialog opens
   function handleOpenChange(v: boolean) {

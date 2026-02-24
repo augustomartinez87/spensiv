@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc-client'
 import { formatCurrency, formatDateToInput, cn } from '@/lib/utils'
@@ -880,19 +880,29 @@ function ShareableSimulationView({
   const [imageGenerated, setImageGenerated] = useState(false)
   const shareRef = useRef<HTMLDivElement>(null)
 
+  const maxTermIndex = results.length > 0
+    ? results.reduce((maxI, r, i, arr) => r.termMonths > arr[maxI].termMonths ? i : maxI, 0)
+    : 0
+
+  const [selectedIndex, setSelectedIndex] = useState<number>(0)
+
+  // Update selected index when results change
+  useEffect(() => {
+    if (results.length > 0) {
+      setSelectedIndex(results.reduce((maxI, r, i, arr) => r.termMonths > arr[maxI].termMonths ? i : maxI, 0))
+    }
+  }, [results])
+
   if (results.length === 0) return null
 
   const capital = results[0].capital
-  const maxTermIndex = results.reduce((maxI, r, i, arr) =>
-    r.termMonths > arr[maxI].termMonths ? i : maxI, 0
-  )
-  const [selectedIndex, setSelectedIndex] = useState<number>(maxTermIndex)
   const selectedResult = results[selectedIndex] ?? null
   const lowestInstallment = results[maxTermIndex]
 
   // No-decimal currency formatter for clean display
-  const fmtClean = (amount: number) =>
+  const fmtClean = useCallback((amount: number) =>
     new Intl.NumberFormat('es-AR', { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
+    , [currency])
 
   // ─── Clipboard copy ────────────────────────────────────────────────
   const handleCopyText = useCallback(async () => {
