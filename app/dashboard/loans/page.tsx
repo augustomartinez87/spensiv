@@ -412,170 +412,170 @@ function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => vo
         </div>
       )}
 
-    <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-      {otherLoans.map((loan) => {
-        const now = new Date()
-        const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
-        const isOverdue = nextDue && nextDue < now
-        const isInterestOnly = loan.loanType === 'interest_only'
-        const isZeroRate = Number(loan.monthlyRate) === 0
-        const progress = !isInterestOnly && loan.totalCount > 0 ? (loan.paidCount / loan.totalCount) * 100 : 0
-        const cur = loan.currency
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+        {otherLoans.map((loan) => {
+          const now = new Date()
+          const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
+          const isOverdue = nextDue && nextDue < now
+          const isInterestOnly = loan.loanType === 'interest_only'
+          const isZeroRate = Number(loan.monthlyRate) === 0
+          const progress = !isInterestOnly && loan.totalCount > 0 ? (loan.paidCount / loan.totalCount) * 100 : 0
+          const cur = loan.currency
 
-        // Parse title/subtitle from borrowerName
-        let cardTitle: string
-        let cardSubtitle: string | null = null
-        if (loan.person) {
-          cardTitle = loan.person.name || loan.person.alias || loan.borrowerName
-          // Remove person name from borrowerName to get subtitle
-          const parts = loan.borrowerName.split(' - ')
-          if (parts.length > 1) {
-            const personName = loan.person.name || loan.person.alias || ''
-            cardSubtitle = parts.filter(p => p.trim() !== personName.trim()).join(' - ') || null
+          // Parse title/subtitle from borrowerName
+          let cardTitle: string
+          let cardSubtitle: string | null = null
+          if (loan.person) {
+            cardTitle = loan.person.name || loan.person.alias || loan.borrowerName
+            // Remove person name from borrowerName to get subtitle
+            const parts = loan.borrowerName.split(' - ')
+            if (parts.length > 1) {
+              const personName = loan.person.name || loan.person.alias || ''
+              cardSubtitle = parts.filter(p => p.trim() !== personName.trim()).join(' - ') || null
+            }
+          } else {
+            const parts = loan.borrowerName.split(' - ')
+            cardTitle = parts[0]
+            cardSubtitle = parts.length > 1 ? parts.slice(1).join(' - ') : null
           }
-        } else {
-          const parts = loan.borrowerName.split(' - ')
-          cardTitle = parts[0]
-          cardSubtitle = parts.length > 1 ? parts.slice(1).join(' - ') : null
-        }
 
-        // Collect chips
-        const chips: { label: string; variant?: 'destructive' | 'outline' }[] = []
-        if (isInterestOnly) {
-          chips.push({ label: isZeroRate ? 'Sin intereses' : 'Solo interés', variant: 'outline' })
-        }
-        if (cur !== 'ARS') {
-          chips.push({ label: cur, variant: 'outline' })
-        }
-        if (Number(loan.tna) > 1.5) {
-          chips.push({ label: 'TNA >150%', variant: 'destructive' })
-        }
-        if (loan.person) {
-          const scoreResult = calculatePersonScore(loan.person)
-          if (scoreResult.score < 4) {
-            chips.push({ label: 'Alto riesgo', variant: 'destructive' })
+          // Collect chips
+          const chips: { label: string; variant?: 'destructive' | 'outline' }[] = []
+          if (isInterestOnly) {
+            chips.push({ label: isZeroRate ? 'Sin intereses' : 'Solo interés', variant: 'outline' })
           }
-        }
+          if (cur !== 'ARS') {
+            chips.push({ label: cur, variant: 'outline' })
+          }
+          if (Number(loan.tna) > 1.5) {
+            chips.push({ label: 'TNA >150%', variant: 'destructive' })
+          }
+          if (loan.person) {
+            const scoreResult = calculatePersonScore(loan.person)
+            if (scoreResult.score < 4) {
+              chips.push({ label: 'Alto riesgo', variant: 'destructive' })
+            }
+          }
 
-        return (
-          <Card
-            key={loan.id}
-            className="cursor-pointer hover:border-primary/50 transition-all duration-200"
-            onClick={() => onSelect(loan.id)}
-          >
-            <CardContent className="p-5 space-y-3">
-              {/* NIVEL 1 — Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="font-bold text-lg text-foreground truncate">{cardTitle}</h3>
-                  {cardSubtitle && (
-                    <p className="text-sm text-muted-foreground truncate">{cardSubtitle}</p>
+          return (
+            <Card
+              key={loan.id}
+              className="cursor-pointer hover:border-primary/50 transition-all duration-200"
+              onClick={() => onSelect(loan.id)}
+            >
+              <CardContent className="p-5 space-y-3">
+                {/* NIVEL 1 — Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-lg text-foreground truncate">{cardTitle}</h3>
+                    {cardSubtitle && (
+                      <p className="text-sm text-muted-foreground truncate">{cardSubtitle}</p>
+                    )}
+                  </div>
+                  <Badge
+                    variant={
+                      loan.status === 'active' ? 'default' :
+                        loan.status === 'completed' ? 'secondary' :
+                          loan.status === 'refinanced' ? 'secondary' : 'destructive'
+                    }
+                    className="shrink-0"
+                  >
+                    {loan.status === 'active' ? 'Activo' :
+                      loan.status === 'completed' ? 'Completado' :
+                        loan.status === 'refinanced' ? 'Refinanciado' : 'Moroso'}
+                  </Badge>
+                </div>
+
+                {/* NIVEL 2 — Info + Chips */}
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    {formatCurrency(Number(loan.capital), cur)}
+                    {' · '}
+                    {isInterestOnly
+                      ? isZeroRate ? 'Sin plazo fijo' : 'Solo interés'
+                      : `${loan.termMonths} meses`
+                    }
+                  </p>
+                  {chips.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {chips.map((chip) => (
+                        <Badge key={chip.label} variant={chip.variant || 'outline'} className="text-[10px] px-1.5 py-0">
+                          {chip.label}
+                        </Badge>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <Badge
-                  variant={
-                    loan.status === 'active' ? 'default' :
-                    loan.status === 'completed' ? 'secondary' :
-                    loan.status === 'refinanced' ? 'secondary' : 'destructive'
-                  }
-                  className="shrink-0"
-                >
-                  {loan.status === 'active' ? 'Activo' :
-                   loan.status === 'completed' ? 'Completado' :
-                   loan.status === 'refinanced' ? 'Refinanciado' : 'Moroso'}
-                </Badge>
-              </div>
 
-              {/* NIVEL 2 — Info + Chips */}
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  {formatCurrency(Number(loan.capital), cur)}
-                  {' · '}
-                  {isInterestOnly
-                    ? isZeroRate ? 'Sin plazo fijo' : 'Solo interés'
-                    : `${loan.termMonths} meses`
-                  }
-                </p>
-                {chips.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {chips.map((chip) => (
-                      <Badge key={chip.label} variant={chip.variant || 'outline'} className="text-[10px] px-1.5 py-0">
-                        {chip.label}
-                      </Badge>
-                    ))}
+                {/* NIVEL 3 — Footer */}
+                {/* Progress bar - only for amortized */}
+                {!isInterestOnly && (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Cuotas pagadas</span>
+                      <span className="font-medium text-foreground">{loan.paidCount}/{loan.totalCount}</span>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
                   </div>
                 )}
-              </div>
 
-              {/* NIVEL 3 — Footer */}
-              {/* Progress bar - only for amortized */}
-              {!isInterestOnly && (
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Cuotas pagadas</span>
-                    <span className="font-medium text-foreground">{loan.paidCount}/{loan.totalCount}</span>
+                {/* Next due for amortized */}
+                {nextDue && loan.status === 'active' && !isInterestOnly && (
+                  <div className={cn(
+                    "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
+                    isOverdue
+                      ? "bg-red-500/10 text-red-400"
+                      : "bg-muted text-muted-foreground"
+                  )}>
+                    {isOverdue ? (
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <Clock className="h-4 w-4 shrink-0" />
+                    )}
+                    <span className="text-xs">
+                      {isOverdue ? 'Vencida: ' : 'Próxima: '}
+                      {format(nextDue, "d 'de' MMM", { locale: es })} · {formatCurrency(loan.nextAmount, cur)}
+                    </span>
                   </div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${progress}%` }}
-                    />
+                )}
+
+                {/* Interest-only info */}
+                {isInterestOnly && loan.status === 'active' && (
+                  <div className={cn(
+                    "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
+                    isZeroRate
+                      ? "bg-green-500/10 text-green-400"
+                      : "bg-blue-500/10 text-blue-400"
+                  )}>
+                    <Infinity className="h-4 w-4 shrink-0" />
+                    <span className="text-xs">
+                      {isZeroRate
+                        ? `Capital: ${formatCurrency(Number(loan.capital), cur)}`
+                        : `Interés mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                      }
+                    </span>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Next due for amortized */}
-              {nextDue && loan.status === 'active' && !isInterestOnly && (
-                <div className={cn(
-                  "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
-                  isOverdue
-                    ? "bg-red-500/10 text-red-400"
-                    : "bg-muted text-muted-foreground"
-                )}>
-                  {isOverdue ? (
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                  ) : (
-                    <Clock className="h-4 w-4 shrink-0" />
-                  )}
-                  <span className="text-xs">
-                    {isOverdue ? 'Vencida: ' : 'Próxima: '}
-                    {format(nextDue, "d 'de' MMM", { locale: es })} · {formatCurrency(loan.nextAmount, cur)}
-                  </span>
-                </div>
-              )}
-
-              {/* Interest-only info */}
-              {isInterestOnly && loan.status === 'active' && (
-                <div className={cn(
-                  "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
-                  isZeroRate
-                    ? "bg-green-500/10 text-green-400"
-                    : "bg-blue-500/10 text-blue-400"
-                )}>
-                  <Infinity className="h-4 w-4 shrink-0" />
-                  <span className="text-xs">
-                    {isZeroRate
-                      ? `Capital: ${formatCurrency(Number(loan.capital), cur)}`
-                      : `Interés mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                <div className="flex justify-between text-xs text-muted-foreground border-t border-border/50 pt-2">
+                  <span>
+                    {isInterestOnly
+                      ? isZeroRate ? 'Sin intereses' : `${(Number(loan.monthlyRate) * 100).toFixed(1)}% mensual`
+                      : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
                     }
                   </span>
+                  <span>{isZeroRate ? 'TNA: 0%' : `TNA: ${(Number(loan.tna) * 100).toFixed(1)}%`}</span>
                 </div>
-              )}
-
-              <div className="flex justify-between text-xs text-muted-foreground border-t border-border/50 pt-2">
-                <span>
-                  {isInterestOnly
-                    ? isZeroRate ? 'Sin intereses' : `${(Number(loan.monthlyRate) * 100).toFixed(1)}% mensual`
-                    : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
-                  }
-                </span>
-                <span>{isZeroRate ? 'TNA: 0%' : `TNA: ${(Number(loan.tna) * 100).toFixed(1)}%`}</span>
-              </div>
-            </CardContent>
-          </Card>
-        )
-      })}
-    </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -783,6 +783,14 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
     },
   })
 
+  const recalculateMutation = trpc.loans.recalculate.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.getMonthlyAccruals.invalidate({ loanId })
+      toast({ title: 'Recálculo completado' })
+    },
+  })
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -980,6 +988,47 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         )}
       </div>
 
+      {/* Accounting Summary (Phase 1) */}
+      {(loan.irrRealAnnual || loan.irrContractualAnnual || loan.principalOutstanding > 0) && (
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+          <Card className="bg-muted/30">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Capital Progresivo</p>
+              <p className="text-xl font-bold text-foreground mt-1">
+                {formatCurrency(Number(loan.principalOutstanding || loan.capital), cur)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="bg-muted/30">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Mora Acumulada</p>
+              <p className={cn("text-xl font-bold mt-1", Number(loan.overdueInterestOutstanding) > 0 ? "text-red-400" : "text-foreground")}>
+                {formatCurrency(Number(loan.overdueInterestOutstanding || 0), cur)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="bg-muted/30">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">TIR Real (XIRR)</p>
+                {loan.irrStatus === 'no_convergence' && <AlertCircle className="h-3 w-3 text-amber-500" title="Sin convergencia" />}
+              </div>
+              <p className="text-xl font-bold text-foreground mt-1">
+                {loan.irrRealAnnual ? `${(Number(loan.irrRealAnnual) * 100).toFixed(2)}%` : 'N/D'}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="bg-muted/30">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Slippage</p>
+              <p className={cn("text-xl font-bold mt-1", (loan.irrSlippageBps || 0) < 0 ? "text-red-400" : (loan.irrSlippageBps || 0) > 0 ? "text-green-400" : "text-foreground")}>
+                {loan.irrSlippageBps ? `${loan.irrSlippageBps} bps` : '0 bps'}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Refinance banner for refinanced loans */}
       {loan.status === 'refinanced' && loan.refinancedByLoanId && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted text-sm">
@@ -1012,7 +1061,18 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
       {loan.status === 'active' && unpaidCount > 0 && (
         <div className="flex flex-wrap gap-2">
           <CopyCollectionMessage loan={loan} />
+          <RegisterPaymentDialog loanId={loanId} cur={cur} />
           <RefinanceDialog loan={loan} onBack={onBack} />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => recalculateMutation.mutate({ loanId })}
+            disabled={recalculateMutation.isPending}
+            className="text-muted-foreground"
+          >
+            <RefreshCw className={cn("h-4 w-4 mr-2", recalculateMutation.isPending && "animate-spin")} />
+            Recalcular
+          </Button>
         </div>
       )}
 
@@ -1053,134 +1113,273 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
       )}
 
       {/* Installments table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Cuotas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Desktop table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-xs text-muted-foreground uppercase tracking-wider">
-                  <th className="text-left py-2 px-3 font-medium">#</th>
-                  <th className="text-left py-2 px-3 font-medium">Vencimiento</th>
-                  <th className="text-right py-2 px-3 font-medium">Cuota</th>
-                  <th className="text-right py-2 px-3 font-medium">Interés</th>
-                  <th className="text-right py-2 px-3 font-medium">Capital</th>
-                  <th className="text-right py-2 px-3 font-medium">Saldo</th>
-                  <th className="text-center py-2 px-3 font-medium">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
+      <Tabs defaultValue="installments" className="w-full">
+        <TabsList>
+          <TabsTrigger value="installments">Cuotas</TabsTrigger>
+          <TabsTrigger value="accounting">Contabilidad</TabsTrigger>
+        </TabsList>
+        <TabsContent value="installments" className="mt-4">
+          <Card>
+            <CardContent className="pt-6">
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-xs text-muted-foreground uppercase tracking-wider">
+                      <th className="text-left py-2 px-3 font-medium">#</th>
+                      <th className="text-left py-2 px-3 font-medium">Vencimiento</th>
+                      <th className="text-right py-2 px-3 font-medium">Cuota</th>
+                      <th className="text-right py-2 px-3 font-medium">Interés</th>
+                      <th className="text-right py-2 px-3 font-medium">Capital</th>
+                      <th className="text-right py-2 px-3 font-medium">Saldo</th>
+                      <th className="text-center py-2 px-3 font-medium">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loan.loanInstallments.map((inst) => {
+                      const dueDate = new Date(inst.dueDate)
+                      const isOverdue = !inst.isPaid && dueDate < now
+                      const isUpcoming = !inst.isPaid && !isOverdue &&
+                        dueDate.getTime() - now.getTime() < 7 * 24 * 60 * 60 * 1000
+
+                      return (
+                        <tr
+                          key={inst.id}
+                          className={cn(
+                            "border-b border-border/50 hover:bg-muted/50 transition-colors",
+                            inst.isPaid && "opacity-60"
+                          )}
+                        >
+                          <td className="py-2.5 px-3 font-medium">{inst.number}</td>
+                          <td className={cn(
+                            "py-2.5 px-3",
+                            isOverdue && "text-red-400 font-medium",
+                            isUpcoming && "text-amber-400"
+                          )}>
+                            {format(dueDate, "d MMM yyyy", { locale: es })}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">{formatCurrency(Number(inst.amount), cur)}</td>
+                          <td className="py-2.5 px-3 text-right text-accent-blue">{formatCurrency(Number(inst.interest), cur)}</td>
+                          <td className="py-2.5 px-3 text-right">{formatCurrency(Number(inst.principal), cur)}</td>
+                          <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(Number(inst.balance), cur)}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            {inst.isPaid ? (
+                              <button
+                                onClick={() => unmarkPaid.mutate({ installmentId: inst.id })}
+                                className="inline-flex items-center gap-1.5 text-accent-positive hover:opacity-70 transition-opacity"
+                                title="Desmarcar como cobrada"
+                              >
+                                <CheckCircle2 className="h-5 w-5" />
+                                <span className="text-xs">Cobrada</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => markPaid.mutate({ installmentId: inst.id })}
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 hover:text-green-400 transition-colors",
+                                  isOverdue ? "text-red-500" : "text-muted-foreground"
+                                )}
+                                title="Marcar como cobrada"
+                              >
+                                <Circle className="h-5 w-5" />
+                                <span className="text-xs">{isOverdue ? 'Vencida' : 'Pendiente'}</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile list */}
+              <div className="md:hidden divide-y divide-border">
                 {loan.loanInstallments.map((inst) => {
                   const dueDate = new Date(inst.dueDate)
                   const isOverdue = !inst.isPaid && dueDate < now
-                  const isUpcoming = !inst.isPaid && !isOverdue &&
-                    dueDate.getTime() - now.getTime() < 7 * 24 * 60 * 60 * 1000
 
                   return (
-                    <tr
-                      key={inst.id}
-                      className={cn(
-                        "border-b border-border/50 hover:bg-muted/50 transition-colors",
-                        inst.isPaid && "opacity-60"
-                      )}
-                    >
-                      <td className="py-2.5 px-3 font-medium">{inst.number}</td>
-                      <td className={cn(
-                        "py-2.5 px-3",
-                        isOverdue && "text-red-400 font-medium",
-                        isUpcoming && "text-amber-400"
-                      )}>
-                        {format(dueDate, "d MMM yyyy", { locale: es })}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">{formatCurrency(Number(inst.amount), cur)}</td>
-                      <td className="py-2.5 px-3 text-right text-accent-blue">{formatCurrency(Number(inst.interest), cur)}</td>
-                      <td className="py-2.5 px-3 text-right">{formatCurrency(Number(inst.principal), cur)}</td>
-                      <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(Number(inst.balance), cur)}</td>
-                      <td className="py-2.5 px-3 text-center">
-                        {inst.isPaid ? (
-                          <button
-                            onClick={() => unmarkPaid.mutate({ installmentId: inst.id })}
-                            className="inline-flex items-center gap-1.5 text-accent-positive hover:opacity-70 transition-opacity"
-                            title="Desmarcar como cobrada"
-                          >
-                            <CheckCircle2 className="h-5 w-5" />
-                            <span className="text-xs">Cobrada</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => markPaid.mutate({ installmentId: inst.id })}
-                            className={cn(
-                              "inline-flex items-center gap-1.5 hover:text-green-400 transition-colors",
-                              isOverdue ? "text-red-500" : "text-muted-foreground"
-                            )}
-                            title="Marcar como cobrada"
-                          >
-                            <Circle className="h-5 w-5" />
-                            <span className="text-xs">{isOverdue ? 'Vencida' : 'Pendiente'}</span>
-                          </button>
+                    <div key={inst.id} className={cn("py-3 flex items-center gap-3", inst.isPaid && "opacity-60")}>
+                      <button
+                        onClick={() => inst.isPaid
+                          ? unmarkPaid.mutate({ installmentId: inst.id })
+                          : markPaid.mutate({ installmentId: inst.id })
+                        }
+                        className={cn(
+                          "shrink-0",
+                          inst.isPaid
+                            ? "text-accent-positive"
+                            : isOverdue
+                              ? "text-red-500"
+                              : "text-muted-foreground"
                         )}
-                      </td>
-                    </tr>
+                      >
+                        {inst.isPaid ? (
+                          <CheckCircle2 className="h-6 w-6" />
+                        ) : (
+                          <Circle className="h-6 w-6" />
+                        )}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between">
+                          <p className="text-sm font-medium">Cuota {inst.number}</p>
+                          <p className="text-sm font-bold">{formatCurrency(Number(inst.amount), cur)}</p>
+                        </div>
+                        <p className={cn(
+                          "text-xs mt-0.5",
+                          isOverdue ? "text-red-500 font-medium" : "text-muted-foreground"
+                        )}>
+                          {format(dueDate, "d 'de' MMMM yyyy", { locale: es })}
+                          {inst.isPaid && inst.paidAt && ` - Cobrada ${format(new Date(inst.paidAt), "d MMM", { locale: es })}`}
+                        </p>
+                      </div>
+                    </div>
                   )
                 })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile list */}
-          <div className="md:hidden divide-y divide-border">
-            {loan.loanInstallments.map((inst) => {
-              const dueDate = new Date(inst.dueDate)
-              const isOverdue = !inst.isPaid && dueDate < now
-
-              return (
-                <div key={inst.id} className={cn("py-3 flex items-center gap-3", inst.isPaid && "opacity-60")}>
-                  <button
-                    onClick={() => inst.isPaid
-                      ? unmarkPaid.mutate({ installmentId: inst.id })
-                      : markPaid.mutate({ installmentId: inst.id })
-                    }
-                    className={cn(
-                      "shrink-0",
-                      inst.isPaid
-                        ? "text-accent-positive"
-                        : isOverdue
-                          ? "text-red-500"
-                          : "text-muted-foreground"
-                    )}
-                  >
-                    {inst.isPaid ? (
-                      <CheckCircle2 className="h-6 w-6" />
-                    ) : (
-                      <Circle className="h-6 w-6" />
-                    )}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between">
-                      <p className="text-sm font-medium">Cuota {inst.number}</p>
-                      <p className="text-sm font-bold">{formatCurrency(Number(inst.amount), cur)}</p>
-                    </div>
-                    <p className={cn(
-                      "text-xs mt-0.5",
-                      isOverdue ? "text-red-500 font-medium" : "text-muted-foreground"
-                    )}>
-                      {format(dueDate, "d 'de' MMMM yyyy", { locale: es })}
-                      {inst.isPaid && inst.paidAt && ` - Cobrada ${format(new Date(inst.paidAt), "d MMM", { locale: es })}`}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="accounting" className="mt-4">
+          <MonthlyAccrualsTable loanId={loanId} cur={cur} />
+        </TabsContent>
+      </Tabs>
 
       {/* Activity Timeline */}
       <LoanActivityTimeline loanId={loanId} logs={loan.activityLogs || []} />
     </div>
+  )
+}
+
+// ─── Register Payment Dialog ────────────────────────────────────────
+
+function RegisterPaymentDialog({ loanId, cur }: { loanId: string; cur: string }) {
+  const utils = trpc.useUtils()
+  const [open, setOpen] = useState(false)
+  const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(formatDateToInput(new Date()))
+  const [note, setNote] = useState('')
+
+  const registerMutation = trpc.loans.registerPayment.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.getMonthlyAccruals.invalidate({ loanId })
+      setOpen(false)
+      setAmount('')
+    },
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm">
+          <Banknote className="h-4 w-4 mr-2" />
+          Registrar Cobro
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Registrar Cobro Real</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Monto cobrado ({cur})</Label>
+            <Input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Fecha del cobro (valor)</Label>
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Nota</Label>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Ej: Transferencia, Efectivo..."
+            />
+          </div>
+          <Button
+            className="w-full"
+            disabled={!amount || parseFloat(amount) <= 0 || registerMutation.isPending}
+            onClick={() => registerMutation.mutate({
+              loanId,
+              amount: parseFloat(amount),
+              paymentDate: date,
+              note: note || undefined,
+            })}
+          >
+            {registerMutation.isPending ? 'Registrando...' : 'Confirmar Cobro'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Monthly Accruals Table ─────────────────────────────────────────
+
+function MonthlyAccrualsTable({ loanId, cur }: { loanId: string; cur: string }) {
+  const { data: accruals, isLoading } = trpc.loans.getMonthlyAccruals.useQuery({ loanId })
+
+  if (isLoading) return <Skeleton className="h-40" />
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b text-muted-foreground uppercase tracking-wider">
+                <th className="text-left py-2 px-3 font-medium">Periodo</th>
+                <th className="text-right py-2 px-3 font-medium">Principal Inicial</th>
+                <th className="text-right py-2 px-3 font-medium">Int. Esperado</th>
+                <th className="text-right py-2 px-3 font-medium">Int. Cobrado</th>
+                <th className="text-right py-2 px-3 font-medium">Desvío</th>
+                <th className="text-right py-2 px-3 font-medium">Principal Cobrado</th>
+                <th className="text-right py-2 px-3 font-medium">Mora Cierre</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accruals?.map((a) => (
+                <tr key={a.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                  <td className="py-2.5 px-3 font-medium capitalize">
+                    {format(new Date(a.year, a.month - 1), 'MMM yyyy', { locale: es })}
+                  </td>
+                  <td className="py-2.5 px-3 text-right">{formatCurrency(Number(a.openingPrincipal), cur)}</td>
+                  <td className="py-2.5 px-3 text-right text-accent-blue">{formatCurrency(Number(a.interestExpected), cur)}</td>
+                  <td className="py-2.5 px-3 text-right text-accent-positive">{formatCurrency(Number(a.interestCollectedCurrent), cur)}</td>
+                  <td className={cn("py-2.5 px-3 text-right", Number(a.deviationAmount) < 0 ? "text-red-400" : "text-foreground")}>
+                    {formatCurrency(Number(a.deviationAmount), cur)}
+                  </td>
+                  <td className="py-2.5 px-3 text-right">{formatCurrency(Number(a.principalCollected), cur)}</td>
+                  <td className={cn("py-2.5 px-3 text-right font-medium", Number(a.overdueInterestClosing) > 0 ? "text-red-400" : "text-foreground")}>
+                    {formatCurrency(Number(a.overdueInterestClosing), cur)}
+                  </td>
+                </tr>
+              ))}
+              {!accruals?.length && (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-muted-foreground italic">
+                    Sin datos de contabilidad registrados. Realizá un cobro o recalculá.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

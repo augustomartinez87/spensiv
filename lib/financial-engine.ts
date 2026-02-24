@@ -45,6 +45,11 @@ export interface BuildFrenchLoanResult {
   irrTnaNominal: number
 }
 
+export interface DatedCashflow {
+  date: Date
+  amount: number
+}
+
 const DEFAULT_EPSILON = 1e-8
 const SAFETY_MARGIN = 1e-5
 const IRR_NUMERIC_TOLERANCE = 1e-10
@@ -404,6 +409,163 @@ export function calculateIRRRobust(
   throw new Error('IRR did not converge within maxIterations')
 }
 
+export function calculateXirrAnnualRobust(
+  cashFlows: DatedCashflow[],
+  tolerance = 1e-12,
+  maxIterations = 500,
+): number {
+  if (!Array.isArray(cashFlows) || cashFlows.length < 2) {
+    throw new Error('XIRR requires at least two cash flows')
+  }
+
+  const normalized = cashFlows
+    .map((flow) => ({
+      date: normalizeDate(flow.date),
+      amount: flow.amount,
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+
+  if (!normalized.every((flow) => Number.isFinite(flow.amount))) {
+    throw new Error('XIRR cash flows must be finite numbers')
+  }
+
+  const hasPositive = normalized.some((flow) => flow.amount > 0)
+  const hasNegative = normalized.some((flow) => flow.amount < 0)
+  if (!hasPositive || !hasNegative) {
+    throw new Error('XIRR requires at least one positive and one negative cash flow')
+  }
+
+  const origin = normalized[0].date
+  const yearFractions = normalized.map((flow) => daysBetweenUtc(origin, flow.date) / 365)
+
+  const xnpv = (rate: number): number => {
+    let sum = 0
+    for (let i = 0; i < normalized.length; i++) {
+      const yf = yearFractions[i]
+      const denom = Math.pow(1 + rate, yf)
+      sum += normalized[i].amount / denom
+    }
+    return sum
+  }
+
+  const xnpvDerivative = (rate: number): number => {
+    let sum = 0
+    for (let i = 0; i < normalized.length; i++) {
+      const yf = yearFractions[i]
+      if (yf === 0) continue
+      const denom = Math.pow(1 + rate, yf + 1)
+      sum += (-yf * normalized[i].amount) / denom
+    }
+    return sum
+  }
+
+  let guess = 0.1
+  for (let i = 0; i < maxIterations; i++) {
+    const f = xnpv(guess)
+    if (!Number.isFinite(f)) break
+    if (Math.abs(f) <= tolerance) {
+      validateFiniteRate(guess)
+      return guess
+    }
+
+    const d = xnpvDerivative(guess)
+    if (!Number.isFinite(d) || Math.abs(d) < 1e-18) break
+
+    const next = guess - f / d
+    if (!Number.isFinite(next) || next <= -0.999999999999 || next > 1e12) break
+
+    if (Math.abs(next - guess) <= tolerance) {
+      validateFiniteRate(next)
+      return next
+    }
+
+    guess = next
+  }
+
+  const lowerCandidates = [-0.9999, -0.9, -0.5, -0.25, -0.1, 0]
+  let lower = lowerCandidates[0]
+  let fLower = xnpv(lower)
+  for (const candidate of lowerCandidates) {
+    const value = xnpv(candidate)
+    if (Number.isFinite(value)) {
+      lower = candidate
+      fLower = value
+      break
+    }
+  }
+  if (!Number.isFinite(fLower)) {
+    throw new Error('XIRR bracketing failed: lower bound is not finite')
+  }
+
+  let upper = 1
+  let fUpper = xnpv(upper)
+  let expansions = 0
+  while (fLower * fUpper > 0 && expansions < 80) {
+    upper *= 2
+    fUpper = xnpv(upper)
+    expansions++
+    if (!Number.isFinite(fUpper) || upper > 1e12) {
+      break
+    }
+  }
+
+  if (!Number.isFinite(fUpper) || fLower * fUpper > 0) {
+    throw new Error('XIRR bracketing failed')
+  }
+
+  let left = lower
+  let right = upper
+  let fLeft = fLower
+  let fRight = fUpper
+  const maxBisectionIterations = Math.max(maxIterations, 200)
+
+  for (let i = 0; i < maxBisectionIterations; i++) {
+    const mid = (left + right) / 2
+    const fMid = xnpv(mid)
+    if (!Number.isFinite(fMid)) {
+      throw new Error('XIRR produced non-finite value during bisection')
+    }
+
+    if (Math.abs(fMid) <= tolerance || Math.abs(right - left) <= tolerance) {
+      validateFiniteRate(mid)
+      return mid
+    }
+
+    if (fLeft * fMid <= 0) {
+      right = mid
+      fRight = fMid
+    } else {
+      left = mid
+      fLeft = fMid
+    }
+
+    if (i % 8 === 7) {
+      const denom = fRight - fLeft
+      if (Math.abs(denom) > 1e-18) {
+        const secant = right - (fRight * (right - left)) / denom
+        if (secant > left && secant < right) {
+          const fSecant = xnpv(secant)
+          if (Number.isFinite(fSecant)) {
+            if (Math.abs(fSecant) <= tolerance) {
+              validateFiniteRate(secant)
+              return secant
+            }
+            if (fLeft * fSecant <= 0) {
+              right = secant
+              fRight = fSecant
+            } else {
+              left = secant
+              fLeft = fSecant
+            }
+          }
+        }
+      }
+    }
+  }
+
+  throw new Error('XIRR did not converge within maxIterations')
+}
+
 export function addMonthsEOM(date: Date, monthsToAdd: number): Date {
   if (!Number.isInteger(monthsToAdd) || monthsToAdd < 0) {
     throw new Error('monthsToAdd must be an integer >= 0')
@@ -500,4 +662,17 @@ function validateFiniteRate(rate: number): void {
   if (rate <= -1) {
     throw new Error('IRR produced invalid rate <= -100%')
   }
+}
+
+function normalizeDate(date: Date): Date {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    throw new Error('XIRR cash flow date must be a valid Date')
+  }
+  return date
+}
+
+function daysBetweenUtc(start: Date, end: Date): number {
+  const startUtc = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())
+  const endUtc = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate())
+  return (endUtc - startUtc) / (24 * 60 * 60 * 1000)
 }

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { addMonthsEOM, buildFrenchLoanWithMinimumTna } from '../lib/financial-engine'
+import { addMonthsEOM, buildFrenchLoanWithMinimumTna, calculateXirrAnnualRobust } from '../lib/financial-engine'
 
 const EPS = 1e-8
 
@@ -114,4 +114,13 @@ test('fixed-term regression: 6/9/12 months must not collapse to same flow', () =
   const totals = results.map((r) => r.schedule.totalPaid)
   assert.ok(totals[0] < totals[1], `Expected total(6) < total(9), got ${totals[0]} vs ${totals[1]}`)
   assert.ok(totals[1] < totals[2], `Expected total(9) < total(12), got ${totals[1]} vs ${totals[2]}`)
+})
+
+test('XIRR annual simple convergent case', () => {
+  const xirr = calculateXirrAnnualRobust([
+    { date: new Date('2026-01-01T00:00:00Z'), amount: -1000 },
+    { date: new Date('2027-01-01T00:00:00Z'), amount: 1100 },
+  ])
+
+  assert.ok(Math.abs(xirr - 0.1) < 1e-8, `Expected XIRR near 0.1, got ${xirr}`)
 })

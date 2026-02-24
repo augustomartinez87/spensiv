@@ -38,17 +38,17 @@ model User {
 }
 
 model UserPreferences {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  currency       String  @default("ARS")
-  timezone       String  @default("America/Argentina/Buenos_Aires")
-  dashboardView  String  @default("simple") // "simple" | "advanced"
-  
-  notifyEmail    Boolean @default(true)
-  notifyPush     Boolean @default(false)
-  
+  currency      String @default("ARS")
+  timezone      String @default("America/Argentina/Buenos_Aires")
+  dashboardView String @default("simple") // "simple" | "advanced"
+
+  notifyEmail Boolean @default(true)
+  notifyPush  Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -60,22 +60,22 @@ model UserPreferences {
 // ============================================================================
 
 model CreditCard {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name          String   // "CIUDAD Visa", "BBVA Mastercard"
-  bank          String   // "CIUDAD", "BBVA", "GALICIA"
-  brand         String   // "visa", "mastercard", "amex"
-  last4         String?  // Últimos 4 dígitos
-  
-  closingDay    Int      // Día de cierre por defecto (1-31)
-  dueDay        Int      // Día de vencimiento por defecto (1-31)
-  
-  creditLimit   Decimal? @db.Decimal(12, 2)
-  color         String?  // Para UI (hex color)
-  holderType    String   @default("additional") // "primary" | "additional"
-  isActive      Boolean  @default(true)
+  name  String // "CIUDAD Visa", "BBVA Mastercard"
+  bank  String // "CIUDAD", "BBVA", "GALICIA"
+  brand String // "visa", "mastercard", "amex"
+  last4 String? // Últimos 4 dígitos
+
+  closingDay Int // Día de cierre por defecto (1-31)
+  dueDay     Int // Día de vencimiento por defecto (1-31)
+
+  creditLimit Decimal? @db.Decimal(12, 2)
+  color       String? // Para UI (hex color)
+  holderType  String   @default("additional") // "primary" | "additional"
+  isActive    Boolean  @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -91,19 +91,19 @@ model CreditCard {
 }
 
 model CardClosingSchedule {
-  id          String   @id @default(cuid())
-  cardId      String
-  card        CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  
-  year        Int      // 2025, 2026, etc.
-  month       Int      // 1-12
-  
-  closingDay  Int      // Día específico de cierre (1-31)
-  dueDay      Int      // Día específico de vencimiento (1-31)
-  
+  id     String     @id @default(cuid())
+  cardId String
+  card   CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  year  Int // 2025, 2026, etc.
+  month Int // 1-12
+
+  closingDay Int // Día específico de cierre (1-31)
+  dueDay     Int // Día específico de vencimiento (1-31)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@unique([cardId, year, month])
   @@index([cardId])
   @@index([cardId, year])
@@ -111,17 +111,17 @@ model CardClosingSchedule {
 }
 
 model BillingCycle {
-  id        String   @id @default(cuid())
-  cardId    String
-  card      CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  id     String     @id @default(cuid())
+  cardId String
+  card   CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
-  period        String   // "2025-01", "2025-02" (YYYY-MM)
-  closeDate     DateTime // Fecha real de cierre
-  dueDate       DateTime // Fecha real de vencimiento
-  
-  totalAmount   Decimal? @db.Decimal(12, 2) // Cache: suma de installments
-  paidAmount    Decimal  @default(0) @db.Decimal(12, 2)
-  status        String   @default("open") // "open" | "closed" | "paid"
+  period    String // "2025-01", "2025-02" (YYYY-MM)
+  closeDate DateTime // Fecha real de cierre
+  dueDate   DateTime // Fecha real de vencimiento
+
+  totalAmount Decimal? @db.Decimal(12, 2) // Cache: suma de installments
+  paidAmount  Decimal  @default(0) @db.Decimal(12, 2)
+  status      String   @default("open") // "open" | "closed" | "paid"
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -142,41 +142,41 @@ model BillingCycle {
 // ============================================================================
 
 model Transaction {
-  id        String   @id // ID personalizado del Excel
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id // ID personalizado del Excel
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Metodo de pago: credit_card, cash, transfer
-  paymentMethod String   @default("credit_card")
+  paymentMethod String @default("credit_card")
 
   // Solo requerido si paymentMethod = "credit_card"
-  cardId    String?
-  card      CreditCard? @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId String?
+  card   CreditCard? @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
-  description   String
-  totalAmount   Decimal    @db.Decimal(12, 2)
-  purchaseDate  DateTime
+  description  String
+  totalAmount  Decimal  @db.Decimal(12, 2)
+  purchaseDate DateTime
 
-  installments  Int        @default(1) // Cantidad de cuotas (solo aplica a tarjeta)
+  installments Int @default(1) // Cantidad de cuotas (solo aplica a tarjeta)
 
-  categoryId    String?
-  category      Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   subcategoryId String?
   subcategory   SubCategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
 
   // Tipo de gasto customizado (tu clasificación única)
-  expenseType   String?    // "structural" | "emotional_recurrent" | "emotional_impulsive"
+  expenseType String? // "structural" | "emotional_recurrent" | "emotional_impulsive"
 
   // Compras para terceros
-  isForThirdParty Boolean  @default(false)
+  isForThirdParty Boolean @default(false)
   thirdPartyId    String?
 
-  notes         String?
+  notes String?
 
   // Sistema de anulación
-  isVoided      Boolean    @default(false)
-  voidedAt      DateTime?
+  isVoided Boolean   @default(false)
+  voidedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -193,20 +193,20 @@ model Transaction {
 }
 
 model Installment {
-  id              String   @id @default(cuid())
-  transactionId   String
-  transaction     Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  
-  billingCycleId  String
-  billingCycle    BillingCycle @relation(fields: [billingCycleId], references: [id], onDelete: Cascade)
-  
-  installmentNumber Int      // 1, 2, 3, ..., N
-  amount          Decimal    @db.Decimal(12, 2)
-  impactDate      DateTime   // Fecha en que impacta en el resumen (primer día del mes)
-  
-  isPaid          Boolean    @default(false)
-  paidAt          DateTime?
-  
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  billingCycleId String
+  billingCycle   BillingCycle @relation(fields: [billingCycleId], references: [id], onDelete: Cascade)
+
+  installmentNumber Int // 1, 2, 3, ..., N
+  amount            Decimal  @db.Decimal(12, 2)
+  impactDate        DateTime // Fecha en que impacta en el resumen (primer día del mes)
+
+  isPaid Boolean   @default(false)
+  paidAt DateTime?
+
   createdAt DateTime @default(now())
 
   @@index([transactionId])
@@ -221,22 +221,22 @@ model Installment {
 // ============================================================================
 
 model Income {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  description   String
-  amount        Decimal    @db.Decimal(12, 2)
-  date          DateTime
-  
+  description String
+  amount      Decimal  @db.Decimal(12, 2)
+  date        DateTime
+
   // Categorización
-  category      String     // "active_income" | "other_income"
-  subcategory   String?    // "salary" | "asset_sale" | "third_party_transfer"
-  
+  category    String // "active_income" | "other_income"
+  subcategory String? // "salary" | "asset_sale" | "third_party_transfer"
+
   // Si es recurrente (ej: sueldo mensual)
-  isRecurring   Boolean    @default(false)
-  
-  notes         String?
+  isRecurring Boolean @default(false)
+
+  notes String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -252,14 +252,14 @@ model Income {
 // ============================================================================
 
 model Category {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name          String
-  icon          String?
-  color         String?
-  
+  name  String
+  icon  String?
+  color String?
+
   createdAt DateTime @default(now())
 
   // Relations
@@ -273,11 +273,11 @@ model Category {
 }
 
 model SubCategory {
-  id          String   @id @default(cuid())
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  name        String
+  name String
 
   createdAt DateTime @default(now())
 
@@ -294,16 +294,16 @@ model SubCategory {
 // ============================================================================
 
 model Payment {
-  id              String   @id @default(cuid())
-  userId          String
-  billingCycleId  String
-  billingCycle    BillingCycle @relation(fields: [billingCycleId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  userId         String
+  billingCycleId String
+  billingCycle   BillingCycle @relation(fields: [billingCycleId], references: [id], onDelete: Cascade)
 
-  amount          Decimal    @db.Decimal(12, 2)
-  paymentDate     DateTime
-  paymentMethod   String?    // "debit", "transfer", "cash"
-  
-  notes           String?
+  amount        Decimal  @db.Decimal(12, 2)
+  paymentDate   DateTime
+  paymentMethod String? // "debit", "transfer", "cash"
+
+  notes String?
 
   createdAt DateTime @default(now())
 
@@ -316,23 +316,23 @@ model Payment {
 // ============================================================================
 
 model BankStatement {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  cardId    String
-  
-  period          String     // "2025-01"
-  importedAt      DateTime   @default(now())
-  
-  bankTotal       Decimal    @db.Decimal(12, 2)
-  calculatedTotal Decimal    @db.Decimal(12, 2)
-  discrepancy     Decimal    @db.Decimal(12, 2) // bankTotal - calculatedTotal
-  
-  lineItems       Json       // Array de items del banco
-  
-  matchedCount    Int        @default(0)
-  unmatchedCount  Int        @default(0)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cardId String
+
+  period     String // "2025-01"
+  importedAt DateTime @default(now())
+
+  bankTotal       Decimal @db.Decimal(12, 2)
+  calculatedTotal Decimal @db.Decimal(12, 2)
+  discrepancy     Decimal @db.Decimal(12, 2) // bankTotal - calculatedTotal
+
+  lineItems Json // Array de items del banco
+
+  matchedCount   Int @default(0)
+  unmatchedCount Int @default(0)
 
   @@index([userId])
   @@index([cardId, period])
@@ -344,63 +344,63 @@ model BankStatement {
 // ============================================================================
 
 model Person {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Identificación
-  name            String
-  alias           String?
-  relationship    String   @default("conocido") // "amigo" | "amigo_de_amigo" | "conocido"
-  referrer        String?  // Quien lo refiere
+  name         String
+  alias        String?
+  relationship String  @default("conocido") // "amigo" | "amigo_de_amigo" | "conocido"
+  referrer     String? // Quien lo refiere
 
   // Perfil económico
   incomeType      String   @default("informal") // "en_blanco" | "monotributo" | "informal"
   sector          String?
-  tenureMonths    Int?     // Antigüedad laboral en meses
+  tenureMonths    Int? // Antigüedad laboral en meses
   estimatedIncome Decimal? @db.Decimal(12, 2)
 
   // Estabilidad
-  livesAlone      Boolean  @default(false)
-  hasChildren     Boolean  @default(false)
+  livesAlone       Boolean @default(false)
+  hasChildren      Boolean @default(false)
   recentJobChanges Boolean @default(false)
-  previousDebts   Boolean  @default(false)
+  previousDebts    Boolean @default(false)
 
   // Comportamiento (1-5)
-  punctualityScore     Int @default(3)
-  communicationScore   Int @default(3)
-  debtAttitudeScore    Int @default(3)
+  punctualityScore   Int @default(3)
+  communicationScore Int @default(3)
+  debtAttitudeScore  Int @default(3)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  loans                Loan[]
-  thirdPartyPurchases  ThirdPartyPurchase[]
+  loans               Loan[]
+  thirdPartyPurchases ThirdPartyPurchase[]
 
   @@index([userId])
   @@map("persons")
 }
 
 model Loan {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  personId        String?
-  person          Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+  personId String?
+  person   Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
 
-  borrowerName    String   // Nombre/alias del deudor
-  capital         Decimal  @db.Decimal(12, 2)
-  currency        String   @default("ARS") // "ARS" | "USD" | "EUR"
-  loanType        String   @default("amortized") // "amortized" | "interest_only"
-  tna             Decimal  @db.Decimal(8, 6) // TNA como decimal (ej: 0.55)
-  termMonths      Int?     // null for interest_only loans
-  monthlyRate     Decimal  @db.Decimal(10, 8)
-  installmentAmount Decimal @db.Decimal(12, 2)
-  totalAmount     Decimal? @db.Decimal(12, 2) // null for interest_only loans
-  startDate       DateTime
-  status          String   @default("active") // "active" | "completed" | "defaulted" | "pre_approved" | "refinanced"
+  borrowerName      String // Nombre/alias del deudor
+  capital           Decimal  @db.Decimal(12, 2)
+  currency          String   @default("ARS") // "ARS" | "USD" | "EUR"
+  loanType          String   @default("amortized") // "amortized" | "interest_only"
+  tna               Decimal  @db.Decimal(8, 6) // TNA como decimal (ej: 0.55)
+  termMonths        Int? // null for interest_only loans
+  monthlyRate       Decimal  @db.Decimal(10, 8)
+  installmentAmount Decimal  @db.Decimal(12, 2)
+  totalAmount       Decimal? @db.Decimal(12, 2) // null for interest_only loans
+  startDate         DateTime
+  status            String   @default("active") // "active" | "completed" | "defaulted" | "pre_approved" | "refinanced"
 
   // Refinancing
   refinancedByLoanId String? // ID del nuevo préstamo que reemplaza a este
@@ -410,12 +410,25 @@ model Loan {
   direction    String  @default("lender") // "lender" | "borrower"
   creditorName String? // Nombre del acreedor (cuando direction=borrower)
 
+  // Phase 1 loan accounting metrics
+  principalOutstanding       Decimal   @default(0) @db.Decimal(12, 2)
+  overdueInterestOutstanding Decimal   @default(0) @db.Decimal(12, 2)
+  irrContractualAnnual       Decimal?  @db.Decimal(12, 8)
+  irrRealAnnual              Decimal?  @db.Decimal(12, 8)
+  irrSlippageBps             Int?
+  irrStatus                  String    @default("insufficient_flows") // "ok" | "insufficient_flows" | "no_convergence"
+  irrCalculatedAt            DateTime?
+  cashflowRevision           Int       @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   loanInstallments LoanInstallment[]
   activityLogs     LoanActivityLog[]
+  loanPayments     LoanPayment[]
+  realCashflows    LoanRealCashflow[]
+  monthlyAccruals  LoanAccrualMonthly[]
 
   @@index([userId])
   @@index([userId, status])
@@ -424,19 +437,19 @@ model Loan {
 }
 
 model LoanInstallment {
-  id        String   @id @default(cuid())
-  loanId    String
-  loan      Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  loanId String
+  loan   Loan   @relation(fields: [loanId], references: [id], onDelete: Cascade)
 
-  number    Int      // 1, 2, 3, ..., N
+  number    Int // 1, 2, 3, ..., N
   dueDate   DateTime
   amount    Decimal  @db.Decimal(12, 2) // Cuota total
   interest  Decimal  @db.Decimal(12, 2) // Parte de interés
   principal Decimal  @db.Decimal(12, 2) // Parte de capital
   balance   Decimal  @db.Decimal(12, 2) // Saldo restante después de esta cuota
 
-  isPaid    Boolean  @default(false)
-  paidAt    DateTime?
+  isPaid Boolean   @default(false)
+  paidAt DateTime?
 
   createdAt DateTime @default(now())
 
@@ -446,22 +459,84 @@ model LoanInstallment {
   @@map("loan_installments")
 }
 
+model LoanPayment {
+  id          String   @id @default(cuid())
+  loanId      String
+  loan        Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  paymentDate DateTime
+  amount      Decimal  @db.Decimal(12, 2)
+  currency    String   @default("ARS")
+  note        String?
+  externalRef String?
+
+  createdAt DateTime @default(now())
+
+  realCashflows LoanRealCashflow[]
+
+  @@unique([loanId, externalRef])
+  @@index([loanId, paymentDate])
+  @@map("loan_payments")
+}
+
+model LoanRealCashflow {
+  id           String       @id @default(cuid())
+  loanId       String
+  loan         Loan         @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  paymentId    String?
+  payment      LoanPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  flowDate     DateTime
+  amountSigned Decimal      @db.Decimal(12, 2)
+  component    String // "disbursement" | "interest_overdue" | "interest_current" | "principal" | ...
+
+  createdAt DateTime @default(now())
+
+  @@index([loanId, flowDate, id])
+  @@index([paymentId])
+  @@map("loan_real_cashflows")
+}
+
+model LoanAccrualMonthly {
+  id                       String  @id @default(cuid())
+  loanId                   String
+  loan                     Loan    @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  year                     Int
+  month                    Int
+  openingPrincipal         Decimal @db.Decimal(12, 2)
+  interestExpected         Decimal @db.Decimal(12, 2)
+  interestCollectedCurrent Decimal @db.Decimal(12, 2)
+  overdueInterestOpening   Decimal @db.Decimal(12, 2)
+  overdueInterestGenerated Decimal @db.Decimal(12, 2)
+  overdueInterestCollected Decimal @db.Decimal(12, 2)
+  overdueInterestClosing   Decimal @db.Decimal(12, 2)
+  principalCollected       Decimal @db.Decimal(12, 2)
+  closingPrincipal         Decimal @db.Decimal(12, 2)
+  deviationAmount          Decimal @db.Decimal(12, 2)
+  deviationPct             Decimal @db.Decimal(10, 6)
+  status                   String  @default("idle")
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([loanId, year, month])
+  @@index([loanId, year, month])
+  @@map("loan_accruals_monthly")
+}
+
 // ============================================================================
 // ALERTS
 // ============================================================================
 
 model Alert {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type          String   // "closing_date" | "due_date" | "high_spending" | "limit_approaching"
-  cardId        String?
-  
-  threshold     Decimal? @db.Decimal(12, 2)
-  daysBefore    Int?     // Para alertas de fecha
-  
-  isEnabled     Boolean  @default(true)
+  type   String // "closing_date" | "due_date" | "high_spending" | "limit_approaching"
+  cardId String?
+
+  threshold  Decimal? @db.Decimal(12, 2)
+  daysBefore Int? // Para alertas de fecha
+
+  isEnabled Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -475,30 +550,30 @@ model Alert {
 // ============================================================================
 
 model ThirdPartyPurchase {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  description     String
-  personId        String?
-  person          Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
-  personName      String   // Nombre libre (por si no hay Person)
+  description String
+  personId    String?
+  person      Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
+  personName  String // Nombre libre (por si no hay Person)
 
-  cardId          String
-  card            CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId String
+  card   CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
-  transactionId   String   @unique
-  transaction     Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transactionId String      @unique
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
-  totalAmount     Decimal  @db.Decimal(12, 2)
-  installments    Int      @default(1)
+  totalAmount       Decimal @db.Decimal(12, 2)
+  installments      Int     @default(1)
   installmentAmount Decimal @db.Decimal(12, 2)
-  currency        String   @default("ARS") // "ARS" | "USD"
+  currency          String  @default("ARS") // "ARS" | "USD"
 
-  purchaseDate    DateTime
-  firstDueDate    DateTime?
-  status          String   @default("active") // "active" | "completed"
-  notes           String?
+  purchaseDate DateTime
+  firstDueDate DateTime?
+  status       String    @default("active") // "active" | "completed"
+  notes        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -513,15 +588,15 @@ model ThirdPartyPurchase {
 }
 
 model ThirdPartyInstallment {
-  id                    String   @id @default(cuid())
-  thirdPartyPurchaseId  String
-  thirdPartyPurchase    ThirdPartyPurchase @relation(fields: [thirdPartyPurchaseId], references: [id], onDelete: Cascade)
+  id                   String             @id @default(cuid())
+  thirdPartyPurchaseId String
+  thirdPartyPurchase   ThirdPartyPurchase @relation(fields: [thirdPartyPurchaseId], references: [id], onDelete: Cascade)
 
-  number          Int      // 1, 2, 3, ..., N
-  amount          Decimal  @db.Decimal(12, 2)
-  dueDate         DateTime
+  number  Int // 1, 2, 3, ..., N
+  amount  Decimal  @db.Decimal(12, 2)
+  dueDate DateTime
 
-  isCollected     Boolean  @default(false)
+  isCollected     Boolean   @default(false)
   collectedAt     DateTime?
   collectionNotes String?
 
@@ -538,13 +613,13 @@ model ThirdPartyInstallment {
 // ============================================================================
 
 model LoanActivityLog {
-  id        String   @id @default(cuid())
-  loanId    String
-  loan      Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
-  userId    String
-  note      String
-  tag       String   @default("otro") // "llamada" | "pago" | "acuerdo" | "otro"
-  logDate   DateTime @default(now())
+  id      String   @id @default(cuid())
+  loanId  String
+  loan    Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  userId  String
+  note    String
+  tag     String   @default("otro") // "llamada" | "pago" | "acuerdo" | "otro"
+  logDate DateTime @default(now())
 
   createdAt DateTime @default(now())
 

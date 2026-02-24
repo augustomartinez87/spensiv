@@ -4,6 +4,7 @@ import { simulateLoan, compareLoanTypes, reverseFromInstallment, tnaToMonthlyRat
 import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
 import { addMonths } from 'date-fns'
 import { getDolarMep, pesify } from '@/lib/dolar'
+import { LoanAccountingService } from '../services/loan-accounting.service'
 
 const simulateInput = z.object({
   capital: z.number().positive('El capital debe ser positivo'),
@@ -118,6 +119,8 @@ export const loansRouter = router({
             totalAmount: null,
             startDate,
             status: 'active',
+            principalOutstanding: input.capital,
+            overdueInterestOutstanding: 0,
             personId: input.personId ?? null,
             direction: input.direction,
             creditorName: input.creditorName ?? null,
@@ -175,6 +178,8 @@ export const loansRouter = router({
           totalAmount,
           startDate,
           status: 'active',
+          principalOutstanding: input.capital,
+          overdueInterestOutstanding: 0,
           personId: input.personId ?? null,
           direction: input.direction,
           creditorName: input.creditorName ?? null,
@@ -392,6 +397,26 @@ export const loansRouter = router({
       return loan
     }),
 
+  registerPayment: protectedProcedure
+    .input(z.object({
+      loanId: z.string(),
+      paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      amount: z.number().positive(),
+      note: z.string().optional(),
+      externalRef: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const service = new LoanAccountingService(ctx.prisma)
+      return service.registerPayment({
+        loanId: input.loanId,
+        userId: ctx.user.id,
+        paymentDate: new Date(input.paymentDate + 'T00:00:00'),
+        amount: input.amount,
+        note: input.note,
+        externalRef: input.externalRef,
+      })
+    }),
+
   addActivityLog: protectedProcedure
     .input(z.object({
       loanId: z.string(),
@@ -520,6 +545,8 @@ export const loansRouter = router({
             totalAmount: null,
             startDate,
             status: 'pre_approved',
+            principalOutstanding: input.capital,
+            overdueInterestOutstanding: 0,
             personId: input.personId ?? null,
             direction: input.direction,
             creditorName: input.creditorName ?? null,
@@ -565,6 +592,8 @@ export const loansRouter = router({
           totalAmount,
           startDate,
           status: 'pre_approved',
+          principalOutstanding: input.capital,
+          overdueInterestOutstanding: 0,
           personId: input.personId ?? null,
           direction: input.direction,
           creditorName: input.creditorName ?? null,
@@ -708,6 +737,8 @@ export const loansRouter = router({
             totalAmount,
             startDate,
             status: 'active',
+            principalOutstanding: newCapital,
+            overdueInterestOutstanding: 0,
             personId: loan.personId,
             originalLoanId: loan.id,
             loanInstallments: {
@@ -869,4 +900,22 @@ export const loansRouter = router({
       nextInstallment,
     }
   }),
+
+  getMonthlyAccruals: protectedProcedure
+    .input(z.object({ loanId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.loanAccrualMonthly.findMany({
+        where: { loanId: input.loanId },
+        orderBy: [{ year: 'asc' }, { month: 'asc' }],
+      })
+    }),
+
+  recalculate: protectedProcedure
+    .input(z.object({ loanId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const service = new LoanAccountingService(ctx.prisma)
+      await service.rebuildMonthlyAccruals(input.loanId)
+      await service.recalculateIrrCache(input.loanId)
+      return { success: true }
+    }),
 })
