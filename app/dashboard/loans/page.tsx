@@ -990,7 +990,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
       </div>
 
       {/* Accounting Summary (Phase 1) */}
-      {(loan.irrRealAnnual || loan.irrContractualAnnual || loan.principalOutstanding > 0) && (
+      {(loan.irrRealAnnual || loan.irrContractualAnnual || Number(loan.principalOutstanding) > 0) && (
         <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
           <Card className="bg-muted/30">
             <CardContent className="p-4">
@@ -1012,7 +1012,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">TIR Real (XIRR)</p>
-                {loan.irrStatus === 'no_convergence' && <AlertCircle className="h-3 w-3 text-amber-500" title="Sin convergencia" />}
+                {loan.irrStatus === 'no_convergence' && <AlertCircle className="h-3 w-3 text-amber-500" aria-label="Sin convergencia" />}
               </div>
               <p className="text-xl font-bold text-foreground mt-1">
                 {loan.irrRealAnnual ? `${(Number(loan.irrRealAnnual) * 100).toFixed(2)}%` : 'N/D'}
