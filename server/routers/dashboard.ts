@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
-import { startOfMonth, endOfMonth, addMonths } from 'date-fns'
+import { startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { getMonthlyBalance, getCashFlowProjection } from '@/lib/balance'
 import { formatPeriod } from '@/lib/periods'
 
@@ -35,6 +35,29 @@ export const dashboardRouter = router({
         startPeriod,
         input.months || 6
       )
+    }),
+
+  /**
+   * Evolución mensual: ingresos y egresos de los últimos N meses
+   */
+  getEvolutionData: protectedProcedure
+    .input(z.object({ months: z.number().min(2).max(12).default(6) }))
+    .query(async ({ ctx, input }) => {
+      const now = new Date()
+      const base = new Date(now.getFullYear(), now.getMonth(), 1)
+      const periods: string[] = []
+      for (let i = input.months - 1; i >= 0; i--) {
+        periods.push(formatPeriod(subMonths(base, i)))
+      }
+      const results = await Promise.all(
+        periods.map((period) => getMonthlyBalance(ctx.user.id, period))
+      )
+      return periods.map((period, i) => ({
+        period,
+        income: results[i].totalIncome,
+        expense: results[i].totalExpense,
+        balance: results[i].balance,
+      }))
     }),
 
   /**
