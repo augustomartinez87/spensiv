@@ -10,7 +10,7 @@ export const portfolioRouter = router({
     .query(async ({ ctx, input }) => {
       const [loans, mepRate] = await Promise.all([
         ctx.prisma.loan.findMany({
-          where: { userId: ctx.user.id, status: 'active' },
+          where: { userId: ctx.user.id, status: 'active', direction: 'lender' },
           include: {
             person: true,
             loanInstallments: {
@@ -119,7 +119,7 @@ export const portfolioRouter = router({
     .query(async ({ ctx, input }) => {
       const [loans, mepRate] = await Promise.all([
         ctx.prisma.loan.findMany({
-          where: { userId: ctx.user.id, status: 'active' },
+          where: { userId: ctx.user.id, status: 'active', direction: 'lender' },
           include: {
             loanInstallments: {
               select: {
@@ -332,7 +332,7 @@ export const portfolioRouter = router({
         where: { userId: ctx.user.id },
         include: {
           loans: {
-            where: { status: 'active' },
+            where: { status: 'active', direction: 'lender' },
             select: { capital: true, currency: true },
           },
         },
