@@ -63,6 +63,13 @@ import { useToast } from '@/hooks/use-toast'
 import { calculatePersonScore } from '@/lib/loan-scoring'
 import { tnaToMonthlyRate, frenchInstallment, generateAmortizationTable } from '@/lib/loan-calculator'
 
+function loanRateInfo(loan: { rateIsNominal: boolean | null; tna: any; monthlyRate: any }) {
+  const tem = Number(loan.monthlyRate)
+  const tea = Math.pow(1 + tem, 12) - 1
+  const tna = loan.rateIsNominal ? Number(loan.tna) : tem * 12
+  return { tem, tea, tna, isLegacy: !loan.rateIsNominal }
+}
+
 export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
   const [view, setView] = useState<'list' | 'calendar'>('list')
@@ -602,15 +609,25 @@ function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => vo
                   </div>
                 )}
 
-                <div className="flex justify-between text-xs text-muted-foreground border-t border-border/50 pt-2">
-                  <span>
-                    {isInterestOnly
-                      ? isZeroRate ? 'Sin intereses' : `${(Number(loan.monthlyRate) * 100).toFixed(1)}% mensual`
-                      : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
-                    }
-                  </span>
-                  <span>{isZeroRate ? 'TNA: 0%' : `TNA: ${(Number(loan.tna) * 100).toFixed(1)}%`}</span>
-                </div>
+                {(() => {
+                  const ri = loanRateInfo(loan)
+                  return (
+                    <div className="flex justify-between text-xs text-muted-foreground border-t border-border/50 pt-2">
+                      <span>
+                        {isInterestOnly
+                          ? isZeroRate ? 'Sin intereses' : `${(ri.tem * 100).toFixed(2)}% TEM`
+                          : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                        }
+                      </span>
+                      <span>
+                        {isZeroRate
+                          ? 'TNA: 0%'
+                          : `TNA ${(ri.tna * 100).toFixed(1)}% · TEA ${(ri.tea * 100).toFixed(1)}%`
+                        }
+                      </span>
+                    </div>
+                  )
+                })()}
               </CardContent>
             </Card>
           )
@@ -658,15 +675,20 @@ function PreApprovedLoanCard({
           </Badge>
         </div>
 
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>
-            {isInterestOnly
-              ? `${(Number(loan.monthlyRate) * 100).toFixed(1)}% mensual`
-              : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
-            }
-          </span>
-          <span>TNA: {(Number(loan.tna) * 100).toFixed(1)}%</span>
-        </div>
+        {(() => {
+          const ri = loanRateInfo(loan)
+          return (
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>
+                {isInterestOnly
+                  ? `${(ri.tem * 100).toFixed(2)}% TEM`
+                  : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                }
+              </span>
+              <span>TNA {(ri.tna * 100).toFixed(1)}% · TEA {(ri.tea * 100).toFixed(1)}%</span>
+            </div>
+          )
+        })()}
 
         {expanded ? (
           <div className="space-y-3 pt-2 border-t border-amber-800/50">
@@ -1028,6 +1050,25 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           </>
         )}
       </div>
+
+      {/* Rate info row */}
+      {Number(loan.monthlyRate) > 0 && (
+        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground px-1">
+          {(() => {
+            const ri = loanRateInfo(loan)
+            return (
+              <>
+                <span><span className="text-foreground font-medium">TNA:</span> {(ri.tna * 100).toFixed(2)}%</span>
+                <span className="text-border">·</span>
+                <span><span className="text-foreground font-medium">TEA:</span> {(ri.tea * 100).toFixed(2)}%</span>
+                <span className="text-border">·</span>
+                <span><span className="text-foreground font-medium">TEM:</span> {(ri.tem * 100).toFixed(3)}%</span>
+                {ri.isLegacy && <span className="text-[10px] text-amber-500">(legado)</span>}
+              </>
+            )
+          })()}
+        </div>
+      )}
 
       {/* Accounting Summary (Phase 1) */}
       {(loan.irrRealAnnual || loan.irrContractualAnnual || Number(loan.principalOutstanding) > 0) && (
@@ -2327,6 +2368,16 @@ function CreateLoanDialog({
                   step="0.5"
                   required
                 />
+                {monthlyRate && parseFloat(monthlyRate) > 0 && (() => {
+                  const tem = parseFloat(monthlyRate) / 100
+                  const tea = (Math.pow(1 + tem, 12) - 1) * 100
+                  const tna = tem * 12 * 100
+                  return (
+                    <p className="text-xs text-muted-foreground">
+                      TNA {tna.toFixed(1)}% · TEA {tea.toFixed(2)}%
+                    </p>
+                  )
+                })()}
               </div>
             )}
           </div>
@@ -2344,6 +2395,15 @@ function CreateLoanDialog({
                   step="0.5"
                   required
                 />
+                {tna && parseFloat(tna) > 0 && (() => {
+                  const tem = tnaToMonthlyRate(parseFloat(tna) / 100)
+                  const tea = (Math.pow(1 + tem, 12) - 1) * 100
+                  return (
+                    <p className="text-xs text-muted-foreground">
+                      TEA equivalente: <strong className="text-foreground">{tea.toFixed(2)}%</strong>
+                    </p>
+                  )
+                })()}
                 {suggestedTna !== null && impliedTna === null && parseFloat(tna) === suggestedTna && (
                   <p className="text-xs flex items-center gap-1 text-accent-positive">
                     <Zap className="h-3 w-3" />

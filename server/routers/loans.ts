@@ -93,8 +93,8 @@ export const loansRouter = router({
         if (rate === undefined || rate === null) throw new Error('La tasa mensual es requerida para prestamos interest-only')
 
         const monthlyInterest = input.capital * rate
-        // Convert monthly rate to TNA for storage: TNA = (1 + r_m)^12 - 1
-        const tna = Math.pow(1 + rate, 12) - 1
+        // Store TNA nominal: TNA = rate * 12
+        const tna = rate * 12
 
         // Generate 12 initial interest-only installments
         const installments = Array.from({ length: 12 }, (_, i) => ({
@@ -114,6 +114,7 @@ export const loansRouter = router({
             currency: input.currency,
             loanType: 'interest_only',
             tna,
+            rateIsNominal: true,
             termMonths: null,
             monthlyRate: rate,
             installmentAmount: monthlyInterest,
@@ -173,6 +174,7 @@ export const loansRouter = router({
           currency: input.currency,
           loanType: 'amortized',
           tna,
+          rateIsNominal: true,
           termMonths: input.termMonths,
           monthlyRate,
           installmentAmount,
@@ -537,7 +539,7 @@ export const loansRouter = router({
         if (rate === undefined || rate === null) throw new Error('La tasa mensual es requerida para prestamos interest-only')
 
         const monthlyInterest = input.capital * rate
-        const tna = Math.pow(1 + rate, 12) - 1
+        const tna = rate * 12  // Store TNA nominal
 
         const loan = await ctx.prisma.loan.create({
           data: {
@@ -547,6 +549,7 @@ export const loansRouter = router({
             currency: input.currency,
             loanType: 'interest_only',
             tna,
+            rateIsNominal: true,
             termMonths: null,
             monthlyRate: rate,
             installmentAmount: monthlyInterest,
@@ -594,6 +597,7 @@ export const loansRouter = router({
           currency: input.currency,
           loanType: 'amortized',
           tna,
+          rateIsNominal: true,
           termMonths: input.termMonths,
           monthlyRate,
           installmentAmount,
@@ -739,6 +743,7 @@ export const loansRouter = router({
             currency: loan.currency,
             loanType: 'amortized',
             tna,
+            rateIsNominal: true,
             termMonths: input.termMonths,
             monthlyRate,
             installmentAmount,

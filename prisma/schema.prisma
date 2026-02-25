@@ -395,6 +395,7 @@ model Loan {
   currency          String   @default("ARS") // "ARS" | "USD" | "EUR"
   loanType          String   @default("amortized") // "amortized" | "interest_only"
   tna               Decimal  @db.Decimal(8, 6) // TNA como decimal (ej: 0.55)
+  rateIsNominal     Boolean  @default(false) // true = tna es TNA nominal (nueva lógica); false = tna es TEA (legado)
   termMonths        Int? // null for interest_only loans
   monthlyRate       Decimal  @db.Decimal(10, 8)
   installmentAmount Decimal  @db.Decimal(12, 2)
