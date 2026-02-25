@@ -337,7 +337,8 @@ function UpcomingInstallmentsGadget() {
 
 function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => void; direction: 'lender' | 'borrower' }) {
   const utils = trpc.useUtils()
-  const { data: loans, isLoading } = trpc.loans.list.useQuery({ direction })
+  const [statusFilter, setStatusFilter] = useState<'active' | 'completed' | 'refinanced'>('active')
+  const { data: loans, isLoading } = trpc.loans.list.useQuery({ direction, status: statusFilter })
   const [createOpen, setCreateOpen] = useState(false)
 
   const confirmMutation = trpc.loans.confirmPreApproved.useMutation({
@@ -364,19 +365,43 @@ function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => vo
   }
 
   if (!loans || loans.length === 0) {
+    const emptyLabel =
+      statusFilter === 'completed' ? 'Sin préstamos finalizados' :
+      statusFilter === 'refinanced' ? 'Sin préstamos refinanciados' :
+      direction === 'lender' ? 'Sin préstamos' : 'Sin deudas'
+    const emptySubLabel =
+      statusFilter !== 'active' ? null :
+      direction === 'lender' ? 'Creá tu primer préstamo o usa el simulador' : 'Registrá una deuda que tengas con alguien'
+
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <Banknote className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-lg font-medium text-foreground">
-            {direction === 'lender' ? 'Sin préstamos' : 'Sin deudas'}
-          </p>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">
-            {direction === 'lender' ? 'Creá tu primer préstamo o usa el simulador' : 'Registrá una deuda que tengas con alguien'}
-          </p>
-          <CreateLoanDialog open={createOpen} onOpenChange={setCreateOpen} direction={direction} />
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        {/* Status filter toggle — shown even when empty */}
+        <div className="flex bg-muted rounded-lg p-0.5 w-fit">
+          {(['active', 'completed', 'refinanced'] as const).map((s) => (
+            <Button
+              key={s}
+              variant={statusFilter === s ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setStatusFilter(s)}
+            >
+              {s === 'active' ? 'Activos' : s === 'completed' ? 'Finalizados' : 'Refinanciados'}
+            </Button>
+          ))}
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <Banknote className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-lg font-medium text-foreground">{emptyLabel}</p>
+            {emptySubLabel && (
+              <p className="text-sm text-muted-foreground mt-1 mb-4">{emptySubLabel}</p>
+            )}
+            {statusFilter === 'active' && (
+              <CreateLoanDialog open={createOpen} onOpenChange={setCreateOpen} direction={direction} />
+            )}
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
@@ -385,6 +410,21 @@ function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => vo
 
   return (
     <div className="space-y-6">
+      {/* Status filter toggle */}
+      <div className="flex bg-muted rounded-lg p-0.5 w-fit">
+        {(['active', 'completed', 'refinanced'] as const).map((s) => (
+          <Button
+            key={s}
+            variant={statusFilter === s ? 'default' : 'ghost'}
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setStatusFilter(s)}
+          >
+            {s === 'active' ? 'Activos' : s === 'completed' ? 'Finalizados' : 'Refinanciados'}
+          </Button>
+        ))}
+      </div>
+
       {/* Pre-approved section */}
       {preApproved.length > 0 && (
         <div className="space-y-3">

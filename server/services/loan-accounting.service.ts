@@ -115,24 +115,91 @@ export class LoanAccountingService {
 
       await this.ensureInitialDisbursementCashflowTx(tx, loan)
 
+      // Fetch all unpaid installments for max-payable validation and advance logic
+      const unpaidInstallments = await tx.loanInstallment.findMany({
+        where: { loanId: loan.id, isPaid: false },
+        orderBy: { number: 'asc' },
+        select: { id: true, number: true, dueDate: true, amount: true, interest: true, principal: true },
+      })
+
       const preState = await this.rebuildMonthlyAccrualsTx(tx, loan.id, paymentDate)
       const currentRow = findRowByYearMonth(preState.rows, paymentDate)
 
       const overduePending = money(preState.overdueInterestOutstanding)
-      const currentPending = currentRow
+      const currentInterestPending = currentRow
         ? Decimal.max(money(currentRow.interestExpected).minus(money(currentRow.interestCollectedCurrent)), ZERO)
         : ZERO
       const principalPending = money(preState.principalOutstanding)
 
-      const waterfall = applyPaymentWaterfall({
-        paymentAmount: amount.toNumber(),
-        overdueInterestPending: overduePending.toNumber(),
-        currentInterestPending: currentPending.toNumber(),
-        principalPending: principalPending.toNumber(),
-      })
+      // Future installments: dueDate strictly after end of payment month
+      const paymentMonthEnd = new Date(paymentDate.getFullYear(), paymentDate.getMonth() + 1, 0, 23, 59, 59)
+      const futureInstallments = unpaidInstallments.filter(
+        (i) => new Date(i.dueDate) > paymentMonthEnd,
+      )
 
-      if (waterfall.totalApplied <= 0) {
+      // Current-period principal = outstanding minus future installments' principals
+      const futurePrincipalSum = futureInstallments.reduce((s, i) => s.plus(money(i.principal)), ZERO)
+      const currentPeriodPrincipal = Decimal.max(principalPending.minus(futurePrincipalSum), ZERO)
+
+      // Current dues: everything owed up to and including this month
+      const currentDues = overduePending.plus(currentInterestPending).plus(currentPeriodPrincipal)
+
+      // Max payable: current dues + all future installments
+      const futureInstallmentsTotal = futureInstallments.reduce((s, i) => s.plus(money(i.amount)), ZERO)
+      const maxPayable = currentDues.plus(futureInstallmentsTotal)
+
+      if (amount.gt(maxPayable.plus(CENT_TOLERANCE))) {
+        throw new Error(
+          `El pago excede la deuda total del préstamo (máximo: ${round2(maxPayable)})`,
+        )
+      }
+
+      // Apply waterfall for current period only (capped at currentDues)
+      const amountForCurrentPeriod = Decimal.min(amount, currentDues)
+      let waterfall: PaymentWaterfallResult
+
+      if (amountForCurrentPeriod.gt(0)) {
+        waterfall = applyPaymentWaterfall({
+          paymentAmount: round2(amountForCurrentPeriod),
+          overdueInterestPending: round2(overduePending),
+          currentInterestPending: round2(currentInterestPending),
+          principalPending: round2(currentPeriodPrincipal),
+        })
+      } else {
+        waterfall = { interestOverdueApplied: 0, interestCurrentApplied: 0, principalApplied: 0, totalApplied: 0, totalPending: 0 }
+      }
+
+      if (waterfall.totalApplied <= 0 && futureInstallments.length === 0) {
         throw new Error('No hay deuda pendiente para aplicar el pago')
+      }
+
+      // Apply excess to future installments (adelanto de cuotas)
+      let excessRemaining = amount.minus(money(waterfall.totalApplied))
+      type AdvancePaid = { id: string; dueDate: Date; interestPaid: number; principalPaid: number; fullyPaid: boolean }
+      const advancePaid: AdvancePaid[] = []
+
+      for (const inst of futureInstallments) {
+        if (excessRemaining.lte(CENT_TOLERANCE)) break
+
+        const instInterest = money(inst.interest)
+        const instPrincipal = money(inst.principal)
+        const instTotal = money(inst.amount)
+
+        const interestPaid = Decimal.min(excessRemaining, instInterest)
+        excessRemaining = excessRemaining.minus(interestPaid)
+        const principalPaid = Decimal.min(excessRemaining, instPrincipal)
+        excessRemaining = excessRemaining.minus(principalPaid)
+
+        const totalPaid = interestPaid.plus(principalPaid)
+        const fullyPaid = totalPaid.gte(instTotal.minus(CENT_TOLERANCE))
+
+        advancePaid.push({
+          id: inst.id,
+          dueDate: inst.dueDate instanceof Date ? inst.dueDate : new Date(inst.dueDate),
+          interestPaid: round2(interestPaid),
+          principalPaid: round2(principalPaid),
+          fullyPaid,
+        })
       }
 
       const payment = await tx.loanPayment.create({
@@ -149,6 +216,7 @@ export class LoanAccountingService {
       const directionSign = loan.direction === 'lender' ? 1 : -1
       const cashflows: Prisma.LoanRealCashflowCreateManyInput[] = []
 
+      // Current-period cashflows (flowDate = paymentDate)
       if (waterfall.interestOverdueApplied > 0) {
         cashflows.push({
           loanId: loan.id,
@@ -158,7 +226,6 @@ export class LoanAccountingService {
           component: 'interest_overdue',
         })
       }
-
       if (waterfall.interestCurrentApplied > 0) {
         cashflows.push({
           loanId: loan.id,
@@ -168,7 +235,6 @@ export class LoanAccountingService {
           component: 'interest_current',
         })
       }
-
       if (waterfall.principalApplied > 0) {
         cashflows.push({
           loanId: loan.id,
@@ -179,8 +245,49 @@ export class LoanAccountingService {
         })
       }
 
+      // Advance-payment cashflows (flowDate = installment.dueDate so accruals are correct)
+      for (const adv of advancePaid) {
+        if (adv.interestPaid > 0) {
+          cashflows.push({
+            loanId: loan.id,
+            paymentId: payment.id,
+            flowDate: adv.dueDate,
+            amountSigned: round2(directionSign * adv.interestPaid),
+            component: 'interest_current',
+          })
+        }
+        if (adv.principalPaid > 0) {
+          cashflows.push({
+            loanId: loan.id,
+            paymentId: payment.id,
+            flowDate: adv.dueDate,
+            amountSigned: round2(directionSign * adv.principalPaid),
+            component: 'principal',
+          })
+        }
+      }
+
       if (cashflows.length > 0) {
         await tx.loanRealCashflow.createMany({ data: cashflows })
+      }
+
+      // Mark advance-paid installments as isPaid
+      const toMarkPaid = advancePaid.filter((a) => a.fullyPaid).map((a) => a.id)
+      if (toMarkPaid.length > 0) {
+        await tx.loanInstallment.updateMany({
+          where: { id: { in: toMarkPaid } },
+          data: { isPaid: true, paidAt: paymentDate },
+        })
+      }
+
+      // Auto-complete amortized loan if all installments are now paid
+      if (loan.loanType === 'amortized' && toMarkPaid.length > 0) {
+        const remaining = await tx.loanInstallment.count({
+          where: { loanId: loan.id, isPaid: false },
+        })
+        if (remaining === 0) {
+          await tx.loan.update({ where: { id: loan.id }, data: { status: 'completed' } })
+        }
       }
 
       const postState = await this.rebuildMonthlyAccrualsTx(tx, loan.id, new Date())
@@ -193,6 +300,7 @@ export class LoanAccountingService {
       return {
         payment,
         waterfall,
+        advancedInstallments: toMarkPaid.length,
         principalOutstanding: postState.principalOutstanding,
         overdueInterestOutstanding: postState.overdueInterestOutstanding,
         irr,

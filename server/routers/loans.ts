@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { simulateLoan, compareLoanTypes, reverseFromInstallment, tnaToMonthlyRate, frenchInstallment, generateAmortizationTable, strategicRoundInstallment } from '@/lib/loan-calculator'
 import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
@@ -254,12 +255,19 @@ export const loansRouter = router({
   list: protectedProcedure
     .input(z.object({
       direction: z.enum(['lender', 'borrower']).optional(),
+      status: z.enum(['active', 'completed', 'refinanced']).optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
+    const statusFilter: Prisma.LoanWhereInput =
+      input?.status === 'completed' ? { status: 'completed' } :
+      input?.status === 'refinanced' ? { status: 'refinanced' } :
+      { status: { in: ['active', 'pre_approved'] } }
+
     const loans = await ctx.prisma.loan.findMany({
       where: {
         userId: ctx.user.id,
         ...(input?.direction ? { direction: input.direction } : {}),
+        ...statusFilter,
       },
       include: {
         person: {
