@@ -1,15 +1,14 @@
 'use client'
 
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import { format, parse } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -24,13 +23,22 @@ interface DataPoint {
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-card border border-border rounded-lg p-3 text-xs shadow-lg">
-      <p className="font-semibold text-foreground mb-2 capitalize">{label}</p>
+    <div
+      className="rounded-lg p-3 text-xs shadow-2xl"
+      style={{
+        background: 'rgba(10, 10, 15, 0.95)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      <p className="font-semibold mb-2 capitalize" style={{ color: 'rgba(255,255,255,0.7)' }}>
+        {label}
+      </p>
       {payload.map((entry: any) => (
-        <div key={entry.dataKey} className="flex items-center gap-2 mb-1">
-          <div className="w-2 h-2 rounded-full shrink-0" style={{ background: entry.color }} />
-          <span className="text-muted-foreground">{entry.name}:</span>
-          <span className="font-semibold" style={{ color: entry.color }}>
+        <div key={entry.dataKey} className="flex items-center gap-2 mb-0.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: entry.color }} />
+          <span style={{ color: 'rgba(255,255,255,0.4)' }}>{entry.name}:</span>
+          <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.9)' }}>
             {formatCurrency(entry.value)}
           </span>
         </div>
@@ -45,66 +53,83 @@ export function MonthlyEvolutionChart({ data }: { data: DataPoint[] }) {
     label: format(parse(d.period, 'yyyy-MM', new Date()), "MMM 'yy", { locale: es }),
   }))
 
-  const maxValue = Math.max(...data.map((d) => Math.max(d.income, d.expense)))
+  const maxValue = Math.max(...data.map((d) => Math.max(d.income, d.expense)), 1)
 
   return (
-    <Card className="h-full">
-      <CardHeader className="py-3 px-4">
-        <CardTitle className="text-sm font-semibold">Evolución mensual</CardTitle>
-      </CardHeader>
-      <CardContent className="px-2 pb-3 pt-0">
-        <ResponsiveContainer width="100%" height={210}>
-          <LineChart data={chartData} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tickFormatter={(v) =>
-                maxValue >= 1_000_000
-                  ? `$${(v / 1_000_000).toFixed(1)}M`
-                  : `$${Math.round(v / 1_000)}k`
-              }
-              tick={{ fontSize: 10, fill: '#94a3b8' }}
-              axisLine={false}
-              tickLine={false}
-              width={54}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Line
-              type="monotone"
-              dataKey="income"
-              name="Ingresos"
-              stroke="#3b82f6"
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, fill: '#3b82f6' }}
-            />
-            <Line
-              type="monotone"
-              dataKey="expense"
-              name="Egresos"
-              stroke="#f97316"
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, fill: '#f97316' }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-        <div className="flex items-center justify-center gap-6 mt-1">
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <div className="w-3 h-0.5 rounded bg-blue-500" />
+    <div className="px-1 pt-1 pb-2">
+      {/* Title + legend row */}
+      <div className="flex items-center justify-between mb-3 px-2">
+        <p className="text-sm font-semibold text-foreground">Evolución mensual</p>
+        <div className="flex items-center gap-5">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-4 h-px rounded" style={{ background: '#3b82f6', height: 2 }} />
             Ingresos
           </div>
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <div className="w-3 h-0.5 rounded bg-orange-500" />
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-4 h-px rounded" style={{ background: '#ef4444', height: 2 }} />
             Egresos
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      <ResponsiveContainer width="100%" height={220}>
+        <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -8, bottom: 0 }}>
+          <defs>
+            <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ef4444" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+
+          <CartesianGrid
+            strokeDasharray="0"
+            stroke="rgba(255,255,255,0.05)"
+            vertical={false}
+          />
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 11, fill: '#4b5563' }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tickFormatter={(v) =>
+              maxValue >= 1_000_000
+                ? `$${(v / 1_000_000).toFixed(1)}M`
+                : `$${Math.round(v / 1_000)}k`
+            }
+            tick={{ fontSize: 10, fill: '#4b5563' }}
+            axisLine={false}
+            tickLine={false}
+            width={52}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Area
+            type="monotone"
+            dataKey="income"
+            name="Ingresos"
+            stroke="#3b82f6"
+            strokeWidth={1.5}
+            fill="url(#incomeGrad)"
+            dot={false}
+            activeDot={{ r: 3, fill: '#3b82f6', strokeWidth: 0 }}
+          />
+          <Area
+            type="monotone"
+            dataKey="expense"
+            name="Egresos"
+            stroke="#ef4444"
+            strokeWidth={1.5}
+            fill="url(#expenseGrad)"
+            dot={false}
+            activeDot={{ r: 3, fill: '#ef4444', strokeWidth: 0 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
