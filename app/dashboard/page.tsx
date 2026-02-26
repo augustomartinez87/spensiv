@@ -24,7 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { formatCurrency, cn } from '@/lib/utils'
+import { formatCurrency, cn, formatExpenseType } from '@/lib/utils'
 import {
   AlertCircle,
   AlertTriangle,
@@ -219,94 +219,106 @@ function MonthlyHealthDonut({
       : 'conic-gradient(#f97316 0% 100%)'
 
   return (
-    <Card>
+    <Card className="flex flex-col">
       <CardHeader className="py-2.5 px-4">
         <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
           Distribución del mes
           {hasOverBudget && <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />}
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-4 pb-5 flex items-center gap-8">
-        {/* Donut */}
-        <div className="relative shrink-0" style={{ width: 128, height: 128 }}>
-          <div
-            style={{
-              width: 128,
-              height: 128,
-              borderRadius: '50%',
-              background: conicGrad,
-              WebkitMask: 'radial-gradient(transparent 50%, black 50%)',
-              mask: 'radial-gradient(transparent 50%, black 50%)',
-            }}
-          />
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span
-              className={cn(
-                'text-2xl font-bold leading-tight',
-                savingsRate >= 20
-                  ? 'text-green-400'
-                  : savingsRate > 0
-                    ? 'text-amber-400'
-                    : 'text-red-400'
-              )}
-            >
-              {income > 0 ? `${Math.round(savingsRate)}%` : '—'}
-            </span>
-            <span className="text-[9px] text-muted-foreground leading-tight">ahorro</span>
+      <CardContent className="px-4 pt-0 pb-4 flex flex-col flex-1">
+        <div className="flex items-center gap-8 flex-1">
+          {/* Donut */}
+          <div className="relative shrink-0" style={{ width: 128, height: 128 }}>
+            <div
+              style={{
+                width: 128,
+                height: 128,
+                borderRadius: '50%',
+                background: conicGrad,
+                WebkitMask: 'radial-gradient(transparent 50%, black 50%)',
+                mask: 'radial-gradient(transparent 50%, black 50%)',
+              }}
+            />
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span
+                className={cn(
+                  'text-2xl font-bold leading-tight',
+                  savingsRate >= 20
+                    ? 'text-green-400'
+                    : savingsRate > 0
+                      ? 'text-amber-400'
+                      : 'text-red-400'
+                )}
+              >
+                {income > 0 ? `${Math.round(savingsRate)}%` : '—'}
+              </span>
+              <span className="text-[9px] text-muted-foreground leading-tight">ahorro</span>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="flex-1 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: '#f97316' }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-muted-foreground">Gastado</p>
+                <p className="text-sm font-bold text-foreground">{formatHero(expense)}</p>
+              </div>
+              <span className="text-xs font-semibold text-orange-400 shrink-0">
+                {Math.round(spendRate)}%
+              </span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: '#22c55e' }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-muted-foreground">Ahorrado</p>
+                <p className="text-sm font-bold text-foreground">
+                  {formatHero(Math.max(0, income - expense))}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  'text-xs font-semibold shrink-0',
+                  savingsRate >= 20 ? 'text-green-400' : 'text-amber-400'
+                )}
+              >
+                {Math.round(savingsRate)}%
+              </span>
+            </div>
+            {budgetProgress && budgetProgress.length > 0 && (
+              <div className="flex items-center gap-2 pt-2 border-t border-border/40">
+                {hasOverBudget ? (
+                  <AlertTriangle className="h-3 w-3 text-amber-400 shrink-0" />
+                ) : (
+                  <div className="w-3 h-3 rounded-full bg-green-500/20 shrink-0 flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                  </div>
+                )}
+                <p className="text-[10px] text-muted-foreground">
+                  {hasOverBudget ? (
+                    <span className="text-amber-400">
+                      {overBudgetCategories.length} categoría
+                      {overBudgetCategories.length !== 1 ? 's' : ''} excedida
+                      {overBudgetCategories.length !== 1 ? 's' : ''}
+                    </span>
+                  ) : (
+                    'Dentro del presupuesto'
+                  )}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Legend */}
-        <div className="flex-1 space-y-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: '#f97316' }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-muted-foreground">Gastado</p>
-              <p className="text-sm font-bold text-foreground">{formatHero(expense)}</p>
-            </div>
-            <span className="text-xs font-semibold text-orange-400 shrink-0">
-              {Math.round(spendRate)}%
-            </span>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: '#22c55e' }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-muted-foreground">Ahorrado</p>
-              <p className="text-sm font-bold text-foreground">
-                {formatHero(Math.max(0, income - expense))}
-              </p>
-            </div>
-            <span
-              className={cn(
-                'text-xs font-semibold shrink-0',
-                savingsRate >= 20 ? 'text-green-400' : 'text-amber-400'
-              )}
-            >
-              {Math.round(savingsRate)}%
-            </span>
-          </div>
-          {budgetProgress && budgetProgress.length > 0 && (
-            <div className="flex items-center gap-2 pt-2 border-t border-border/40">
-              {hasOverBudget ? (
-                <AlertTriangle className="h-3 w-3 text-amber-400 shrink-0" />
-              ) : (
-                <div className="w-3 h-3 rounded-full bg-green-500/20 shrink-0 flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                </div>
-              )}
-              <p className="text-[10px] text-muted-foreground">
-                {hasOverBudget ? (
-                  <span className="text-amber-400">
-                    {overBudgetCategories.length} categoría
-                    {overBudgetCategories.length !== 1 ? 's' : ''} excedida
-                    {overBudgetCategories.length !== 1 ? 's' : ''}
-                  </span>
-                ) : (
-                  'Dentro del presupuesto'
-                )}
-              </p>
-            </div>
-          )}
+        {/* Footer link */}
+        <div className="mt-4 pt-3 border-t border-border/40">
+          <Link
+            href="/dashboard/budget"
+            className="text-xs text-muted-foreground hover:text-foreground hover:underline flex items-center gap-1 transition-colors"
+          >
+            Ver presupuesto <ArrowRight className="h-3 w-3" />
+          </Link>
         </div>
       </CardContent>
     </Card>
@@ -431,13 +443,13 @@ function UnifiedRecentMovements({
                     <div
                       className={cn(
                         'h-7 w-7 rounded-lg flex items-center justify-center shrink-0',
-                        isIncome ? 'bg-blue-500/10' : 'bg-muted'
+                        isIncome ? 'bg-green-500/10' : 'bg-muted'
                       )}
                     >
                       <CatIcon
                         className={cn(
                           'h-3.5 w-3.5',
-                          isIncome ? 'text-blue-400' : 'text-muted-foreground'
+                          isIncome ? 'text-green-400' : 'text-muted-foreground'
                         )}
                       />
                     </div>
@@ -449,14 +461,14 @@ function UnifiedRecentMovements({
                         {format(m.date, 'd MMM', { locale: es })}
                         {' · '}
                         {m.category}
-                        {m.expenseType && ` · ${m.expenseType}`}
+                        {m.expenseType && ` · ${formatExpenseType(m.expenseType)}`}
                       </p>
                     </div>
                   </div>
                   <p
                     className={cn(
                       'font-semibold text-sm shrink-0 ml-3 tabular-nums',
-                      isIncome ? 'text-blue-400' : 'text-orange-400'
+                      isIncome ? 'text-green-400' : 'text-red-400'
                     )}
                   >
                     {isIncome ? '+' : '-'}

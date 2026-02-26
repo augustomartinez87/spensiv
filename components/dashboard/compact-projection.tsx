@@ -57,7 +57,7 @@ export function CompactProjection({
 
   return (
     <Card className={cn(
-      "overflow-hidden bg-gradient-to-br border",
+      "overflow-hidden bg-gradient-to-br border h-full min-h-[140px]",
       status.bgColor,
       status.borderColor
     )}>

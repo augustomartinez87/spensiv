@@ -48,12 +48,22 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export function MonthlyEvolutionChart({ data }: { data: DataPoint[] }) {
-  const chartData = data.map((d) => ({
-    ...d,
-    label: format(parse(d.period, 'yyyy-MM', new Date()), "MMM 'yy", { locale: es }),
-  }))
+  const chartData = data
+    .filter((d) => d.income > 0 || d.expense > 0)
+    .map((d) => ({
+      ...d,
+      label: format(parse(d.period, 'yyyy-MM', new Date()), 'MMM yy', { locale: es }),
+    }))
 
-  const maxValue = Math.max(...data.map((d) => Math.max(d.income, d.expense)), 1)
+  if (chartData.length < 2) {
+    return (
+      <div className="px-2 py-8 text-center text-sm text-muted-foreground italic">
+        Sin suficientes datos para mostrar la evolución mensual
+      </div>
+    )
+  }
+
+  const maxValue = Math.max(...chartData.map((d) => Math.max(d.income, d.expense)), 1)
 
   return (
     <div className="px-1 pt-1 pb-2">
@@ -76,11 +86,11 @@ export function MonthlyEvolutionChart({ data }: { data: DataPoint[] }) {
         <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -8, bottom: 0 }}>
           <defs>
             <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.22} />
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.15} />
               <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ef4444" stopOpacity={0.22} />
+              <stop offset="0%" stopColor="#ef4444" stopOpacity={0.15} />
               <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
             </linearGradient>
           </defs>

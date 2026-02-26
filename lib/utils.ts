@@ -52,3 +52,22 @@ export function parseInputDate(dateString: string): Date {
   const [year, month, day] = dateString.split('-').map(Number)
   return new Date(year, month - 1, day, 0, 0, 0, 0)
 }
+
+/**
+ * Traduce el valor raw de expenseType al español
+ */
+export function formatExpenseType(type: string | null | undefined): string {
+  if (!type) return 'Sin clasificar'
+  const map: Record<string, string> = {
+    structural: 'Estructural',
+    emotional_recurrent: 'Emocional Recurrente',
+    emotional_impulsive: 'Emocional Impulsivo',
+    fixed_essential: 'Fijo · Esencial',
+    variable_essential: 'Variable · Esencial',
+    fixed_non_essential: 'Fijo · No esencial',
+    variable_non_essential: 'Variable · No esencial',
+    planned_purchase: 'Compra planeada',
+    income: 'Ingreso',
+  }
+  return map[type] ?? type.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
+}
