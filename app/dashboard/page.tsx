@@ -27,7 +27,6 @@ import { es } from 'date-fns/locale'
 import { formatCurrency, cn, formatExpenseType } from '@/lib/utils'
 import {
   AlertCircle,
-  AlertTriangle,
   ArrowRight,
   CreditCard,
   Star,
@@ -92,7 +91,6 @@ export default function DashboardPage() {
 
   const { data: balance, isLoading: isLoadingBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period })
   const { data: prevBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period: previousPeriod })
-  const { data: budgetProgress } = trpc.budget.getProgress.useQuery({ period })
   const { data: evolutionData } = trpc.dashboard.getEvolutionData.useQuery({ months: 6 })
 
   if (isLoadingBalance) {
@@ -166,152 +164,115 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* ── ROW 2: Evolution chart (full width, no card border) ── */}
-      {evolutionData && evolutionData.length > 1 && (
-        <MonthlyEvolutionChart data={evolutionData} />
-      )}
-
-      {/* ── ROW 3: Donut + Movements ── */}
+      {/* ── ROW 2: Evolución (50%) + Distribución de categorías (50%) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <MonthlyHealthDonut
-          income={balance.totalIncome}
-          expense={balance.totalExpense}
-          budgetProgress={budgetProgress ?? undefined}
-        />
-        <UnifiedRecentMovements
-          installments={balance.installments}
-          cashTransactions={balance.cashTransactions || []}
-          incomes={balance.incomes}
+        <Card className="overflow-hidden">
+          {evolutionData && evolutionData.length > 1 ? (
+            <MonthlyEvolutionChart data={evolutionData} />
+          ) : (
+            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground italic">
+              Sin suficientes datos para el gráfico
+            </div>
+          )}
+        </Card>
+        <CategoryBreakdown
+          data={balance.aggregations.expensesByCategory}
+          totalExpense={balance.totalExpense}
         />
       </div>
+
+      {/* ── ROW 3: Movimientos recientes (ancho completo) ── */}
+      <UnifiedRecentMovements
+        installments={balance.installments}
+        cashTransactions={balance.cashTransactions || []}
+        incomes={balance.incomes}
+      />
     </div>
   )
 }
 
-// ── Monthly Health Donut ──────────────────────────────────────────────
+// ── Category Breakdown ───────────────────────────────────────────────
 
-interface BudgetItem {
-  categoryId: string
-  categoryName: string
-  spent: number
-  monthlyLimit: number
-  percentage: number
+const CATEGORY_COLORS: Record<string, string> = {
+  'Gastos Fijos': '#1f6c9c',
+  Servicios: '#2a89bf',
+  Transporte: '#348bb5',
+  Educacion: '#7c3aed',
+  Educación: '#7c3aed',
+  Salud: '#feb92e',
+  Comida: '#e8a820',
+  Compras: '#f0953a',
+  Deudas: '#feb92e',
+  Lujos: '#e54352',
 }
+const FALLBACK_COLORS = ['#1f6c9c', '#feb92e', '#e54352', '#2a89bf', '#e8a820', '#f0953a', '#348bb5']
 
-function MonthlyHealthDonut({
-  income,
-  expense,
-  budgetProgress,
+function CategoryBreakdown({
+  data,
+  totalExpense,
 }: {
-  income: number
-  expense: number
-  budgetProgress?: BudgetItem[]
+  data: Record<string, number>
+  totalExpense: number
 }) {
-  const savingsRate = income > 0 ? Math.max(0, ((income - expense) / income) * 100) : 0
-  const spendRate = income > 0 ? Math.min(100, (expense / income) * 100) : 100
+  const MAX_SHOW = 6
 
-  const overBudgetCategories = budgetProgress?.filter((b) => b.percentage > 100) ?? []
-  const hasOverBudget = overBudgetCategories.length > 0
+  const sorted = Object.entries(data)
+    .map(([name, amount], i) => ({
+      name,
+      amount,
+      color: CATEGORY_COLORS[name] || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+    }))
+    .sort((a, b) => b.amount - a.amount)
 
-  const conicGrad =
-    income > 0
-      ? `conic-gradient(#f97316 0% ${spendRate}%, #22c55e ${spendRate}% 100%)`
-      : 'conic-gradient(#f97316 0% 100%)'
+  const top = sorted.slice(0, MAX_SHOW)
+  const rest = sorted.slice(MAX_SHOW)
+  if (rest.length > 0) {
+    const othersAmount = rest.reduce((s, c) => s + c.amount, 0)
+    top.push({ name: 'Otros', amount: othersAmount, color: '#6b7280' })
+  }
+
+  const maxAmount = Math.max(...top.map((c) => c.amount), 1)
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col h-full">
       <CardHeader className="py-2.5 px-4">
-        <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-          Distribución del mes
-          {hasOverBudget && <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />}
-        </CardTitle>
+        <CardTitle className="text-sm font-semibold">Distribución de categorías</CardTitle>
       </CardHeader>
       <CardContent className="px-4 pt-0 pb-4 flex flex-col flex-1">
-        <div className="flex items-center gap-8 flex-1">
-          {/* Donut */}
-          <div className="relative shrink-0" style={{ width: 128, height: 128 }}>
-            <div
-              style={{
-                width: 128,
-                height: 128,
-                borderRadius: '50%',
-                background: conicGrad,
-                WebkitMask: 'radial-gradient(transparent 50%, black 50%)',
-                mask: 'radial-gradient(transparent 50%, black 50%)',
-              }}
-            />
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span
-                className={cn(
-                  'text-2xl font-bold leading-tight',
-                  savingsRate >= 20
-                    ? 'text-green-400'
-                    : savingsRate > 0
-                      ? 'text-amber-400'
-                      : 'text-red-400'
-                )}
-              >
-                {income > 0 ? `${Math.round(savingsRate)}%` : '—'}
-              </span>
-              <span className="text-[9px] text-muted-foreground leading-tight">ahorro</span>
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div className="flex-1 space-y-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: '#f97316' }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-muted-foreground">Gastado</p>
-                <p className="text-sm font-bold text-foreground">{formatHero(expense)}</p>
-              </div>
-              <span className="text-xs font-semibold text-orange-400 shrink-0">
-                {Math.round(spendRate)}%
-              </span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: '#22c55e' }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-muted-foreground">Ahorrado</p>
-                <p className="text-sm font-bold text-foreground">
-                  {formatHero(Math.max(0, income - expense))}
-                </p>
-              </div>
-              <span
-                className={cn(
-                  'text-xs font-semibold shrink-0',
-                  savingsRate >= 20 ? 'text-green-400' : 'text-amber-400'
-                )}
-              >
-                {Math.round(savingsRate)}%
-              </span>
-            </div>
-            {budgetProgress && budgetProgress.length > 0 && (
-              <div className="flex items-center gap-2 pt-2 border-t border-border/40">
-                {hasOverBudget ? (
-                  <AlertTriangle className="h-3 w-3 text-amber-400 shrink-0" />
-                ) : (
-                  <div className="w-3 h-3 rounded-full bg-green-500/20 shrink-0 flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+        <div className="space-y-3 flex-1">
+          {top.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic text-center py-8">
+              Sin egresos registrados en este período
+            </p>
+          ) : (
+            top.map(({ name, amount, color }) => {
+              const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0
+              const barWidth = (amount / maxAmount) * 100
+              return (
+                <div key={name}>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
+                      <span className="font-medium text-foreground truncate">{name}</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 shrink-0 ml-2">
+                      <span className="text-muted-foreground tabular-nums">{formatHero(amount)}</span>
+                      <span className="text-muted-foreground tabular-nums w-7 text-right">
+                        {Math.round(pct)}%
+                      </span>
+                    </div>
                   </div>
-                )}
-                <p className="text-[10px] text-muted-foreground">
-                  {hasOverBudget ? (
-                    <span className="text-amber-400">
-                      {overBudgetCategories.length} categoría
-                      {overBudgetCategories.length !== 1 ? 's' : ''} excedida
-                      {overBudgetCategories.length !== 1 ? 's' : ''}
-                    </span>
-                  ) : (
-                    'Dentro del presupuesto'
-                  )}
-                </p>
-              </div>
-            )}
-          </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${barWidth}%`, background: color, opacity: 0.75 }}
+                    />
+                  </div>
+                </div>
+              )
+            })
+          )}
         </div>
-
-        {/* Footer link */}
         <div className="mt-4 pt-3 border-t border-border/40">
           <Link
             href="/dashboard/budget"

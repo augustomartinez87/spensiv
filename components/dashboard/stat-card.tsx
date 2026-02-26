@@ -20,9 +20,7 @@ export function StatCard({ title, value, count, type, previousValue }: StatCardP
         ? isPositive
             ? 'text-accent-positive'
             : 'text-accent-danger'
-        : type === 'income'
-            ? 'text-accent-positive'
-            : 'text-foreground'
+        : 'text-foreground'
 
     const variation = previousValue !== undefined && previousValue !== 0
         ? ((value - previousValue) / Math.abs(previousValue)) * 100

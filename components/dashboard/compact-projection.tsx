@@ -55,6 +55,10 @@ export function CompactProjection({
   const status = getStatus()
   const Icon = status.icon
 
+  const today = new Date()
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+  const daysRemaining = daysInMonth - today.getDate()
+
   return (
     <Card className={cn(
       "overflow-hidden bg-gradient-to-br border h-full min-h-[140px]",
@@ -71,6 +75,9 @@ export function CompactProjection({
 
         <p className="text-3xl font-bold text-white mt-3 tracking-tight">
           {formatCurrency(balance)}
+        </p>
+        <p className="text-xs text-white/50 mt-1">
+          {daysRemaining} {daysRemaining === 1 ? 'día restante' : 'días restantes'}
         </p>
 
         <div className="mt-3">
