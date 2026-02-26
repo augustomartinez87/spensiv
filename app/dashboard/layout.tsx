@@ -16,18 +16,18 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-
   Users,
   PieChart,
   Layers,
   Target,
   Tags,
+  ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
 type NavItem = { name: string; href: string; icon: typeof LayoutDashboard }
-type NavSection = { label: string; items: NavItem[] }
+type NavSection = { label: string; items: NavItem[]; adminOnly?: boolean }
 
 const navigation: NavSection[] = [
   {
@@ -50,6 +50,7 @@ const navigation: NavSection[] = [
   },
   {
     label: 'Préstamos',
+    adminOnly: true,
     items: [
       { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
       { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
@@ -57,11 +58,21 @@ const navigation: NavSection[] = [
       { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
     ],
   },
+  {
+    label: 'Administración',
+    adminOnly: true,
+    items: [
+      { name: 'Usuarios', href: '/dashboard/admin', icon: ShieldCheck },
+    ],
+  },
 ]
 
-const mobileNav = [
+const mobileNavBase = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Movimientos', href: '/dashboard/transactions', icon: Receipt },
+]
+
+const mobileNavAdmin = [
   { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
   { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
 ]
@@ -76,6 +87,12 @@ export default function DashboardLayout({
   const { user } = useUser()
 
   const displayName = user?.fullName || user?.firstName || 'Usuario'
+  const userIsAdmin = user?.publicMetadata?.role === 'admin'
+
+  const visibleNavigation = navigation.filter(s => !s.adminOnly || userIsAdmin)
+  const mobileNav = userIsAdmin
+    ? [...mobileNavBase, ...mobileNavAdmin]
+    : mobileNavBase
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -106,7 +123,7 @@ export default function DashboardLayout({
 
         {/* Nav Links */}
         <nav className={cn("flex-1 py-4 overflow-y-auto transition-all duration-300", sidebarCollapsed ? "px-2" : "px-3")}>
-          {navigation.map((section, sectionIdx) => (
+          {visibleNavigation.map((section, sectionIdx) => (
             <div key={section.label} className={cn(sectionIdx > 0 && "mt-5")}>
               {!sidebarCollapsed && (
                 <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-[hsl(var(--sidebar-foreground))]/50">

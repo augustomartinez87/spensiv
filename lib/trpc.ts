@@ -82,3 +82,35 @@ const isAuthed = t.middleware(async ({ ctx, next }) => {
  * Procedimiento protegido (requiere auth)
  */
 export const protectedProcedure = t.procedure.use(isAuthed)
+
+/**
+ * Middleware para rutas de administrador
+ * Verifica que el usuario tenga role: 'admin' en Clerk publicMetadata
+ */
+const isAdminMiddleware = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.userId) {
+    throw new TRPCError({ code: 'UNAUTHORIZED' })
+  }
+
+  const clerkUser = await currentUser()
+  if (clerkUser?.publicMetadata?.role !== 'admin') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Se requieren permisos de administrador',
+    })
+  }
+
+  let user = ctx.userCache.get(ctx.userId)
+  if (!user) {
+    user = await ctx.prisma.user.findUnique({ where: { clerkId: ctx.userId } })
+    if (!user) throw new TRPCError({ code: 'UNAUTHORIZED' })
+    ctx.userCache.set(ctx.userId, user)
+  }
+
+  return next({ ctx: { ...ctx, userId: ctx.userId, user } })
+})
+
+/**
+ * Procedimiento solo para admins
+ */
+export const adminProcedure = t.procedure.use(isAdminMiddleware)
