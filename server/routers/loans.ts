@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { router, protectedProcedure } from '@/lib/trpc'
-import { simulateLoan, compareLoanTypes, reverseFromInstallment, tnaToMonthlyRate, frenchInstallment, generateAmortizationTable, strategicRoundInstallment } from '@/lib/loan-calculator'
+import { simulateLoan, compareLoanTypes, reverseFromInstallment, tnaToMonthlyRate, frenchInstallment, generateAmortizationTable, generateSmartAmortizationTable, strategicRoundInstallment } from '@/lib/loan-calculator'
 import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
 import { addMonths } from 'date-fns'
 import { getDolarMep, pesify } from '@/lib/dolar'
@@ -140,11 +140,59 @@ export const loansRouter = router({
         return loan
       }
 
-      // Amortized loan (existing logic)
+      // Amortized loan
       if (!input.termMonths) throw new Error('El plazo es requerido para prestamos amortizados')
       if (input.tna === undefined || input.tna === null) throw new Error('La TNA es requerida para prestamos amortizados')
 
-      let monthlyRate = tnaToMonthlyRate(input.tna)
+      const monthlyRate = tnaToMonthlyRate(input.tna)
+
+      // ── Smart due date path: días reales, interés diario ──────────────────
+      if (input.smartDueDate) {
+        const smart = generateSmartAmortizationTable(
+          input.capital,
+          input.tna,
+          input.startDate,
+          input.termMonths,
+          input.roundingMultiple ?? 0,
+        )
+
+        const loan = await ctx.prisma.loan.create({
+          data: {
+            userId: ctx.user.id,
+            borrowerName: input.borrowerName,
+            capital: input.capital,
+            currency: input.currency,
+            loanType: 'amortized',
+            tna: input.tna,
+            rateIsNominal: true,
+            termMonths: input.termMonths,
+            monthlyRate,
+            installmentAmount: smart.installmentAmount,
+            totalAmount: smart.totalPaid,
+            startDate,
+            status: 'active',
+            principalOutstanding: input.capital,
+            overdueInterestOutstanding: 0,
+            personId: input.personId ?? null,
+            direction: input.direction,
+            creditorName: input.creditorName ?? null,
+            loanInstallments: {
+              create: smart.rows.map((row) => ({
+                number: row.month,
+                dueDate: new Date(row.date + 'T00:00:00'),
+                amount: row.installment,
+                interest: row.interest,
+                principal: row.principal,
+                balance: row.balance,
+              })),
+            },
+          },
+          include: { loanInstallments: { orderBy: { number: 'asc' } } },
+        })
+        return loan
+      }
+
+      // ── Standard French amortization path ────────────────────────────────
       const exactInstallment = frenchInstallment(input.capital, monthlyRate, input.termMonths)
       const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
         ? strategicRoundInstallment(input.capital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
@@ -152,11 +200,12 @@ export const loansRouter = router({
 
       // If rounding changed the installment, recalculate the real TNA/rate
       let tna = input.tna
+      let effectiveMonthlyRate = monthlyRate
       if (installmentAmount !== exactInstallment) {
         const real = reverseFromInstallment(input.capital, input.termMonths, installmentAmount)
         if (real) {
           tna = real.tna
-          monthlyRate = real.monthlyRate
+          effectiveMonthlyRate = real.monthlyRate
         }
       }
 
@@ -164,11 +213,10 @@ export const loansRouter = router({
 
       const table = generateAmortizationTable(
         input.capital,
-        monthlyRate,
+        effectiveMonthlyRate,
         input.termMonths,
         installmentAmount,
         input.startDate,
-        input.smartDueDate,
       )
 
       const loan = await ctx.prisma.loan.create({
@@ -181,7 +229,7 @@ export const loansRouter = router({
           tna,
           rateIsNominal: true,
           termMonths: input.termMonths,
-          monthlyRate,
+          monthlyRate: effectiveMonthlyRate,
           installmentAmount,
           totalAmount,
           startDate,
@@ -202,9 +250,7 @@ export const loansRouter = router({
             })),
           },
         },
-        include: {
-          loanInstallments: { orderBy: { number: 'asc' } },
-        },
+        include: { loanInstallments: { orderBy: { number: 'asc' } } },
       })
 
       return loan

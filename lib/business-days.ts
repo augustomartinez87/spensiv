@@ -72,3 +72,149 @@ export function getSmartDueDates(startDate: Date, termMonths: number): Date[] {
 
   return dates
 }
+
+// ─── Smart amortization schedule ─────────────────────────────────────────────
+
+export interface SmartScheduleRow {
+  period: number
+  dueDate: string  // ISO YYYY-MM-DD
+  days: number     // actual calendar days in this period
+  installment: number
+  interest: number
+  principal: number
+  balance: number
+}
+
+export interface SmartScheduleResult {
+  schedule: SmartScheduleRow[]
+  installmentAmount: number  // exact (before rounding); last period may differ
+  totalPaid: number
+}
+
+/**
+ * Generates an amortization schedule for irregular periods using actual-day interest accrual.
+ *
+ * Formula:
+ *   interest_i = balance_i × (TNA / 365) × days_i
+ *
+ * The fixed installment that exactly amortizes the capital is solved in closed form:
+ *   C = capital / Σ DF_i
+ *   where DF_i = Π_{j=1..i} 1 / (1 + TNA/365 × days_j)
+ *
+ * The last period adjusts to close the balance to exactly 0.
+ */
+export function generateSmartSchedule(
+  capital: number,
+  tna: number,
+  startDate: Date,
+  dueDates: Date[],
+  roundingMultiple = 0,
+): SmartScheduleResult {
+  const dailyRate = tna / 365
+  const n = dueDates.length
+
+  // Actual calendar days per period
+  const periodDays = dueDates.map((d, i) => {
+    const prev = i === 0 ? startDate : dueDates[i - 1]
+    return Math.round((d.getTime() - prev.getTime()) / 86_400_000)
+  })
+
+  // Period simple-interest rates: r_i = dailyRate × days_i
+  const periodRates = periodDays.map(d => dailyRate * d)
+
+  // Cumulative discount factors: DF_i = Π_{j=0..i} 1/(1 + r_j)
+  let cumDF = 1
+  let sumDF = 0
+  for (const r of periodRates) {
+    cumDF /= (1 + r)
+    sumDF += cumDF
+  }
+
+  // Exact installment (closed-form)
+  const exactInstallment = capital / sumDF
+
+  // Apply rounding (ceiling to multiple)
+  const installment = roundingMultiple > 0
+    ? Math.ceil(exactInstallment / roundingMultiple) * roundingMultiple
+    : exactInstallment
+
+  // Build schedule
+  const schedule: SmartScheduleRow[] = []
+  let balance = capital
+  let totalPaid = 0
+
+  for (let i = 0; i < n; i++) {
+    const interest = balance * periodRates[i]
+    const isLast = i === n - 1
+    // Last period: close balance regardless of rounding
+    const cuota = isLast ? balance + interest : installment
+    const principal = cuota - interest
+
+    balance = isLast ? 0 : balance - principal
+    totalPaid += cuota
+
+    schedule.push({
+      period: i + 1,
+      dueDate: fmtDate(dueDates[i]),
+      days: periodDays[i],
+      installment: cuota,
+      interest,
+      principal,
+      balance: Math.max(0, balance),
+    })
+  }
+
+  return { schedule, installmentAmount: exactInstallment, totalPaid }
+}
+
+// ─── XIRR ────────────────────────────────────────────────────────────────────
+
+/**
+ * Calculates the effective annual IRR (XIRR) for cash flows at irregular dates.
+ * Uses Newton-Raphson on: NPV = Σ CF_i / (1+rate)^(t_i / 365.25)
+ *
+ * @param dates      dates[0] = investment date (same as startDate)
+ * @param cashFlows  cashFlows[0] = -capital (negative), rest = installments
+ */
+export function calculateXIRR(
+  dates: Date[],
+  cashFlows: number[],
+  maxIterations = 300,
+  tolerance = 1e-10,
+): number {
+  const t0 = dates[0].getTime()
+  const yearFracs = dates.map(d => (d.getTime() - t0) / (365.25 * 86_400_000))
+
+  let rate = 1.0  // initial guess: 100% effective annual (reasonable for AR)
+
+  for (let iter = 0; iter < maxIterations; iter++) {
+    let npv = 0
+    let dnpv = 0
+
+    for (let i = 0; i < cashFlows.length; i++) {
+      const t = yearFracs[i]
+      if (t === 0) { npv += cashFlows[i]; continue }
+      const factor = Math.pow(1 + rate, t)
+      npv  += cashFlows[i] / factor
+      dnpv -= cashFlows[i] * t / (factor * (1 + rate))
+    }
+
+    if (Math.abs(dnpv) < 1e-14) break
+    const delta = npv / dnpv
+    rate -= delta
+    if (rate < -0.9999) rate = -0.9999
+    if (rate > 200) rate = 200
+    if (Math.abs(delta) < tolerance) break
+  }
+
+  return rate
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtDate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}

@@ -11,7 +11,7 @@ import {
   tnaNominalToDailyRate,
   tnaNominalToMonthlyRate,
 } from './financial-engine'
-import { getSmartDueDates } from './business-days'
+import { getSmartDueDates, generateSmartSchedule, calculateXIRR } from './business-days'
 
 export type AccrualType = 'linear' | 'exponential'
 export type LoanType = 'bullet' | 'amortized'
@@ -97,17 +97,15 @@ export function generateAmortizationTable(
   termMonths: number,
   installmentAmount: number,
   startDate: string,
-  smartDueDate?: boolean,
 ): AmortizationRow[] {
   const schedule = generateFrenchScheduleExact(capital, monthlyRate, termMonths, installmentAmount, startDate)
-  const smartDates = smartDueDate ? getSmartDueDates(parseIsoDate(startDate), termMonths) : null
   let accrued = new Decimal(0)
 
-  return schedule.schedule.map((row, i) => {
+  return schedule.schedule.map((row) => {
     accrued = accrued.plus(row.interest)
     return {
       month: row.period,
-      date: smartDates ? formatDate(smartDates[i]) : row.dueDate,
+      date: row.dueDate,
       installment: round2(row.installment),
       interest: round2(row.interest),
       principal: round2(row.principal),
@@ -115,6 +113,38 @@ export function generateAmortizationTable(
       accruedReturn: round2(accrued.toNumber()),
     }
   })
+}
+
+/**
+ * Generates an amortization table using actual-day interest accrual for smart due dates.
+ * Returns the rows plus the exact installment amount and total paid.
+ */
+export function generateSmartAmortizationTable(
+  capital: number,
+  tna: number,
+  startDate: string,
+  termMonths: number,
+  roundingMultiple = 0,
+): { rows: AmortizationRow[]; installmentAmount: number; totalPaid: number } {
+  const start = parseIsoDate(startDate)
+  const dueDates = getSmartDueDates(start, termMonths)
+  const smart = generateSmartSchedule(capital, tna, start, dueDates, roundingMultiple)
+
+  let accrued = new Decimal(0)
+  const rows: AmortizationRow[] = smart.schedule.map((row) => {
+    accrued = accrued.plus(row.interest)
+    return {
+      month: row.period,
+      date: row.dueDate,
+      installment: round2(row.installment),
+      interest: round2(row.interest),
+      principal: round2(row.principal),
+      balance: round2(row.balance),
+      accruedReturn: round2(accrued.toNumber()),
+    }
+  })
+
+  return { rows, installmentAmount: smart.installmentAmount, totalPaid: smart.totalPaid }
 }
 
 export function reverseFromInstallment(
@@ -280,6 +310,10 @@ function simulateAmortized(
   input: LoanInput,
   base: Omit<SimulationResult, 'tirEffective' | 'tirTNA' | 'hurdleTirTNA' | 'spread' | 'isConvenient' | 'accruedCurve'>,
 ): SimulationResult {
+  if (input.smartDueDate) {
+    return simulateAmortizedSmart(input, base)
+  }
+
   const built = buildFrenchLoanWithMinimumTna({
     capital: input.capital,
     termMonths: input.termMonths,
@@ -289,18 +323,13 @@ function simulateAmortized(
     customInstallment: input.customInstallment,
   })
 
-  const smartDates = input.smartDueDate
-    ? getSmartDueDates(parseIsoDate(input.startDate), input.termMonths)
-    : null
-
   const table: AmortizationRow[] = []
   let accrued = new Decimal(0)
-  for (let i = 0; i < built.schedule.schedule.length; i++) {
-    const row = built.schedule.schedule[i]
+  for (const row of built.schedule.schedule) {
     accrued = accrued.plus(row.interest)
     table.push({
       month: row.period,
-      date: smartDates ? formatDate(smartDates[i]) : row.dueDate,
+      date: row.dueDate,
       installment: round2(row.installment),
       interest: round2(row.interest),
       principal: round2(row.principal),
@@ -326,6 +355,65 @@ function simulateAmortized(
     spread,
     isConvenient: tirTNA + 1e-8 >= input.hurdleRate,
     accruedCurve: [{ month: 0, value: 0 }, ...table.map((row) => ({ month: row.month, value: row.accruedReturn }))],
+  }
+}
+
+function simulateAmortizedSmart(
+  input: LoanInput,
+  base: Omit<SimulationResult, 'tirEffective' | 'tirTNA' | 'hurdleTirTNA' | 'spread' | 'isConvenient' | 'accruedCurve'>,
+): SimulationResult {
+  const startDate = parseIsoDate(input.startDate)
+  const dueDates = getSmartDueDates(startDate, input.termMonths)
+  const smart = generateSmartSchedule(
+    input.capital,
+    input.tnaTarget,
+    startDate,
+    dueDates,
+    input.roundingMultiple ?? 0,
+  )
+
+  let accrued = new Decimal(0)
+  const table: AmortizationRow[] = smart.schedule.map((row) => {
+    accrued = accrued.plus(row.interest)
+    return {
+      month: row.period,
+      date: row.dueDate,
+      installment: round2(row.installment),
+      interest: round2(row.interest),
+      principal: round2(row.principal),
+      balance: round2(row.balance),
+      accruedReturn: round2(accrued.toNumber()),
+    }
+  })
+
+  // XIRR: effective annual IRR considering actual payment dates
+  const xirrDates = [startDate, ...dueDates]
+  const xirrCFs = [-input.capital, ...smart.schedule.map((r) => r.installment)]
+  const xirr = calculateXIRR(xirrDates, xirrCFs)
+
+  // Convert effective annual rate → TNA (nominal, monthly compounding convention)
+  const xirrMonthly = Math.pow(1 + xirr, 1 / 12) - 1
+  const tirTNA = monthlyRateToTnaNominal(xirrMonthly)
+  const tirEffective = xirr
+  const spread = round2((tirTNA - input.hurdleRate) * 100)
+
+  const roundedInstallment =
+    input.roundingMultiple && input.roundingMultiple > 0
+      ? Math.ceil(smart.installmentAmount / input.roundingMultiple) * input.roundingMultiple
+      : smart.installmentAmount
+
+  return {
+    ...base,
+    installmentAmount: round2(smart.installmentAmount),
+    roundedInstallmentAmount: round2(roundedInstallment),
+    amortizationTable: table,
+    totalPaid: round2(smart.totalPaid),
+    tirEffective,
+    tirTNA,
+    hurdleTirTNA: input.hurdleRate,
+    spread,
+    isConvenient: tirTNA + 1e-8 >= input.hurdleRate,
+    accruedCurve: [{ month: 0, value: 0 }, ...table.map((r) => ({ month: r.month, value: r.accruedReturn }))],
   }
 }
 
