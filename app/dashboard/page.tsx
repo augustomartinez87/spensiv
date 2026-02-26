@@ -129,6 +129,39 @@ export default function DashboardPage() {
     )
   }
 
+  // ── Métricas derivadas para hero cards ──────────────────────────────
+  const [periodYear, periodMonth] = period.split('-').map(Number)
+  const daysElapsed =
+    period === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      ? now.getDate()
+      : new Date(periodYear, periodMonth, 0).getDate()
+  const dailyExpenseAverage = daysElapsed > 0 ? balance.totalExpense / daysElapsed : 0
+
+  const allExpenseDates = [
+    ...balance.installments.map((inst: any) => new Date(inst.transaction.purchaseDate)),
+    ...(balance.cashTransactions || []).map((tx: any) => new Date(tx.purchaseDate)),
+  ]
+  const lastExpenseDate =
+    allExpenseDates.length > 0
+      ? new Date(Math.max(...allExpenseDates.map((d) => d.getTime())))
+      : null
+  const lastExpenseDaysAgo = lastExpenseDate
+    ? Math.max(0, Math.floor((now.getTime() - lastExpenseDate.getTime()) / (1000 * 60 * 60 * 24)))
+    : undefined
+
+  const lastIncome = balance.incomes.length > 0 ? balance.incomes[0] : null
+  const nextIncomeEstimate = lastIncome
+    ? (() => {
+        const lastDate = new Date(lastIncome.date)
+        const nextDate = new Date(lastDate)
+        nextDate.setMonth(nextDate.getMonth() + 1)
+        return format(nextDate, 'd MMM', { locale: es })
+      })()
+    : undefined
+
+  const expenseSparkline = evolutionData?.map((d) => d.expense) ?? []
+  const incomeSparkline = evolutionData?.map((d) => d.income) ?? []
+
   return (
     <div className="space-y-4">
       {/* ── Header ── */}
@@ -149,6 +182,9 @@ export default function DashboardPage() {
           count={balance.installments.length + (balance.cashTransactions?.length || 0)}
           type="expense"
           previousValue={prevBalance?.totalExpense}
+          dailyAverage={dailyExpenseAverage}
+          lastTransactionDaysAgo={lastExpenseDaysAgo}
+          sparklineData={expenseSparkline}
         />
         <StatCard
           title="Ingresos del mes"
@@ -156,6 +192,8 @@ export default function DashboardPage() {
           count={balance.incomes.length}
           type="income"
           previousValue={prevBalance?.totalIncome}
+          nextEstimatedDate={nextIncomeEstimate}
+          sparklineData={incomeSparkline}
         />
         <CompactProjection
           balance={balance.balance}

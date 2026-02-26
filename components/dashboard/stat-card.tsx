@@ -1,7 +1,9 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { ResponsiveContainer, AreaChart, Area } from 'recharts'
 
 interface StatCardProps {
     title: string
@@ -10,9 +12,32 @@ interface StatCardProps {
     type: 'income' | 'expense' | 'balance'
     previousValue?: number
     currency?: string
+    dailyAverage?: number
+    lastTransactionDaysAgo?: number
+    nextEstimatedDate?: string
+    sparklineData?: number[]
 }
 
-export function StatCard({ title, value, count, type, previousValue }: StatCardProps) {
+function fmtAvg(n: number): string {
+    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+    if (n >= 1_000) return `$${Math.round(n / 1_000)}k`
+    return `$${Math.round(n)}`
+}
+
+export function StatCard({
+    title,
+    value,
+    count,
+    type,
+    previousValue,
+    dailyAverage,
+    lastTransactionDaysAgo,
+    nextEstimatedDate,
+    sparklineData,
+}: StatCardProps) {
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => setMounted(true), [])
+
     const isPositive = value >= 0
     const isBalance = type === 'balance'
 
@@ -28,10 +53,23 @@ export function StatCard({ title, value, count, type, previousValue }: StatCardP
 
     const hasPreviousData = previousValue !== undefined && previousValue !== 0
 
+    const sparkColor = type === 'expense' ? '#e54352' : '#22c55e'
+    const sparkPoints = (sparklineData ?? []).map((v, i) => ({ v, i }))
+
+    const lastStr =
+        lastTransactionDaysAgo === 0
+            ? 'hoy'
+            : lastTransactionDaysAgo === 1
+                ? 'ayer'
+                : lastTransactionDaysAgo !== undefined
+                    ? `hace ${lastTransactionDaysAgo}d`
+                    : null
+
     return (
-        <Card className="hover:shadow-md h-full min-h-[140px]">
-            <CardContent className="p-6 flex flex-col justify-between h-full">
-                <div className="flex items-start justify-between gap-2 mb-3">
+        <Card className="hover:shadow-md h-full min-h-[160px]">
+            <CardContent className="p-5 flex flex-col h-full">
+                {/* Fila 1: título + badge */}
+                <div className="flex items-start justify-between gap-2">
                     <p className="text-xs font-medium text-muted-foreground leading-snug">{title}</p>
                     {hasPreviousData ? (
                         <span className={cn(
@@ -49,14 +87,66 @@ export function StatCard({ title, value, count, type, previousValue }: StatCardP
                         </span>
                     )}
                 </div>
-                <div className={cn('text-3xl font-bold tracking-tight break-all', valueColor)}>
+
+                {/* Fila 2: valor principal */}
+                <div className={cn('text-2xl font-bold tracking-tight break-all mt-2', valueColor)}>
                     {isBalance && !isPositive && '-'}
                     ${Math.abs(value).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
-                <div className="mt-2">
-                    {count !== undefined && (
-                        <p className="text-xs text-muted-foreground">
-                            {count} {count === 1 ? 'movimiento' : 'movimientos'}
+
+                {/* Sparkline */}
+                {mounted && sparkPoints.length > 1 && (
+                    <div className="h-8 w-full mt-1 -mx-1">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart
+                                data={sparkPoints}
+                                margin={{ top: 2, right: 0, left: 0, bottom: 0 }}
+                            >
+                                <Area
+                                    type="monotone"
+                                    dataKey="v"
+                                    stroke={sparkColor}
+                                    fill={sparkColor}
+                                    fillOpacity={0.08}
+                                    strokeWidth={1.5}
+                                    dot={false}
+                                    isAnimationActive={false}
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                )}
+
+                {/* Insights */}
+                <div className="mt-auto pt-2">
+                    {type === 'expense' && (
+                        <p className="text-[11px] text-muted-foreground leading-tight">
+                            {dailyAverage !== undefined && (
+                                <span>Prom: {fmtAvg(dailyAverage)}/día</span>
+                            )}
+                            {dailyAverage !== undefined && lastStr && (
+                                <span className="opacity-40"> · </span>
+                            )}
+                            {lastStr && <span>Último: {lastStr}</span>}
+                            {count !== undefined && (
+                                <>
+                                    <span className="opacity-40"> · </span>
+                                    <span>{count} {count === 1 ? 'mov.' : 'movs.'}</span>
+                                </>
+                            )}
+                        </p>
+                    )}
+                    {type === 'income' && (
+                        <p className="text-[11px] text-muted-foreground leading-tight">
+                            {count !== undefined && (
+                                <span>{count} {count === 1 ? 'movimiento' : 'movimientos'}</span>
+                            )}
+                            {nextEstimatedDate && (
+                                <>
+                                    <span className="opacity-40"> · </span>
+                                    <span>Próx: ~{nextEstimatedDate}</span>
+                                </>
+                            )}
                         </p>
                     )}
                     {isBalance && (
