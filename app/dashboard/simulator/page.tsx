@@ -75,6 +75,9 @@ export default function SimulatorPage() {
   const [roundEnabled, setRoundEnabled] = useState(true)
   const [roundingMultiple, setRoundingMultiple] = useState<number>(1000)
 
+  // Smart due date state
+  const [smartDueDate, setSmartDueDate] = useState(false)
+
   // Compare terms state
   const [compareTermsInput, setCompareTermsInput] = useState('')
   const [compareTerms, setCompareTerms] = useState<number[]>([6, 9, 12])
@@ -148,6 +151,7 @@ export default function SimulatorPage() {
       accrualType: accrualType as 'linear' | 'exponential',
       startDate,
       roundingMultiple: roundEnabled ? roundingMultiple : 0,
+      smartDueDate,
     }
 
     if (viewMode === 'compare') {
@@ -171,7 +175,7 @@ export default function SimulatorPage() {
   // Create Loan dialog state
   const [createLoanOpen, setCreateLoanOpen] = useState(false)
   const [createLoanDefaults, setCreateLoanDefaults] = useState<{
-    capital: string; tna: string; termMonths: string; startDate: string; currency: 'ARS' | 'USD'; roundingMultiple: number
+    capital: string; tna: string; termMonths: string; startDate: string; currency: 'ARS' | 'USD'; roundingMultiple: number; smartDueDate: boolean
   } | null>(null)
   const [borrowerName, setBorrowerName] = useState('')
 
@@ -201,6 +205,7 @@ export default function SimulatorPage() {
       startDate: startDate,
       currency,
       roundingMultiple: roundEnabled ? roundingMultiple : 0,
+      smartDueDate,
     })
     setCreateLoanOpen(true)
   }
@@ -214,6 +219,7 @@ export default function SimulatorPage() {
       startDate: startDate,
       currency,
       roundingMultiple: roundEnabled ? roundingMultiple : 0,
+      smartDueDate,
     })
     setCreateLoanOpen(true)
   }
@@ -229,6 +235,7 @@ export default function SimulatorPage() {
       termMonths: parseInt(createLoanDefaults.termMonths),
       startDate: createLoanDefaults.startDate,
       roundingMultiple: createLoanDefaults.roundingMultiple,
+      smartDueDate: createLoanDefaults.smartDueDate,
     }
     if (isPreApprove) {
       preApproveMutation.mutate(payload)
@@ -428,6 +435,26 @@ export default function SimulatorPage() {
                   <SelectItem value="10000">Múltiplos de $10.000</SelectItem>
                 </SelectContent>
               </Select>
+            )}
+          </div>
+
+          {/* Smart due date toggle */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="smart-due-date"
+                checked={smartDueDate}
+                onCheckedChange={setSmartDueDate}
+              />
+              <Label htmlFor="smart-due-date" className="text-sm cursor-pointer">
+                Primer vencimiento inteligente
+              </Label>
+            </div>
+            {smartDueDate && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1 pl-0.5">
+                <Info className="h-3 w-3 shrink-0" />
+                Las cuotas vencen el 5° día hábil de cada mes
+              </p>
             )}
           </div>
 

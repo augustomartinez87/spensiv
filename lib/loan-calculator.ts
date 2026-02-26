@@ -11,6 +11,7 @@ import {
   tnaNominalToDailyRate,
   tnaNominalToMonthlyRate,
 } from './financial-engine'
+import { getSmartDueDates } from './business-days'
 
 export type AccrualType = 'linear' | 'exponential'
 export type LoanType = 'bullet' | 'amortized'
@@ -25,6 +26,7 @@ export interface LoanInput {
   customInstallment?: number
   startDate: string
   roundingMultiple?: number
+  smartDueDate?: boolean
 }
 
 export interface AmortizationRow {
@@ -95,15 +97,17 @@ export function generateAmortizationTable(
   termMonths: number,
   installmentAmount: number,
   startDate: string,
+  smartDueDate?: boolean,
 ): AmortizationRow[] {
   const schedule = generateFrenchScheduleExact(capital, monthlyRate, termMonths, installmentAmount, startDate)
+  const smartDates = smartDueDate ? getSmartDueDates(parseIsoDate(startDate), termMonths) : null
   let accrued = new Decimal(0)
 
-  return schedule.schedule.map((row) => {
+  return schedule.schedule.map((row, i) => {
     accrued = accrued.plus(row.interest)
     return {
       month: row.period,
-      date: row.dueDate,
+      date: smartDates ? formatDate(smartDates[i]) : row.dueDate,
       installment: round2(row.installment),
       interest: round2(row.interest),
       principal: round2(row.principal),
@@ -285,13 +289,18 @@ function simulateAmortized(
     customInstallment: input.customInstallment,
   })
 
+  const smartDates = input.smartDueDate
+    ? getSmartDueDates(parseIsoDate(input.startDate), input.termMonths)
+    : null
+
   const table: AmortizationRow[] = []
   let accrued = new Decimal(0)
-  for (const row of built.schedule.schedule) {
+  for (let i = 0; i < built.schedule.schedule.length; i++) {
+    const row = built.schedule.schedule[i]
     accrued = accrued.plus(row.interest)
     table.push({
       month: row.period,
-      date: row.dueDate,
+      date: smartDates ? formatDate(smartDates[i]) : row.dueDate,
       installment: round2(row.installment),
       interest: round2(row.interest),
       principal: round2(row.principal),

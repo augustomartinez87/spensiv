@@ -56,6 +56,7 @@ import {
   Copy,
   RefreshCw,
   Link2,
+  Info,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
@@ -2046,6 +2047,7 @@ function CreateLoanDialog({
   const [creditorName, setCreditorName] = useState('')
   const [fciRate, setFciRate] = useState('40')
   const [suggestedTna, setSuggestedTna] = useState<number | null>(null)
+  const [smartDueDate, setSmartDueDate] = useState(false)
 
   const { data: persons } = trpc.persons.list.useQuery()
 
@@ -2153,6 +2155,7 @@ function CreateLoanDialog({
         personId: selectedPersonId || undefined,
         direction,
         creditorName: direction === 'borrower' ? creditorName || undefined : undefined,
+        smartDueDate,
       })
     }
   }
@@ -2450,6 +2453,28 @@ function CreateLoanDialog({
               required
             />
           </div>
+
+          {/* Smart due date toggle — solo aplica a préstamos amortizados */}
+          {loanType === 'amortized' && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="modal-smart-due-date"
+                  checked={smartDueDate}
+                  onCheckedChange={setSmartDueDate}
+                />
+                <Label htmlFor="modal-smart-due-date" className="text-sm cursor-pointer">
+                  Primer vencimiento inteligente
+                </Label>
+              </div>
+              {smartDueDate && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1 pl-0.5">
+                  <Info className="h-3 w-3 shrink-0" />
+                  Las cuotas vencen el 5° día hábil de cada mes
+                </p>
+              )}
+            </div>
+          )}
 
           {createMutation.error && (
             <p className="text-sm text-red-500">{createMutation.error.message}</p>

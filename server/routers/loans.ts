@@ -10,6 +10,7 @@ import { LoanAccountingService } from '../services/loan-accounting.service'
 const simulateInput = z.object({
   capital: z.number().positive('El capital debe ser positivo'),
   termMonths: z.number().int().min(1).max(360),
+  smartDueDate: z.boolean().optional(),
   tnaTarget: z.number().min(0.001, 'La TNA debe ser mayor a 0'),
   hurdleRate: z.number().min(0),
   loanType: z.enum(['bullet', 'amortized']),
@@ -22,6 +23,7 @@ const simulateInput = z.object({
 const compareTermsInput = z.object({
   capital: z.number().positive(),
   tnaTarget: z.number().min(0.001),
+  smartDueDate: z.boolean().optional(),
   hurdleRate: z.number().min(0),
   accrualType: z.enum(['linear', 'exponential']).default('exponential'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -40,6 +42,7 @@ const createLoanInput = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   personId: z.string().optional(),
   roundingMultiple: z.number().int().min(0).optional(),
+  smartDueDate: z.boolean().optional(),
   direction: z.enum(['lender', 'borrower']).default('lender'),
   creditorName: z.string().optional(),
 })
@@ -64,6 +67,7 @@ export const loansRouter = router({
           accrualType: input.accrualType,
           startDate: input.startDate,
           roundingMultiple: input.roundingMultiple,
+          smartDueDate: input.smartDueDate,
         })
       )
     }),
@@ -164,6 +168,7 @@ export const loansRouter = router({
         input.termMonths,
         installmentAmount,
         input.startDate,
+        input.smartDueDate,
       )
 
       const loan = await ctx.prisma.loan.create({
@@ -189,7 +194,7 @@ export const loansRouter = router({
           loanInstallments: {
             create: table.map((row) => ({
               number: row.month,
-              dueDate: addMonths(startDate, row.month),
+              dueDate: new Date(row.date + 'T00:00:00'),
               amount: row.installment,
               interest: row.interest,
               principal: row.principal,
