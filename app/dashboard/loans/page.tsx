@@ -2047,7 +2047,7 @@ function CreateLoanDialog({
   const [creditorName, setCreditorName] = useState('')
   const [fciRate, setFciRate] = useState('40')
   const [suggestedTna, setSuggestedTna] = useState<number | null>(null)
-  const [smartDueDate, setSmartDueDate] = useState(false)
+  const [smartDueDate, setSmartDueDate] = useState(true)
 
   const { data: persons } = trpc.persons.list.useQuery()
 
@@ -2470,7 +2470,7 @@ function CreateLoanDialog({
               {smartDueDate && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1 pl-0.5">
                   <Info className="h-3 w-3 shrink-0" />
-                  Las cuotas vencen el 5° día hábil de cada mes
+                  Las cuotas vencen el 2° día hábil de cada mes
                 </p>
               )}
             </div>

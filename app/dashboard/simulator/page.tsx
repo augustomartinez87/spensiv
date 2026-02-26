@@ -76,7 +76,7 @@ export default function SimulatorPage() {
   const [roundingMultiple, setRoundingMultiple] = useState<number>(1000)
 
   // Smart due date state
-  const [smartDueDate, setSmartDueDate] = useState(false)
+  const [smartDueDate, setSmartDueDate] = useState(true)
 
   // Compare terms state
   const [compareTermsInput, setCompareTermsInput] = useState('')
@@ -453,7 +453,7 @@ export default function SimulatorPage() {
             {smartDueDate && (
               <p className="text-xs text-muted-foreground flex items-center gap-1 pl-0.5">
                 <Info className="h-3 w-3 shrink-0" />
-                Las cuotas vencen el 5° día hábil de cada mes
+                Las cuotas vencen el 2° día hábil de cada mes
               </p>
             )}
           </div>

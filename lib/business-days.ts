@@ -22,7 +22,7 @@ export function getNthBusinessDay(year: number, month: number, n: number): Date 
 
 /**
  * Returns the first due date under the "primer vencimiento inteligente" rule:
- * - Target: 5th business day of the month following startDate.
+ * - Target: 2nd business day of the month following startDate.
  * - If the gap between startDate and that date is < 25 days, skip to the month after.
  */
 export function getSmartFirstDueDate(startDate: Date): Date {
@@ -34,7 +34,7 @@ export function getSmartFirstDueDate(startDate: Date): Date {
     year++
   }
 
-  const candidate = getNthBusinessDay(year, month, 5)
+  const candidate = getNthBusinessDay(year, month, 2)
   const diffDays = (candidate.getTime() - startDate.getTime()) / 86_400_000
 
   if (diffDays < 25) {
@@ -43,14 +43,14 @@ export function getSmartFirstDueDate(startDate: Date): Date {
       month = 1
       year++
     }
-    return getNthBusinessDay(year, month, 5)
+    return getNthBusinessDay(year, month, 2)
   }
 
   return candidate
 }
 
 /**
- * Returns an array of N smart due dates (5th business day of each consecutive month)
+ * Returns an array of N smart due dates (2nd business day of each consecutive month)
  * starting from the first valid due date for the given startDate.
  */
 export function getSmartDueDates(startDate: Date, termMonths: number): Date[] {
@@ -67,7 +67,7 @@ export function getSmartDueDates(startDate: Date, termMonths: number): Date[] {
       m -= 12
       y++
     }
-    dates.push(getNthBusinessDay(y, m, 5))
+    dates.push(getNthBusinessDay(y, m, 2))
   }
 
   return dates
