@@ -27,7 +27,6 @@ import {
 import {
   Calculator,
   TrendingUp,
-  TrendingDown,
   ArrowRightLeft,
   CheckCircle2,
   XCircle,
@@ -65,8 +64,6 @@ export default function SimulatorPage() {
   const [termMonths, setTermMonths] = useState('12')
   const [tnaTarget, setTnaTarget] = useState('55')
   const [hurdleRate, setHurdleRate] = useState('40')
-  const [loanType, setLoanType] = useState<'bullet' | 'amortized'>('amortized')
-  const [accrualType, setAccrualType] = useState<'linear' | 'exponential'>('exponential')
   const [customInstallment, setCustomInstallment] = useState('')
   const [impliedTna, setImpliedTna] = useState<number | null>(null)
   const [startDate, setStartDate] = useState(formatDateToInput(new Date()))
@@ -81,6 +78,31 @@ export default function SimulatorPage() {
   // Compare terms state
   const [compareTermsInput, setCompareTermsInput] = useState('')
   const [compareTerms, setCompareTerms] = useState<number[]>([6, 9, 12])
+
+  // localStorage persistence
+  const STORAGE_KEY = 'spensiv_simulator_params'
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const installmentTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+      if (saved.capital) setCapital(saved.capital)
+      if (saved.currency) setCurrency(saved.currency)
+      if (saved.tnaTarget) setTnaTarget(saved.tnaTarget)
+      if (saved.hurdleRate) setHurdleRate(saved.hurdleRate)
+      if (saved.startDate) setStartDate(saved.startDate)
+      if (saved.roundEnabled !== undefined) setRoundEnabled(saved.roundEnabled)
+      if (saved.roundingMultiple) setRoundingMultiple(saved.roundingMultiple)
+      if (saved.smartDueDate !== undefined) setSmartDueDate(saved.smartDueDate)
+      if (saved.compareTerms?.length) setCompareTerms(saved.compareTerms)
+      if (saved.viewMode) setViewMode(saved.viewMode)
+      if (saved.termMonths) setTermMonths(saved.termMonths)
+      if (saved.customInstallment) setCustomInstallment(saved.customInstallment)
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Results
   const [singleResult, setSingleResult] = useState<SimulationResult | null>(null)
@@ -114,21 +136,49 @@ export default function SimulatorPage() {
 
   const isLoading = simulateMutation.isPending || compareTermsMutation.isPending
 
+  // Save to localStorage with debounce whenever params change
+  useEffect(() => {
+    clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        const today = formatDateToInput(new Date())
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          capital,
+          currency,
+          tnaTarget,
+          hurdleRate,
+          ...(startDate !== today ? { startDate } : {}),
+          roundEnabled,
+          roundingMultiple,
+          smartDueDate,
+          compareTerms,
+          viewMode,
+          termMonths,
+          customInstallment: customInstallment || undefined,
+        }))
+      } catch {}
+    }, 300)
+    return () => clearTimeout(saveTimerRef.current)
+  }, [capital, currency, tnaTarget, hurdleRate, startDate, roundEnabled, roundingMultiple, smartDueDate, compareTerms, viewMode, termMonths, customInstallment])
+
   function handleInstallmentChange(value: string) {
     setCustomInstallment(value)
     setImpliedTna(null)
 
-    const installment = parseFloat(value)
-    const cap = parseFloat(capital)
-    const term = parseInt(termMonths)
+    clearTimeout(installmentTimerRef.current)
+    installmentTimerRef.current = setTimeout(() => {
+      const installment = parseFloat(value)
+      const cap = parseFloat(capital)
+      const term = parseInt(termMonths)
 
-    if (installment > 0 && cap > 0 && term > 0 && installment > cap / term) {
-      reverseMutation.mutate({
-        capital: cap,
-        termMonths: term,
-        desiredInstallment: installment,
-      })
-    }
+      if (installment > 0 && cap > 0 && term > 0 && installment > cap / term) {
+        reverseMutation.mutate({
+          capital: cap,
+          termMonths: term,
+          desiredInstallment: installment,
+        })
+      }
+    }, 300)
   }
 
   function addCompareTerm() {
@@ -148,7 +198,7 @@ export default function SimulatorPage() {
       capital: parseFloat(capital),
       tnaTarget: parseFloat(tnaTarget) / 100,
       hurdleRate: parseFloat(hurdleRate) / 100,
-      accrualType: accrualType as 'linear' | 'exponential',
+      accrualType: 'exponential' as const,
       startDate,
       roundingMultiple: roundEnabled ? roundingMultiple : 0,
       smartDueDate,
@@ -164,7 +214,7 @@ export default function SimulatorPage() {
       simulateMutation.mutate({
         ...baseInput,
         termMonths: parseInt(termMonths),
-        loanType,
+        loanType: 'amortized',
         ...(customInstallment ? { customInstallment: parseFloat(customInstallment) } : {}),
       })
       setCompareResults(null)
@@ -359,36 +409,6 @@ export default function SimulatorPage() {
 
             {viewMode === 'single' && (
               <div className="space-y-2">
-                <Label>Tipo de Préstamo</Label>
-                <Select value={loanType} onValueChange={(v) => setLoanType(v as any)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="amortized">Amortizado (Cuotas)</SelectItem>
-                    <SelectItem value="bullet">Bullet (Descuento)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {viewMode === 'single' && loanType === 'bullet' && (
-              <div className="space-y-2">
-                <Label>Devengamiento Bullet</Label>
-                <Select value={accrualType} onValueChange={(v) => setAccrualType(v as any)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="exponential">Exponencial</SelectItem>
-                    <SelectItem value="linear">Lineal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {viewMode === 'single' && loanType === 'amortized' && (
-              <div className="space-y-2">
                 <Label htmlFor="customInstallment">Cuota Deseada (opcional)</Label>
                 <Input
                   id="customInstallment"
@@ -398,13 +418,18 @@ export default function SimulatorPage() {
                   placeholder="Dejar vacío para calcular"
                 />
                 {impliedTna !== null && (
-                  <p className="text-xs flex items-center gap-1 text-accent-blue">
+                  <p className="text-xs flex items-center gap-1 text-accent-positive">
                     <Zap className="h-3 w-3" />
-                    TNA implícita: {(impliedTna * 100).toFixed(2)}% (aplicada arriba)
+                    → TNA resultante: {(impliedTna * 100).toFixed(2)}%
                   </p>
                 )}
                 {reverseMutation.isPending && (
                   <p className="text-xs text-muted-foreground">Calculando TNA...</p>
+                )}
+                {!reverseMutation.isPending && impliedTna === null && customInstallment !== '' &&
+                  parseFloat(customInstallment) > 0 && parseFloat(capital) > 0 && parseInt(termMonths) > 0 &&
+                  parseFloat(customInstallment) <= parseFloat(capital) / parseInt(termMonths) && (
+                  <p className="text-xs text-red-500">Cuota insuficiente para amortizar</p>
                 )}
               </div>
             )}
@@ -560,11 +585,8 @@ export default function SimulatorPage() {
               {compareResults && compareResults.map((r) => (
                 <AmortizationTable key={r.termMonths} result={r} title={`${r.termMonths} meses`} />
               ))}
-              {singleResult && singleResult.loanType === 'amortized' && (
+              {singleResult && (
                 <AmortizationTable result={singleResult} title="Amortizado (Cuotas)" />
-              )}
-              {singleResult && singleResult.loanType === 'bullet' && (
-                <BulletTable result={singleResult} title="Bullet (Descuento)" />
               )}
             </TabsContent>
           </Tabs>
@@ -696,10 +718,7 @@ function ResultCardContent({ result, title, onCreateLoan, onPreApprove }: { resu
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
-          {result.loanType === 'amortized'
-            ? <TrendingUp className="h-5 w-5 text-blue-500" />
-            : <TrendingDown className="h-5 w-5 text-amber-500" />
-          }
+          <TrendingUp className="h-5 w-5 text-blue-500" />
           {title}
         </CardTitle>
       </CardHeader>
@@ -714,35 +733,18 @@ function ResultCardContent({ result, title, onCreateLoan, onPreApprove }: { resu
             value={`${(result.tirTNA * 100).toFixed(2)}%`}
             variant={result.isConvenient ? 'success' : 'danger'}
           />
-          {result.loanType === 'amortized' && (
-            <>
-              <MetricCard
-                label="Cuota Mensual"
-                value={formatCurrency(result.installmentAmount!)}
-              />
-              <MetricCard
-                label="Total Cobrado"
-                value={formatCurrency(result.totalPaid!)}
-                subvalue={`Ganancia: ${formatCurrency(result.totalPaid! - result.capital)}`}
-              />
-            </>
-          )}
-          {result.loanType === 'bullet' && (
-            <>
-              <MetricCard
-                label="Precio Hoy (Descuento)"
-                value={formatCurrency(result.discountPrice!)}
-              />
-              <MetricCard
-                label="Valor Nominal al Vto."
-                value={formatCurrency(result.nominalValue!)}
-                subvalue={`Ganancia: ${formatCurrency(result.nominalValue! - result.discountPrice!)}`}
-              />
-            </>
-          )}
+          <MetricCard
+            label="Cuota Mensual"
+            value={formatCurrency(result.installmentAmount!)}
+          />
+          <MetricCard
+            label="Total Cobrado"
+            value={formatCurrency(result.totalPaid!)}
+            subvalue={`Ganancia: ${formatCurrency(result.totalPaid! - result.capital)}`}
+          />
         </div>
         <ConvenienceIndicator isConvenient={result.isConvenient} spread={result.spread} />
-        {result.loanType === 'amortized' && onCreateLoan && (
+        {onCreateLoan && (
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -790,8 +792,7 @@ function CompareTermsResultCards({ results, onCreateLoan, onPreApprove }: { resu
 }
 
 function SingleResultCards({ result, onCreateLoan, onPreApprove }: { result: SimulationResult; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void }) {
-  const title = result.loanType === 'amortized' ? 'Amortizado (Cuotas)' : 'Bullet (Descuento)'
-  return <ResultCardContent result={result} title={title} onCreateLoan={onCreateLoan} onPreApprove={onPreApprove} />
+  return <ResultCardContent result={result} title="Amortizado (Cuotas)" onCreateLoan={onCreateLoan} onPreApprove={onPreApprove} />
 }
 
 // ─── Tables ──────────────────────────────────────────────────────────
@@ -1199,40 +1200,3 @@ function ShareableSimulationView({
   )
 }
 
-function BulletTable({ result, title }: { result: SimulationResult; title: string }) {
-  if (!result.bulletMonthlySummary) return null
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{title} - Devengamiento Mensual</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-muted-foreground">
-                <th className="text-left py-2 px-3 font-medium">Mes</th>
-                <th className="text-left py-2 px-3 font-medium">Fecha</th>
-                <th className="text-right py-2 px-3 font-medium">Valor Contable</th>
-                <th className="text-right py-2 px-3 font-medium">Deveng. Mensual</th>
-                <th className="text-right py-2 px-3 font-medium">Rend. Acum.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.bulletMonthlySummary.map((row) => (
-                <tr key={row.month} className="border-b border-border/50 hover:bg-muted/50">
-                  <td className="py-2 px-3 font-medium">{row.month}</td>
-                  <td className="py-2 px-3 text-muted-foreground">{row.date}</td>
-                  <td className="py-2 px-3 text-right font-medium">{formatCurrency(row.accruedValue)}</td>
-                  <td className="py-2 px-3 text-right text-accent-warning">{formatCurrency(row.monthlyAccrual)}</td>
-                  <td className="py-2 px-3 text-right text-accent-positive">{formatCurrency(row.accruedReturn)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}

@@ -2432,6 +2432,17 @@ function CreateLoanDialog({
                 {reverseMutation.isPending && (
                   <p className="text-xs text-muted-foreground">Calculando TNA...</p>
                 )}
+                {impliedTna !== null && (
+                  <p className="text-xs flex items-center gap-1 text-accent-positive">
+                    <Zap className="h-3 w-3" />
+                    → TNA resultante: {(impliedTna * 100).toFixed(2)}%
+                  </p>
+                )}
+                {!reverseMutation.isPending && impliedTna === null && customInstallment !== '' &&
+                  parseFloat(customInstallment) > 0 && parseFloat(capital) > 0 && parseInt(termMonths) > 0 &&
+                  parseFloat(customInstallment) <= parseFloat(capital) / parseInt(termMonths) && (
+                  <p className="text-xs text-red-500">Cuota insuficiente para amortizar</p>
+                )}
               </div>
             </div>
           )}
