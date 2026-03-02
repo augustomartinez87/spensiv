@@ -149,7 +149,7 @@ function LoanListHeader({ view, onViewChange, direction }: { view: 'list' | 'cal
             Calendario
           </Button>
         </div>
-        <CreateLoanDialog open={createOpen} onOpenChange={setCreateOpen} />
+        <CreateLoanDialog open={createOpen} onOpenChange={setCreateOpen} direction={direction} />
       </div>
     </div>
   )
