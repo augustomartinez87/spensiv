@@ -418,19 +418,22 @@ function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => vo
 
   return (
     <div className="space-y-6">
-      {/* Status filter toggle */}
-      <div className="flex bg-muted rounded-lg p-0.5 w-fit">
-        {(['active', 'completed', 'refinanced'] as const).map((s) => (
-          <Button
-            key={s}
-            variant={statusFilter === s ? 'default' : 'ghost'}
-            size="sm"
-            className="h-8 text-xs"
-            onClick={() => setStatusFilter(s)}
-          >
-            {s === 'active' ? 'Activos' : s === 'completed' ? 'Finalizados' : 'Refinanciados'}
-          </Button>
-        ))}
+      {/* Status filter toggle + create button */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex bg-muted rounded-lg p-0.5 w-fit">
+          {(['active', 'completed', 'refinanced'] as const).map((s) => (
+            <Button
+              key={s}
+              variant={statusFilter === s ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setStatusFilter(s)}
+            >
+              {s === 'active' ? 'Activos' : s === 'completed' ? 'Finalizados' : 'Refinanciados'}
+            </Button>
+          ))}
+        </div>
+        <CreateLoanDialog open={createOpen} onOpenChange={setCreateOpen} direction={direction} />
       </div>
 
       {/* Pre-approved section */}
