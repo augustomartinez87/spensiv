@@ -40,6 +40,8 @@ interface TransactionFormData {
   expenseType: ExpenseType
   notes: string
   isForThirdParty: boolean
+  personId: string
+  personName: string
 }
 
 const initialFormData: TransactionFormData = {
@@ -54,6 +56,8 @@ const initialFormData: TransactionFormData = {
   expenseType: 'structural',
   notes: '',
   isForThirdParty: false,
+  personId: '',
+  personName: '',
 }
 
 const expenseTypeOptions = [
@@ -86,6 +90,9 @@ export function TransactionForm({
 
   const { data: cards } = trpc.cards.list.useQuery()
   const { data: categories } = trpc.transactions.getCategories.useQuery()
+  const { data: persons } = trpc.persons.list.useQuery(undefined, {
+    enabled: formData.isForThirdParty,
+  })
 
   const selectedCategory = categories?.find((c) => c.id === formData.categoryId)
   const subcategories = selectedCategory?.subcategories ?? []
@@ -211,6 +218,30 @@ export function TransactionForm({
     },
   })
 
+  const createThirdPartyMutation = trpc.thirdPartyPurchases.create.useMutation({
+    onSuccess: () => {
+      setOpen(false)
+      setFormData(initialFormData)
+      setNewCategoryName('')
+      setNewSubcategoryName('')
+      utils.dashboard.getMonthlyBalance.invalidate()
+      utils.transactions.list.invalidate()
+      utils.dashboard.getCardBalances.invalidate()
+      utils.thirdPartyPurchases.list.invalidate()
+      toast({
+        title: 'Compra de tercero registrada',
+        description: 'La compra se registró con seguimiento de cobro',
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -229,6 +260,25 @@ export function TransactionForm({
         title: 'Error',
         description: 'Seleccioná una tarjeta',
         variant: 'destructive',
+      })
+      return
+    }
+
+    // Si es para un tercero y tiene nombre, crear ThirdPartyPurchase completo
+    if (formData.isForThirdParty && formData.personName.trim() && formData.paymentMethod === 'credit_card') {
+      createThirdPartyMutation.mutate({
+        description: formData.description,
+        personId: formData.personId || undefined,
+        personName: formData.personName.trim(),
+        cardId: formData.cardId,
+        totalAmount: amount,
+        installments: parseInt(formData.installments) || 1,
+        currency: 'ARS',
+        purchaseDate: formatDateToInput(parseInputDate(formData.purchaseDate)),
+        categoryId: formData.categoryId || undefined,
+        subcategoryId: formData.subcategoryId || undefined,
+        expenseType: formData.expenseType || undefined,
+        notes: formData.notes || undefined,
       })
       return
     }
@@ -425,16 +475,57 @@ export function TransactionForm({
 
           {/* Para tercero (solo crédito) */}
           {isCreditCard && (
-            <div className="flex items-center gap-3 rounded-xl border border-purple-500/20 bg-purple-500/5 p-3">
-              <Users className="h-4 w-4 text-purple-500 shrink-0" />
-              <Label htmlFor="is-third-party" className="flex-1 text-sm cursor-pointer">
-                Es para un tercero
-              </Label>
-              <Switch
-                id="is-third-party"
-                checked={formData.isForThirdParty}
-                onCheckedChange={(checked) => setFormData({ ...formData, isForThirdParty: checked })}
-              />
+            <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 space-y-3 p-3">
+              <div className="flex items-center gap-3">
+                <Users className="h-4 w-4 text-purple-500 shrink-0" />
+                <Label htmlFor="is-third-party" className="flex-1 text-sm cursor-pointer">
+                  Es para un tercero
+                </Label>
+                <Switch
+                  id="is-third-party"
+                  checked={formData.isForThirdParty}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, isForThirdParty: checked, personId: '', personName: '' })
+                  }
+                />
+              </div>
+              {formData.isForThirdParty && (
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Persona</Label>
+                    <Select
+                      value={formData.personId || '_none'}
+                      onValueChange={(v) => {
+                        if (v === '_none') {
+                          setFormData({ ...formData, personId: '', personName: '' })
+                          return
+                        }
+                        const p = persons?.find((p) => p.id === v)
+                        if (p) setFormData({ ...formData, personId: p.id, personName: p.name })
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none">Nombre libre</SelectItem>
+                        {persons?.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Nombre *</Label>
+                    <Input
+                      className="h-8 text-xs"
+                      value={formData.personName}
+                      onChange={(e) => setFormData({ ...formData, personName: e.target.value })}
+                      placeholder="Nombre del tercero"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -625,8 +716,8 @@ export function TransactionForm({
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Guardando...' : 'Guardar'}
+            <Button type="submit" disabled={createMutation.isPending || createThirdPartyMutation.isPending}>
+              {(createMutation.isPending || createThirdPartyMutation.isPending) ? 'Guardando...' : 'Guardar'}
             </Button>
           </div>
         </form>

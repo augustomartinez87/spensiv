@@ -21,7 +21,6 @@ interface FormData {
   installments: string
   currency: 'ARS' | 'USD'
   purchaseDate: string
-  firstDueDate: string
   notes: string
 }
 
@@ -34,7 +33,6 @@ const initialFormData: FormData = {
   installments: '1',
   currency: 'ARS',
   purchaseDate: formatDateToInput(new Date()),
-  firstDueDate: '',
   notes: '',
 }
 
@@ -86,7 +84,6 @@ export function ThirdPartyForm() {
       installments: parseInt(formData.installments) || 1,
       currency: formData.currency,
       purchaseDate: formData.purchaseDate,
-      firstDueDate: formData.firstDueDate || undefined,
       notes: formData.notes || undefined,
     })
   }
@@ -218,24 +215,14 @@ export function ThirdPartyForm() {
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Fecha de compra</Label>
-              <Input
-                type="date"
-                value={formData.purchaseDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, purchaseDate: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Primer vencimiento cobro</Label>
-              <Input
-                type="date"
-                value={formData.firstDueDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, firstDueDate: e.target.value }))}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>Fecha de compra</Label>
+            <Input
+              type="date"
+              value={formData.purchaseDate}
+              onChange={(e) => setFormData(prev => ({ ...prev, purchaseDate: e.target.value }))}
+              required
+            />
           </div>
 
           <div className="space-y-2">

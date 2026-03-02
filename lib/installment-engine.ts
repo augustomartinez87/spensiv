@@ -95,6 +95,39 @@ export function calculateImpactDate(
 }
 
 /**
+ * Calcular las fechas de cierre y vencimiento de un ciclo
+ *
+ * REGLA:
+ * - Si dueDay > closingDay → vencimiento en el MISMO mes del cierre
+ * - Si dueDay <= closingDay → vencimiento en el MES SIGUIENTE al cierre
+ *
+ * Ejemplos:
+ * - Agosto (cierre 28, venc 5): 5 <= 28 → vencimiento sep 5
+ * - Septiembre (cierre 2, venc 13): 13 > 2 → vencimiento sep 13
+ * - Octubre (cierre 30, venc 7): 7 <= 30 → vencimiento nov 7
+ */
+export function computeBillingCycleDates(
+  year: number,
+  month: number, // 1-indexed (1-12)
+  closingDay: number,
+  dueDay: number
+): { closeDate: Date; dueDate: Date } {
+  const closeDate = new Date(year, month - 1, closingDay)
+
+  let dueDate: Date
+  if (dueDay > closingDay) {
+    // Vencimiento en el mismo mes que el cierre
+    dueDate = new Date(year, month - 1, dueDay)
+  } else {
+    // Vencimiento en el mes siguiente al cierre
+    // month (no month-1) funciona porque JS usa 0-indexed
+    dueDate = new Date(year, month, dueDay)
+  }
+
+  return { closeDate, dueDate }
+}
+
+/**
  * Obtener o crear billing cycle para un mes específico
  */
 async function getOrCreateBillingCycle(
@@ -118,19 +151,10 @@ async function getOrCreateBillingCycle(
   // Obtener días de cierre/vencimiento (schedule o defaults)
   const year = impactDate.getFullYear()
   const month = impactDate.getMonth() + 1 // Los meses en JS son 0-indexed, pero en DB son 1-12
-  
+
   const { closingDay, dueDay } = await getClosingDaysForMonth(cardId, year, month)
 
-  // Calcular fecha de cierre y vencimiento
-  const closeDate = new Date(year, month - 1, closingDay)
-
-  // Vencimiento es en el mes siguiente
-  let dueDate = new Date(year, month, dueDay)
-
-  // Si el día de vencimiento es antes del cierre, sumar un mes más
-  if (dueDay < closingDay) {
-    dueDate.setMonth(dueDate.getMonth() + 1)
-  }
+  const { closeDate, dueDate } = computeBillingCycleDates(year, month, closingDay, dueDay)
 
   cycle = await prisma.billingCycle.create({
     data: {
@@ -331,6 +355,85 @@ export async function voidTransaction(transactionId: string) {
   }
 
   return transaction
+}
+
+/**
+ * Recalcular las fechas closeDate/dueDate de todos los BillingCycles de un usuario.
+ * Usar cuando se corrige el bug de cálculo para arreglar datos existentes.
+ */
+export async function recalculateBillingCycleDates(userId: string): Promise<number> {
+  // Obtener todas las tarjetas del usuario
+  const cards = await prisma.creditCard.findMany({
+    where: { userId },
+    select: { id: true, closingDay: true, dueDay: true },
+  })
+
+  let updatedCount = 0
+
+  for (const card of cards) {
+    const cycles = await prisma.billingCycle.findMany({
+      where: { cardId: card.id },
+    })
+
+    for (const cycle of cycles) {
+      // period es "YYYY-MM"
+      const [yearStr, monthStr] = cycle.period.split('-')
+      const year = parseInt(yearStr)
+      const month = parseInt(monthStr)
+
+      const { closingDay, dueDay } = await getClosingDaysForMonth(card.id, year, month)
+      const { closeDate, dueDate } = computeBillingCycleDates(year, month, closingDay, dueDay)
+
+      await prisma.billingCycle.update({
+        where: { id: cycle.id },
+        data: { closeDate, dueDate },
+      })
+      updatedCount++
+    }
+  }
+
+  return updatedCount
+}
+
+/**
+ * Recalcular las fechas dueDate de todas las ThirdPartyInstallments de un usuario,
+ * usando la dueDate del BillingCycle correspondiente de cada cuota.
+ */
+export async function recalculateThirdPartyInstallmentDates(userId: string): Promise<number> {
+  const purchases = await prisma.thirdPartyPurchase.findMany({
+    where: { userId },
+    include: {
+      collectionInstallments: { orderBy: { number: 'asc' } },
+      transaction: {
+        include: {
+          installmentsList: {
+            include: { billingCycle: { select: { dueDate: true } } },
+            orderBy: { installmentNumber: 'asc' },
+          },
+        },
+      },
+    },
+  })
+
+  let updatedCount = 0
+
+  for (const purchase of purchases) {
+    const installments = purchase.transaction?.installmentsList ?? []
+    if (!installments.length) continue
+
+    for (const collInst of purchase.collectionInstallments) {
+      const matchingInst = installments.find((i) => i.installmentNumber === collInst.number)
+      if (!matchingInst) continue
+
+      await prisma.thirdPartyInstallment.update({
+        where: { id: collInst.id },
+        data: { dueDate: matchingInst.billingCycle.dueDate },
+      })
+      updatedCount++
+    }
+  }
+
+  return updatedCount
 }
 
 /**

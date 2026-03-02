@@ -161,7 +161,7 @@ export default function InstallmentsPage() {
                           {formatCurrency(inst.amount)}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(inst.impactDate), "d MMM yyyy", { locale: es })}
+                          {format(new Date(inst.dueDate), "d MMM yyyy", { locale: es })}
                         </p>
                       </div>
                     </div>

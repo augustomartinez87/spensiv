@@ -1,6 +1,11 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
-import { createTransactionWithInstallments, voidTransaction } from '@/lib/installment-engine'
+import {
+  createTransactionWithInstallments,
+  voidTransaction,
+  recalculateBillingCycleDates,
+  recalculateThirdPartyInstallmentDates,
+} from '@/lib/installment-engine'
 import { Decimal } from '@prisma/client/runtime/library'
 
 export const thirdPartyPurchasesRouter = router({
@@ -19,8 +24,10 @@ export const thirdPartyPurchasesRouter = router({
         installments: z.number().int().min(1),
         currency: z.enum(['ARS', 'USD']).default('ARS'),
         purchaseDate: z.string(), // ISO date string
-        firstDueDate: z.string().optional(),
         notes: z.string().optional(),
+        categoryId: z.string().optional(),
+        subcategoryId: z.string().optional(),
+        expenseType: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -37,11 +44,20 @@ export const thirdPartyPurchasesRouter = router({
         purchaseDate,
         installments: input.installments,
         isForThirdParty: true,
+        categoryId: input.categoryId,
+        subcategoryId: input.subcategoryId,
+        expenseType: input.expenseType,
+        notes: input.notes,
       })
 
-      // 2. Create ThirdPartyPurchase for collection tracking
-      const firstDueDate = input.firstDueDate ? new Date(input.firstDueDate) : null
+      // 2. Fetch installments with billing cycle dueDates
+      const createdInstallments = await ctx.prisma.installment.findMany({
+        where: { transactionId: transaction.id },
+        include: { billingCycle: { select: { dueDate: true } } },
+        orderBy: { installmentNumber: 'asc' },
+      })
 
+      // 3. Create ThirdPartyPurchase for collection tracking
       const thirdPartyPurchase = await ctx.prisma.thirdPartyPurchase.create({
         data: {
           userId: ctx.user.id,
@@ -55,18 +71,13 @@ export const thirdPartyPurchasesRouter = router({
           installmentAmount: new Decimal(installmentAmount),
           currency: input.currency,
           purchaseDate,
-          firstDueDate,
           notes: input.notes,
           collectionInstallments: {
-            create: Array.from({ length: input.installments }, (_, i) => {
-              const dueDate = new Date(firstDueDate || purchaseDate)
-              dueDate.setMonth(dueDate.getMonth() + i)
-              return {
-                number: i + 1,
-                amount: new Decimal(installmentAmount),
-                dueDate,
-              }
-            }),
+            create: createdInstallments.map((inst) => ({
+              number: inst.installmentNumber,
+              amount: new Decimal(installmentAmount),
+              dueDate: inst.billingCycle.dueDate,
+            })),
           },
         },
         include: {
@@ -317,7 +328,6 @@ export const thirdPartyPurchasesRouter = router({
         personName: z.string().min(1),
         personId: z.string().optional(),
         currency: z.enum(['ARS', 'USD']).default('ARS'),
-        firstDueDate: z.string().optional(),
         notes: z.string().optional(),
       })
     )
@@ -341,7 +351,13 @@ export const thirdPartyPurchasesRouter = router({
 
       const installmentAmount = Number(transaction.totalAmount) / transaction.installments
       const purchaseDate = transaction.purchaseDate
-      const firstDueDate = input.firstDueDate ? new Date(input.firstDueDate) : null
+
+      // Fetch existing installments with billing cycle dueDates
+      const existingInstallments = await ctx.prisma.installment.findMany({
+        where: { transactionId: input.transactionId },
+        include: { billingCycle: { select: { dueDate: true } } },
+        orderBy: { installmentNumber: 'asc' },
+      })
 
       const thirdPartyPurchase = await ctx.prisma.thirdPartyPurchase.create({
         data: {
@@ -356,18 +372,13 @@ export const thirdPartyPurchasesRouter = router({
           installmentAmount: new Decimal(installmentAmount),
           currency: input.currency,
           purchaseDate,
-          firstDueDate,
           notes: input.notes,
           collectionInstallments: {
-            create: Array.from({ length: transaction.installments }, (_, i) => {
-              const dueDate = new Date(firstDueDate || purchaseDate)
-              dueDate.setMonth(dueDate.getMonth() + i)
-              return {
-                number: i + 1,
-                amount: new Decimal(installmentAmount),
-                dueDate,
-              }
-            }),
+            create: existingInstallments.map((inst) => ({
+              number: inst.installmentNumber,
+              amount: new Decimal(installmentAmount),
+              dueDate: inst.billingCycle.dueDate,
+            })),
           },
         },
         include: {
@@ -409,4 +420,14 @@ export const thirdPartyPurchasesRouter = router({
         pendingAmount: totalAmount - collectedAmount,
       }
     }),
+
+  /**
+   * Recalcular fechas de billing cycles y cuotas de terceros existentes.
+   * Usar para corregir datos generados con el bug anterior.
+   */
+  recalculateDates: protectedProcedure.mutation(async ({ ctx }) => {
+    const cyclesFixed = await recalculateBillingCycleDates(ctx.user.id)
+    const installmentsFixed = await recalculateThirdPartyInstallmentDates(ctx.user.id)
+    return { cyclesFixed, installmentsFixed }
+  }),
 })

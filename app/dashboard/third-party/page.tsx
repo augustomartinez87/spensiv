@@ -17,14 +17,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { formatCurrency, cn, formatDateToInput } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Users, CreditCard, Trash2, AlertCircle } from 'lucide-react'
+import { Users, CreditCard, Trash2, AlertCircle, RefreshCcw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface LinkFormData {
   personName: string
   personId: string
   currency: 'ARS' | 'USD'
-  firstDueDate: string
   notes: string
 }
 
@@ -32,7 +31,6 @@ const initialLinkForm: LinkFormData = {
   personName: '',
   personId: '',
   currency: 'ARS',
-  firstDueDate: '',
   notes: '',
 }
 
@@ -57,6 +55,19 @@ export default function ThirdPartyPage() {
       utils.thirdPartyPurchases.list.invalidate()
       utils.dashboard.getCardBalances.invalidate()
       utils.dashboard.getMonthlyBalance.invalidate()
+    },
+    onError: (err) => {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' })
+    },
+  })
+
+  const recalcMutation = trpc.thirdPartyPurchases.recalculateDates.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: 'Fechas recalculadas',
+        description: `${result.cyclesFixed} ciclos y ${result.installmentsFixed} cuotas actualizadas`,
+      })
+      utils.thirdPartyPurchases.list.invalidate()
     },
     onError: (err) => {
       toast({ title: 'Error', description: err.message, variant: 'destructive' })
@@ -92,7 +103,6 @@ export default function ThirdPartyPage() {
       personName: linkForm.personName,
       personId: linkForm.personId || undefined,
       currency: linkForm.currency,
-      firstDueDate: linkForm.firstDueDate || undefined,
       notes: linkForm.notes || undefined,
     })
   }
@@ -118,7 +128,22 @@ export default function ThirdPartyPage() {
           <h1 className="text-3xl font-bold text-foreground tracking-tight">Compras de Terceros</h1>
           <p className="text-muted-foreground mt-1">Compras con tu tarjeta para otras personas</p>
         </div>
-        <ThirdPartyForm />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (confirm('Recalcular fechas de cuotas usando el calendario de cierres. Esto corrige datos históricos. ¿Continuar?')) {
+                recalcMutation.mutate()
+              }
+            }}
+            disabled={recalcMutation.isPending}
+          >
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Recalcular fechas
+          </Button>
+          <ThirdPartyForm />
+        </div>
       </div>
 
       {/* Orphan transactions banner */}
@@ -310,27 +335,17 @@ export default function ThirdPartyPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Moneda</Label>
-                <Select value={linkForm.currency} onValueChange={(v: 'ARS' | 'USD') => setLinkForm((prev) => ({ ...prev, currency: v }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ARS">ARS</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Primer vencimiento cobro</Label>
-                <Input
-                  type="date"
-                  value={linkForm.firstDueDate}
-                  onChange={(e) => setLinkForm((prev) => ({ ...prev, firstDueDate: e.target.value }))}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Moneda</Label>
+              <Select value={linkForm.currency} onValueChange={(v: 'ARS' | 'USD') => setLinkForm((prev) => ({ ...prev, currency: v }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ARS">ARS</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

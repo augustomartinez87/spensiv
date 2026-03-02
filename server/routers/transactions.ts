@@ -1029,6 +1029,9 @@ export const transactionsRouter = router({
               amount: true,
               isPaid: true,
               impactDate: true,
+              billingCycle: {
+                select: { dueDate: true },
+              },
             },
           },
         },
@@ -1058,6 +1061,7 @@ export const transactionsRouter = router({
             installmentsList: t.installmentsList.map((i) => ({
               ...i,
               amount: Number(i.amount),
+              dueDate: i.billingCycle.dueDate,
             })),
           }
         })
