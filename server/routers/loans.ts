@@ -451,6 +451,7 @@ export const loansRouter = router({
           },
           loanInstallments: { orderBy: { number: 'asc' } },
           activityLogs: { orderBy: { logDate: 'desc' } },
+          loanPayments: { select: { amount: true } },
         },
       })
 
@@ -1005,6 +1006,52 @@ export const loansRouter = router({
       return ctx.prisma.loanAccrualMonthly.findMany({
         where: { loanId: input.loanId },
         orderBy: [{ year: 'asc' }, { month: 'asc' }],
+      })
+    }),
+
+  updatePaymentNote: protectedProcedure
+    .input(z.object({ paymentId: z.string(), note: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const payment = await ctx.prisma.loanPayment.findFirst({
+        where: { id: input.paymentId, loan: { userId: ctx.user.id } },
+      })
+      if (!payment) throw new Error('Pago no encontrado')
+      return ctx.prisma.loanPayment.update({
+        where: { id: input.paymentId },
+        data: { note: input.note || null },
+      })
+    }),
+
+  deletePayment: protectedProcedure
+    .input(z.object({ paymentId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const service = new LoanAccountingService(ctx.prisma)
+      return service.deletePayment({ paymentId: input.paymentId, userId: ctx.user.id })
+    }),
+
+  payInstallment: protectedProcedure
+    .input(z.object({
+      installmentId: z.string(),
+      paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      note: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const installment = await ctx.prisma.loanInstallment.findFirst({
+        where: { id: input.installmentId, loan: { userId: ctx.user.id } },
+      })
+      if (!installment) throw new Error('Cuota no encontrada')
+      if (installment.isPaid) throw new Error('La cuota ya está cobrada')
+
+      const remaining = Math.max(Number(installment.amount) - Number(installment.paidAmount ?? 0), 0)
+      if (remaining <= 0.01) throw new Error('La cuota ya está completamente pagada')
+
+      const service = new LoanAccountingService(ctx.prisma)
+      return service.registerPayment({
+        loanId: installment.loanId,
+        userId: ctx.user.id,
+        paymentDate: new Date(input.paymentDate + 'T00:00:00'),
+        amount: remaining,
+        note: input.note,
       })
     }),
 

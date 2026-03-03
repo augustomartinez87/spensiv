@@ -298,10 +298,30 @@ export class LoanAccountingService {
         }
       }
 
+      // Update current-period installment (dueDate in same month as paymentDate)
+      let currentInstNowPaid = false
+      const currentInstKey = yearMonthKey(paymentDate)
+      const currentInst = unpaidInstallments.find(
+        (i) => yearMonthKey(new Date(i.dueDate)) === currentInstKey,
+      )
+      if (currentInst && (waterfall.interestCurrentApplied + waterfall.principalApplied) > 0) {
+        const alreadyPaid = Number(currentInst.paidAmount ?? 0)
+        const newTotal = alreadyPaid + waterfall.interestCurrentApplied + waterfall.principalApplied
+        const fullyPaid = newTotal >= Number(currentInst.amount) - CENT_TOLERANCE.toNumber()
+        await tx.loanInstallment.update({
+          where: { id: currentInst.id },
+          data: {
+            paidAmount: { increment: waterfall.interestCurrentApplied + waterfall.principalApplied },
+            ...(fullyPaid ? { isPaid: true, paidAt: paymentDate } : {}),
+          },
+        })
+        if (fullyPaid) currentInstNowPaid = true
+      }
+
       const advancedCount = advancePaid.filter((a) => a.fullyPaid).length
 
       // Auto-complete amortized loan if all installments are now paid
-      if (loan.loanType === 'amortized' && advancedCount > 0) {
+      if (loan.loanType === 'amortized' && (advancedCount > 0 || currentInstNowPaid)) {
         const remaining = await tx.loanInstallment.count({
           where: { loanId: loan.id, isPaid: false },
         })
@@ -598,6 +618,77 @@ export class LoanAccountingService {
       irrSlippageBps: updated.irrSlippageBps,
       irrStatus: updated.irrStatus,
       irrCalculatedAt: updated.irrCalculatedAt,
+    }
+  }
+
+  async deletePayment(input: { paymentId: string; userId: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.loanPayment.findFirst({
+        where: { id: input.paymentId, loan: { userId: input.userId } },
+        select: { id: true, loanId: true },
+      })
+      if (!payment) throw new Error('Pago no encontrado')
+
+      await tx.loanRealCashflow.deleteMany({ where: { paymentId: payment.id } })
+      await tx.loanPayment.delete({ where: { id: payment.id } })
+
+      // Reactivate loan if it was completed
+      await tx.loan.update({ where: { id: payment.loanId }, data: { status: 'active' } }).catch(() => {})
+
+      await this.reconcileInstallmentStatesTx(tx, payment.loanId)
+      await this.rebuildMonthlyAccrualsTx(tx, payment.loanId, new Date())
+      await this.recalculateIrrCacheTx(tx, payment.loanId)
+      await tx.loan.update({
+        where: { id: payment.loanId },
+        data: { cashflowRevision: { increment: 1 } },
+      })
+
+      return { success: true, loanId: payment.loanId }
+    })
+  }
+
+  private async reconcileInstallmentStatesTx(tx: TxClient, loanId: string): Promise<void> {
+    // Reset all installment states
+    await tx.loanInstallment.updateMany({
+      where: { loanId },
+      data: { isPaid: false, paidAt: null, paidAmount: 0 },
+    })
+
+    // Get remaining cashflows (interest_current + principal) to derive paid amounts
+    const cashflows = await tx.loanRealCashflow.findMany({
+      where: { loanId, component: { in: ['interest_current', 'principal'] } },
+      select: { flowDate: true, amountSigned: true },
+    })
+
+    // Group by yearMonth of flowDate
+    const paidByMonth = new Map<string, Decimal>()
+    for (const flow of cashflows) {
+      const key = yearMonthKey(new Date(flow.flowDate))
+      paidByMonth.set(key, (paidByMonth.get(key) ?? ZERO).plus(money(flow.amountSigned).abs()))
+    }
+
+    // Match installments by yearMonth of dueDate and update states
+    const installments = await tx.loanInstallment.findMany({
+      where: { loanId },
+      select: { id: true, dueDate: true, amount: true },
+      orderBy: { number: 'asc' },
+    })
+
+    for (const inst of installments) {
+      const key = yearMonthKey(new Date(inst.dueDate))
+      const paid = paidByMonth.get(key) ?? ZERO
+      if (paid.lte(CENT_TOLERANCE)) continue
+      const instAmt = money(inst.amount)
+      const clampedPaid = Decimal.min(paid, instAmt)
+      const fullyPaid = clampedPaid.gte(instAmt.minus(CENT_TOLERANCE))
+      await tx.loanInstallment.update({
+        where: { id: inst.id },
+        data: {
+          paidAmount: round2(clampedPaid),
+          isPaid: fullyPaid,
+          paidAt: fullyPaid ? new Date() : null,
+        },
+      })
     }
   }
 

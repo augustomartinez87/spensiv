@@ -866,6 +866,18 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
     },
   })
 
+  const [payInstId, setPayInstId] = useState<string | null>(null)
+  const [payInstDate, setPayInstDate] = useState(formatDateToInput(new Date()))
+
+  const payInstMutation = trpc.loans.payInstallment.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.getLoanPayments.invalidate({ loanId })
+      utils.loans.getMonthlyAccruals.invalidate({ loanId })
+      setPayInstId(null)
+    },
+  })
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -884,10 +896,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   const cur = loan.currency
   const paid = loan.loanInstallments.filter((i) => i.isPaid).length
   const total = loan.loanInstallments.length
-  const totalCollected = loan.loanInstallments.reduce((sum, i) => {
-    if (i.isPaid) return sum + Number(i.amount)
-    return sum + Number(i.paidAmount ?? 0)
-  }, 0)
+  const totalCollected = (loan.loanPayments ?? []).reduce((sum, p) => sum + Number(p.amount), 0)
   const totalPending = loan.loanInstallments
     .filter((i) => !i.isPaid)
     .reduce((sum, i) => sum + Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0), 0)
@@ -1228,6 +1237,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                       <th className="text-right py-2 px-3 font-medium">Capital</th>
                       <th className="text-right py-2 px-3 font-medium">Saldo</th>
                       <th className="text-center py-2 px-3 font-medium">Estado</th>
+                      <th className="py-2 px-3" />
                     </tr>
                   </thead>
                   <tbody>
@@ -1298,6 +1308,22 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                               </button>
                             )}
                           </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {!inst.isPaid && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-accent-positive"
+                                title="Cobrar esta cuota"
+                                onClick={() => {
+                                  setPayInstId(inst.id)
+                                  setPayInstDate(formatDateToInput(new Date()))
+                                }}
+                              >
+                                <Banknote className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </td>
                         </tr>
                       )
                     })}
@@ -1356,6 +1382,20 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                           {isPartial && ` - Parcial: resta ${formatCurrency(remaining, cur)}`}
                         </p>
                       </div>
+                      {!inst.isPaid && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-accent-positive"
+                          title="Cobrar esta cuota"
+                          onClick={() => {
+                            setPayInstId(inst.id)
+                            setPayInstDate(formatDateToInput(new Date()))
+                          }}
+                        >
+                          <Banknote className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   )
                 })}
@@ -1367,6 +1407,46 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           <MonthlyAccrualsTable loanId={loanId} cur={cur} />
         </TabsContent>
       </Tabs>
+
+      {/* Pay installment dialog */}
+      {payInstId && (() => {
+        const inst = loan.loanInstallments.find((i) => i.id === payInstId)
+        if (!inst) return null
+        const remaining = Math.max(Number(inst.amount) - Number(inst.paidAmount ?? 0), 0)
+        return (
+          <Dialog open onOpenChange={(open) => { if (!open) setPayInstId(null) }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Cobrar cuota {inst.number}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="rounded-lg bg-muted/50 px-3 py-2.5 text-sm flex justify-between">
+                  <span className="text-muted-foreground">Monto a cobrar</span>
+                  <span className="font-bold">{formatCurrency(remaining, cur)}</span>
+                </div>
+                <div className="space-y-2">
+                  <Label>Fecha del cobro</Label>
+                  <Input
+                    type="date"
+                    value={payInstDate}
+                    onChange={(e) => setPayInstDate(e.target.value)}
+                  />
+                </div>
+                <Button
+                  className="w-full"
+                  disabled={payInstMutation.isPending}
+                  onClick={() => payInstMutation.mutate({
+                    installmentId: payInstId,
+                    paymentDate: payInstDate,
+                  })}
+                >
+                  {payInstMutation.isPending ? 'Registrando...' : 'Confirmar Cobro'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )
+      })()}
 
       {/* Payment History */}
       <PaymentHistorySection loanId={loanId} cur={cur} />
@@ -1498,8 +1578,26 @@ function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; cur: str
 // ─── Payment History Section ─────────────────────────────────────────
 
 function PaymentHistorySection({ loanId, cur }: { loanId: string; cur: string }) {
+  const utils = trpc.useUtils()
   const { data: payments, isLoading } = trpc.loans.getLoanPayments.useQuery({ loanId })
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editNote, setEditNote] = useState('')
+
+  const updateNoteMutation = trpc.loans.updatePaymentNote.useMutation({
+    onSuccess: () => {
+      utils.loans.getLoanPayments.invalidate({ loanId })
+      setEditingId(null)
+    },
+  })
+
+  const deletePaymentMutation = trpc.loans.deletePayment.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.getLoanPayments.invalidate({ loanId })
+      utils.loans.getMonthlyAccruals.invalidate({ loanId })
+    },
+  })
 
   if (isLoading) return <Skeleton className="h-24" />
   if (!payments || payments.length === 0) return null
@@ -1522,6 +1620,7 @@ function PaymentHistorySection({ loanId, cur }: { loanId: string; cur: string })
         <div className="divide-y divide-border">
           {payments.map((payment) => {
             const isExpanded = expandedId === payment.id
+            const isEditing = editingId === payment.id
             const breakdowns = payment.realCashflows.filter((f) => f.component !== 'disbursement')
 
             return (
@@ -1552,20 +1651,82 @@ function PaymentHistorySection({ loanId, cur }: { loanId: string; cur: string })
                   </div>
                 </button>
 
-                {isExpanded && breakdowns.length > 0 && (
-                  <div className="mt-2 ml-7 space-y-1">
-                    {breakdowns.map((flow, idx) => (
-                      <div key={idx} className="flex justify-between text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1.5">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
-                          {componentLabel[flow.component] ?? flow.component}
-                          <span className="text-muted-foreground/60">
-                            ({format(new Date(flow.flowDate), "d MMM", { locale: es })})
-                          </span>
-                        </span>
-                        <span>{formatCurrency(Math.abs(Number(flow.amountSigned)), cur)}</span>
+                {isExpanded && (
+                  <div className="mt-2 ml-7 space-y-2">
+                    {breakdowns.length > 0 && (
+                      <div className="space-y-1">
+                        {breakdowns.map((flow, idx) => (
+                          <div key={idx} className="flex justify-between text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1.5">
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
+                              {componentLabel[flow.component] ?? flow.component}
+                              <span className="text-muted-foreground/60">
+                                ({format(new Date(flow.flowDate), "d MMM", { locale: es })})
+                              </span>
+                            </span>
+                            <span>{formatCurrency(Math.abs(Number(flow.amountSigned)), cur)}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
+
+                    {isEditing ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={editNote}
+                          onChange={(e) => setEditNote(e.target.value)}
+                          placeholder="Nota..."
+                          className="h-7 text-xs"
+                          autoFocus
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-green-500"
+                          disabled={updateNoteMutation.isPending}
+                          onClick={() => updateNoteMutation.mutate({ paymentId: payment.id, note: editNote })}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => setEditingId(null)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          title="Editar nota"
+                          onClick={() => {
+                            setEditingId(payment.id)
+                            setEditNote(payment.note ?? '')
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                          title="Eliminar pago"
+                          disabled={deletePaymentMutation.isPending}
+                          onClick={() => {
+                            if (window.confirm('¿Eliminar este pago? Los estados de cuotas se recalcularán.')) {
+                              deletePaymentMutation.mutate({ paymentId: payment.id })
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
