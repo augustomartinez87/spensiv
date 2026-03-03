@@ -119,7 +119,7 @@ export class LoanAccountingService {
       const unpaidInstallments = await tx.loanInstallment.findMany({
         where: { loanId: loan.id, isPaid: false },
         orderBy: { number: 'asc' },
-        select: { id: true, number: true, dueDate: true, amount: true, interest: true, principal: true },
+        select: { id: true, number: true, dueDate: true, amount: true, interest: true, principal: true, paidAmount: true },
       })
 
       const preState = await this.rebuildMonthlyAccrualsTx(tx, loan.id, paymentDate)
@@ -137,15 +137,24 @@ export class LoanAccountingService {
         (i) => new Date(i.dueDate) > paymentMonthEnd,
       )
 
-      // Current-period principal = outstanding minus future installments' principals
-      const futurePrincipalSum = futureInstallments.reduce((s, i) => s.plus(money(i.principal)), ZERO)
+      // Current-period principal = outstanding minus future installments' remaining principals
+      const futurePrincipalSum = futureInstallments.reduce((s, i) => {
+        const paid = money(i.paidAmount ?? 0)
+        const interestAlreadyPaid = Decimal.min(paid, money(i.interest))
+        const principalAlreadyPaid = Decimal.max(paid.minus(interestAlreadyPaid), ZERO)
+        const remainingPrincipal = Decimal.max(money(i.principal).minus(principalAlreadyPaid), ZERO)
+        return s.plus(remainingPrincipal)
+      }, ZERO)
       const currentPeriodPrincipal = Decimal.max(principalPending.minus(futurePrincipalSum), ZERO)
 
       // Current dues: everything owed up to and including this month
       const currentDues = overduePending.plus(currentInterestPending).plus(currentPeriodPrincipal)
 
-      // Max payable: current dues + all future installments
-      const futureInstallmentsTotal = futureInstallments.reduce((s, i) => s.plus(money(i.amount)), ZERO)
+      // Max payable: current dues + remaining future installment amounts
+      const futureInstallmentsTotal = futureInstallments.reduce((s, i) => {
+        const remaining = Decimal.max(money(i.amount).minus(money(i.paidAmount ?? 0)), ZERO)
+        return s.plus(remaining)
+      }, ZERO)
       const maxPayable = currentDues.plus(futureInstallmentsTotal)
 
       if (amount.gt(maxPayable.plus(CENT_TOLERANCE))) {
@@ -181,17 +190,22 @@ export class LoanAccountingService {
       for (const inst of futureInstallments) {
         if (excessRemaining.lte(CENT_TOLERANCE)) break
 
-        const instInterest = money(inst.interest)
-        const instPrincipal = money(inst.principal)
-        const instTotal = money(inst.amount)
+        const alreadyPaid = money(inst.paidAmount ?? 0)
+        const alreadyPaidInterest = Decimal.min(alreadyPaid, money(inst.interest))
+        const alreadyPaidPrincipal = Decimal.max(alreadyPaid.minus(alreadyPaidInterest), ZERO)
+        const remainingInterest = Decimal.max(money(inst.interest).minus(alreadyPaidInterest), ZERO)
+        const remainingPrincipal = Decimal.max(money(inst.principal).minus(alreadyPaidPrincipal), ZERO)
+        const remainingTotal = remainingInterest.plus(remainingPrincipal)
 
-        const interestPaid = Decimal.min(excessRemaining, instInterest)
+        if (remainingTotal.lte(CENT_TOLERANCE)) continue // ya estaba completamente pagada
+
+        const interestPaid = Decimal.min(excessRemaining, remainingInterest)
         excessRemaining = excessRemaining.minus(interestPaid)
-        const principalPaid = Decimal.min(excessRemaining, instPrincipal)
+        const principalPaid = Decimal.min(excessRemaining, remainingPrincipal)
         excessRemaining = excessRemaining.minus(principalPaid)
 
-        const totalPaid = interestPaid.plus(principalPaid)
-        const fullyPaid = totalPaid.gte(instTotal.minus(CENT_TOLERANCE))
+        const totalNewlyPaid = interestPaid.plus(principalPaid)
+        const fullyPaid = totalNewlyPaid.gte(remainingTotal.minus(CENT_TOLERANCE))
 
         advancePaid.push({
           id: inst.id,
@@ -271,17 +285,23 @@ export class LoanAccountingService {
         await tx.loanRealCashflow.createMany({ data: cashflows })
       }
 
-      // Mark advance-paid installments as isPaid
-      const toMarkPaid = advancePaid.filter((a) => a.fullyPaid).map((a) => a.id)
-      if (toMarkPaid.length > 0) {
-        await tx.loanInstallment.updateMany({
-          where: { id: { in: toMarkPaid } },
-          data: { isPaid: true, paidAt: paymentDate },
-        })
+      // Update paidAmount (and mark isPaid) for each advance-paid installment
+      for (const adv of advancePaid) {
+        if (adv.interestPaid + adv.principalPaid > 0) {
+          await tx.loanInstallment.update({
+            where: { id: adv.id },
+            data: {
+              paidAmount: { increment: adv.interestPaid + adv.principalPaid },
+              ...(adv.fullyPaid ? { isPaid: true, paidAt: paymentDate } : {}),
+            },
+          })
+        }
       }
 
+      const advancedCount = advancePaid.filter((a) => a.fullyPaid).length
+
       // Auto-complete amortized loan if all installments are now paid
-      if (loan.loanType === 'amortized' && toMarkPaid.length > 0) {
+      if (loan.loanType === 'amortized' && advancedCount > 0) {
         const remaining = await tx.loanInstallment.count({
           where: { loanId: loan.id, isPaid: false },
         })
@@ -300,7 +320,7 @@ export class LoanAccountingService {
       return {
         payment,
         waterfall,
-        advancedInstallments: toMarkPaid.length,
+        advancedInstallments: advancedCount,
         principalOutstanding: postState.principalOutstanding,
         overdueInterestOutstanding: postState.overdueInterestOutstanding,
         irr,

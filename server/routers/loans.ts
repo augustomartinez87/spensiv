@@ -350,6 +350,7 @@ export const loansRouter = router({
             dueDate: true,
             amount: true,
             isPaid: true,
+            paidAmount: true,
           },
         },
       },
@@ -374,7 +375,9 @@ export const loansRouter = router({
         paidCount: paid,
         totalCount: total,
         nextDueDate: nextInstallment?.dueDate || null,
-        nextAmount: nextInstallment ? Number(nextInstallment.amount) : 0,
+        nextAmount: nextInstallment
+          ? Math.max(Number(nextInstallment.amount) - Number(nextInstallment.paidAmount ?? 0), 0)
+          : 0,
       }
     })
   }),
@@ -478,6 +481,25 @@ export const loansRouter = router({
       })
     }),
 
+  getLoanPayments: protectedProcedure
+    .input(z.object({ loanId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.loanId, userId: ctx.user.id },
+      })
+      if (!loan) throw new Error('Préstamo no encontrado')
+
+      return ctx.prisma.loanPayment.findMany({
+        where: { loanId: input.loanId },
+        orderBy: { paymentDate: 'desc' },
+        include: {
+          realCashflows: {
+            select: { component: true, amountSigned: true, flowDate: true },
+          },
+        },
+      })
+    }),
+
   addActivityLog: protectedProcedure
     .input(z.object({
       loanId: z.string(),
@@ -568,7 +590,7 @@ export const loansRouter = router({
 
       const updated = await ctx.prisma.loanInstallment.update({
         where: { id: input.installmentId },
-        data: { isPaid: false, paidAt: null },
+        data: { isPaid: false, paidAt: null, paidAmount: 0 },
       })
 
       // Reactivate loan if it was completed
@@ -749,14 +771,19 @@ export const loansRouter = router({
       })
       if (!loan) throw new Error('Préstamo activo no encontrado')
 
-      // Calculate new capital: sum of unpaid principal, optionally + unpaid interest
-      let newCapital = loan.loanInstallments.reduce(
-        (sum, i) => sum + Number(i.principal), 0
-      )
+      // Calculate new capital: sum of remaining unpaid principal (accounting for partial payments)
+      let newCapital = loan.loanInstallments.reduce((sum, i) => {
+        const paid = Number(i.paidAmount ?? 0)
+        const paidInterest = Math.min(paid, Number(i.interest))
+        const paidPrincipal = Math.max(paid - paidInterest, 0)
+        return sum + Math.max(Number(i.principal) - paidPrincipal, 0)
+      }, 0)
       if (input.capitalizeInterest) {
-        newCapital += loan.loanInstallments.reduce(
-          (sum, i) => sum + Number(i.interest), 0
-        )
+        newCapital += loan.loanInstallments.reduce((sum, i) => {
+          const paid = Number(i.paidAmount ?? 0)
+          const paidInterest = Math.min(paid, Number(i.interest))
+          return sum + Math.max(Number(i.interest) - paidInterest, 0)
+        }, 0)
       }
 
       const startDate = new Date(input.startDate + 'T00:00:00')
@@ -849,6 +876,7 @@ export const loansRouter = router({
               number: true,
               dueDate: true,
               amount: true,
+              paidAmount: true,
             },
           },
         },
@@ -864,7 +892,7 @@ export const loansRouter = router({
     const totalPending = activeLoans.reduce(
       (sum, loan) =>
         sum + loan.loanInstallments.reduce(
-          (s, i) => s + pesify(Number(i.amount), loan.currency, mepRate),
+          (s, i) => s + pesify(Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0), loan.currency, mepRate),
           0
         ),
       0
@@ -874,14 +902,17 @@ export const loansRouter = router({
 
     // All unpaid installments flattened (keep original currency for display)
     const allUnpaid = activeLoans.flatMap((loan) =>
-      loan.loanInstallments.map((i) => ({
-        ...i,
-        amount: Number(i.amount),
-        amountArs: pesify(Number(i.amount), loan.currency, mepRate),
-        borrowerName: loan.borrowerName,
-        loanId: loan.id,
-        currency: loan.currency,
-      }))
+      loan.loanInstallments.map((i) => {
+        const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
+        return {
+          ...i,
+          amount: remaining,
+          amountArs: pesify(remaining, loan.currency, mepRate),
+          borrowerName: loan.borrowerName,
+          loanId: loan.id,
+          currency: loan.currency,
+        }
+      })
     )
 
     // Overdue (past due date)
@@ -920,7 +951,7 @@ export const loansRouter = router({
           loanInstallments: {
             where: { isPaid: false },
             orderBy: { dueDate: 'asc' },
-            select: { id: true, number: true, dueDate: true, amount: true },
+            select: { id: true, number: true, dueDate: true, amount: true, paidAmount: true },
           },
         },
       }),
@@ -932,20 +963,23 @@ export const loansRouter = router({
     )
     const totalPending = activeDebts.reduce(
       (sum, loan) => sum + loan.loanInstallments.reduce(
-        (s, i) => s + pesify(Number(i.amount), loan.currency, mepRate), 0
+        (s, i) => s + pesify(Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0), loan.currency, mepRate), 0
       ), 0
     )
 
     const now = new Date()
     const allUnpaid = activeDebts.flatMap((loan) =>
-      loan.loanInstallments.map((i) => ({
-        ...i,
-        amount: Number(i.amount),
-        amountArs: pesify(Number(i.amount), loan.currency, mepRate),
-        creditorName: loan.creditorName || loan.borrowerName,
-        loanId: loan.id,
-        currency: loan.currency,
-      }))
+      loan.loanInstallments.map((i) => {
+        const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
+        return {
+          ...i,
+          amount: remaining,
+          amountArs: pesify(remaining, loan.currency, mepRate),
+          creditorName: loan.creditorName || loan.borrowerName,
+          loanId: loan.id,
+          currency: loan.currency,
+        }
+      })
     )
 
     const overdueCount = allUnpaid.filter((i) => i.dueDate < now).length

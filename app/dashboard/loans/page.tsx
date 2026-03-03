@@ -57,9 +57,17 @@ import {
   RefreshCw,
   Link2,
   Info,
+  MinusCircle,
+  ChevronDown,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useToast } from '@/hooks/use-toast'
 import { calculatePersonScore } from '@/lib/loan-scoring'
 import { tnaToMonthlyRate, frenchInstallment, generateAmortizationTable } from '@/lib/loan-calculator'
@@ -876,12 +884,13 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   const cur = loan.currency
   const paid = loan.loanInstallments.filter((i) => i.isPaid).length
   const total = loan.loanInstallments.length
-  const totalCollected = loan.loanInstallments
-    .filter((i) => i.isPaid)
-    .reduce((sum, i) => sum + Number(i.amount), 0)
+  const totalCollected = loan.loanInstallments.reduce((sum, i) => {
+    if (i.isPaid) return sum + Number(i.amount)
+    return sum + Number(i.paidAmount ?? 0)
+  }, 0)
   const totalPending = loan.loanInstallments
     .filter((i) => !i.isPaid)
-    .reduce((sum, i) => sum + Number(i.amount), 0)
+    .reduce((sum, i) => sum + Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0), 0)
   const unpaidCount = loan.loanInstallments.filter((i) => !i.isPaid).length
 
   return (
@@ -1147,7 +1156,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
       {loan.status === 'active' && unpaidCount > 0 && (
         <div className="flex flex-wrap gap-2">
           <CopyCollectionMessage loan={loan} />
-          <RegisterPaymentDialog loanId={loanId} cur={cur} />
+          <RegisterPaymentDialog loanId={loanId} cur={cur} loan={loan} />
           <RefinanceDialog loan={loan} onBack={onBack} />
           <Button
             variant="ghost"
@@ -1224,6 +1233,9 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                   <tbody>
                     {loan.loanInstallments.map((inst) => {
                       const dueDate = new Date(inst.dueDate)
+                      const paidAmount = Number(inst.paidAmount ?? 0)
+                      const remaining = Math.max(Number(inst.amount) - paidAmount, 0)
+                      const isPartial = paidAmount > 0 && !inst.isPaid && remaining > 0.01
                       const isOverdue = !inst.isPaid && dueDate < now
                       const isUpcoming = !inst.isPaid && !isOverdue &&
                         dueDate.getTime() - now.getTime() < 7 * 24 * 60 * 60 * 1000
@@ -1258,6 +1270,20 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                                 <CheckCircle2 className="h-5 w-5" />
                                 <span className="text-xs">Cobrada</span>
                               </button>
+                            ) : isPartial ? (
+                              <TooltipProvider>
+                                <UITooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex items-center gap-1.5 text-amber-400 cursor-default">
+                                      <MinusCircle className="h-5 w-5" />
+                                      <span className="text-xs">Parcial</span>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Pagó {formatCurrency(paidAmount, cur)}, resta {formatCurrency(remaining, cur)}</p>
+                                  </TooltipContent>
+                                </UITooltip>
+                              </TooltipProvider>
                             ) : (
                               <button
                                 onClick={() => markPaid.mutate({ installmentId: inst.id })}
@@ -1283,6 +1309,9 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
               <div className="md:hidden divide-y divide-border">
                 {loan.loanInstallments.map((inst) => {
                   const dueDate = new Date(inst.dueDate)
+                  const paidAmount = Number(inst.paidAmount ?? 0)
+                  const remaining = Math.max(Number(inst.amount) - paidAmount, 0)
+                  const isPartial = paidAmount > 0 && !inst.isPaid && remaining > 0.01
                   const isOverdue = !inst.isPaid && dueDate < now
 
                   return (
@@ -1290,19 +1319,25 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                       <button
                         onClick={() => inst.isPaid
                           ? unmarkPaid.mutate({ installmentId: inst.id })
-                          : markPaid.mutate({ installmentId: inst.id })
+                          : !isPartial
+                            ? markPaid.mutate({ installmentId: inst.id })
+                            : undefined
                         }
                         className={cn(
                           "shrink-0",
                           inst.isPaid
                             ? "text-accent-positive"
-                            : isOverdue
-                              ? "text-red-500"
-                              : "text-muted-foreground"
+                            : isPartial
+                              ? "text-amber-400"
+                              : isOverdue
+                                ? "text-red-500"
+                                : "text-muted-foreground"
                         )}
                       >
                         {inst.isPaid ? (
                           <CheckCircle2 className="h-6 w-6" />
+                        ) : isPartial ? (
+                          <MinusCircle className="h-6 w-6" />
                         ) : (
                           <Circle className="h-6 w-6" />
                         )}
@@ -1314,10 +1349,11 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                         </div>
                         <p className={cn(
                           "text-xs mt-0.5",
-                          isOverdue ? "text-red-500 font-medium" : "text-muted-foreground"
+                          isPartial ? "text-amber-400" : isOverdue ? "text-red-500 font-medium" : "text-muted-foreground"
                         )}>
                           {format(dueDate, "d 'de' MMMM yyyy", { locale: es })}
                           {inst.isPaid && inst.paidAt && ` - Cobrada ${format(new Date(inst.paidAt), "d MMM", { locale: es })}`}
+                          {isPartial && ` - Parcial: resta ${formatCurrency(remaining, cur)}`}
                         </p>
                       </div>
                     </div>
@@ -1332,6 +1368,9 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         </TabsContent>
       </Tabs>
 
+      {/* Payment History */}
+      <PaymentHistorySection loanId={loanId} cur={cur} />
+
       {/* Activity Timeline */}
       <LoanActivityTimeline loanId={loanId} logs={loan.activityLogs || []} />
     </div>
@@ -1340,7 +1379,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
 
 // ─── Register Payment Dialog ────────────────────────────────────────
 
-function RegisterPaymentDialog({ loanId, cur }: { loanId: string; cur: string }) {
+function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; cur: string; loan: any }) {
   const utils = trpc.useUtils()
   const [open, setOpen] = useState(false)
   const [amount, setAmount] = useState('')
@@ -1351,10 +1390,22 @@ function RegisterPaymentDialog({ loanId, cur }: { loanId: string; cur: string })
     onSuccess: () => {
       utils.loans.getById.invalidate({ id: loanId })
       utils.loans.getMonthlyAccruals.invalidate({ loanId })
+      utils.loans.getLoanPayments.invalidate({ loanId })
       setOpen(false)
       setAmount('')
     },
   })
+
+  // Compute pending info from loan data
+  const now = new Date()
+  const unpaidInsts = (loan?.loanInstallments ?? []).filter((i: any) => !i.isPaid)
+  const overdueInsts = unpaidInsts.filter((i: any) => new Date(i.dueDate) < now)
+  const nextDueInst = unpaidInsts.find((i: any) => new Date(i.dueDate) >= now)
+  const pendingCount = unpaidInsts.length
+  const totalPendingAmount = unpaidInsts.reduce((s: number, i: any) => {
+    const paid = Number(i.paidAmount ?? 0)
+    return s + Math.max(Number(i.amount) - paid, 0)
+  }, 0)
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -1369,6 +1420,37 @@ function RegisterPaymentDialog({ loanId, cur }: { loanId: string; cur: string })
           <DialogTitle>Registrar Cobro Real</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          {/* Pending info */}
+          {(overdueInsts.length > 0 || nextDueInst) && (
+            <div className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs space-y-1.5">
+              {overdueInsts.length > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-red-400 font-medium">Vencidas ({overdueInsts.length})</span>
+                  <span className="text-red-400 font-medium">
+                    {formatCurrency(overdueInsts.reduce((s: number, i: any) => {
+                      const paid = Number(i.paidAmount ?? 0)
+                      return s + Math.max(Number(i.amount) - paid, 0)
+                    }, 0), cur)}
+                  </span>
+                </div>
+              )}
+              {nextDueInst && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>
+                    Próxima ({format(new Date(nextDueInst.dueDate), "d MMM", { locale: es })})
+                    {Number(nextDueInst.paidAmount ?? 0) > 0 && ' · Parcial'}
+                  </span>
+                  <span>
+                    {formatCurrency(Math.max(Number(nextDueInst.amount) - Number(nextDueInst.paidAmount ?? 0), 0), cur)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-border/50 pt-1.5">
+                <span className="text-muted-foreground">Cuotas pendientes: {pendingCount}</span>
+                <span className="font-medium">{formatCurrency(totalPendingAmount, cur)}</span>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Monto cobrado ({cur})</Label>
             <Input
@@ -1410,6 +1492,88 @@ function RegisterPaymentDialog({ loanId, cur }: { loanId: string; cur: string })
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ─── Payment History Section ─────────────────────────────────────────
+
+function PaymentHistorySection({ loanId, cur }: { loanId: string; cur: string }) {
+  const { data: payments, isLoading } = trpc.loans.getLoanPayments.useQuery({ loanId })
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  if (isLoading) return <Skeleton className="h-24" />
+  if (!payments || payments.length === 0) return null
+
+  const componentLabel: Record<string, string> = {
+    interest_current: 'Interés corriente',
+    interest_overdue: 'Interés mora',
+    principal: 'Capital',
+    disbursement: 'Desembolso',
+    waiver_interest: 'Quita interés',
+    waiver_principal: 'Quita capital',
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Historial de Cobros</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="divide-y divide-border">
+          {payments.map((payment) => {
+            const isExpanded = expandedId === payment.id
+            const breakdowns = payment.realCashflows.filter((f) => f.component !== 'disbursement')
+
+            return (
+              <div key={payment.id} className="py-3">
+                <button
+                  className="w-full flex items-center justify-between gap-3 hover:opacity-80 transition-opacity"
+                  onClick={() => setExpandedId(isExpanded ? null : payment.id)}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Banknote className="h-4 w-4 text-accent-positive shrink-0" />
+                    <div className="text-left min-w-0">
+                      <p className="text-sm font-medium">
+                        {format(new Date(payment.paymentDate), "d 'de' MMMM yyyy", { locale: es })}
+                      </p>
+                      {payment.note && (
+                        <p className="text-xs text-muted-foreground truncate">{payment.note}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-bold text-accent-positive">
+                      {formatCurrency(Number(payment.amount), cur)}
+                    </span>
+                    <ChevronDown className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform",
+                      isExpanded && "rotate-180"
+                    )} />
+                  </div>
+                </button>
+
+                {isExpanded && breakdowns.length > 0 && (
+                  <div className="mt-2 ml-7 space-y-1">
+                    {breakdowns.map((flow, idx) => (
+                      <div key={idx} className="flex justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
+                          {componentLabel[flow.component] ?? flow.component}
+                          <span className="text-muted-foreground/60">
+                            ({format(new Date(flow.flowDate), "d MMM", { locale: es })})
+                          </span>
+                        </span>
+                        <span>{formatCurrency(Math.abs(Number(flow.amountSigned)), cur)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -1476,10 +1640,19 @@ function RefinanceDialog({ loan, onBack }: { loan: any; onBack: () => void }) {
   const [open, setOpen] = useState(false)
   const cur = loan.currency
 
-  // Calculate unpaid capital and interest
+  // Calculate remaining unpaid capital and interest (accounting for partial payments)
   const unpaidInstallments = loan.loanInstallments.filter((i: any) => !i.isPaid)
-  const unpaidPrincipal = unpaidInstallments.reduce((s: number, i: any) => s + Number(i.principal), 0)
-  const unpaidInterest = unpaidInstallments.reduce((s: number, i: any) => s + Number(i.interest), 0)
+  const unpaidPrincipal = unpaidInstallments.reduce((s: number, i: any) => {
+    const paid = Number(i.paidAmount ?? 0)
+    const paidInterest = Math.min(paid, Number(i.interest))
+    const paidPrincipal = Math.max(paid - paidInterest, 0)
+    return s + Math.max(Number(i.principal) - paidPrincipal, 0)
+  }, 0)
+  const unpaidInterest = unpaidInstallments.reduce((s: number, i: any) => {
+    const paid = Number(i.paidAmount ?? 0)
+    const paidInterest = Math.min(paid, Number(i.interest))
+    return s + Math.max(Number(i.interest) - paidInterest, 0)
+  }, 0)
 
   const [capitalizeInterest, setCapitalizeInterest] = useState(false)
   const [tna, setTna] = useState((Number(loan.tna) * 100).toFixed(1))
@@ -1643,10 +1816,11 @@ function CopyCollectionMessage({ loan }: { loan: any }) {
 
   const nombre = loan.borrowerName.split(' - ')[0]
   const fecha = format(new Date(nextInstallment.dueDate), "d 'de' MMMM", { locale: es })
-  const monto = formatCurrency(Number(nextInstallment.amount), cur)
+  const monto = formatCurrency(Math.max(Number(nextInstallment.amount) - Number(nextInstallment.paidAmount ?? 0), 0), cur)
   const total = loan.loanInstallments.length
   const saldo = formatCurrency(
-    loan.loanInstallments.filter((i: any) => !i.isPaid).reduce((s: number, i: any) => s + Number(i.amount), 0),
+    loan.loanInstallments.filter((i: any) => !i.isPaid).reduce((s: number, i: any) =>
+      s + Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0), 0),
     cur
   )
 
