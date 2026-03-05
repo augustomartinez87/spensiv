@@ -611,6 +611,8 @@ export class LoanAccountingService {
           select: {
             dueDate: true,
             amount: true,
+            isPaid: true,
+            paidAmount: true,
           },
           orderBy: { dueDate: 'asc' },
         },
@@ -629,7 +631,22 @@ export class LoanAccountingService {
     })
 
     const contractualIrr = calculateContractualIrr(loan)
-    const realResult = calculateRealIrr(cashflows)
+
+    // Build projected cashflows: real cashflows + pending installment amounts
+    const directionSign = loan.direction === 'lender' ? 1 : -1
+    const pendingFlows = loan.loanInstallments
+      .filter((i) => !i.isPaid)
+      .map((i) => {
+        const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
+        return {
+          flowDate: i.dueDate,
+          amountSigned: new Decimal(directionSign * remaining),
+        }
+      })
+      .filter((f) => Number(f.amountSigned) !== 0)
+
+    const projectedCashflows = [...cashflows, ...pendingFlows]
+    const realResult = calculateRealIrr(projectedCashflows)
 
     const slippageBps = contractualIrr !== null && realResult.rate !== null
       ? Math.round((realResult.rate - contractualIrr) * 10000)

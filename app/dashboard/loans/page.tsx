@@ -1116,7 +1116,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           <Card className="bg-muted/30">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">TIR Real (XIRR)</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">TIR Proyectada (XIRR)</p>
                 {loan.irrStatus === 'no_convergence' && <AlertCircle className="h-3 w-3 text-amber-500" aria-label="Sin convergencia" />}
               </div>
               <p className="text-xl font-bold text-foreground mt-1">
