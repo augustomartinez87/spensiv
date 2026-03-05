@@ -866,6 +866,21 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
     },
   })
 
+  const [editInstId, setEditInstId] = useState<string | null>(null)
+  const [editInstAmount, setEditInstAmount] = useState('')
+  const [editInstDate, setEditInstDate] = useState('')
+
+  const updateInstallmentMutation = trpc.loans.updateInstallment.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.getMonthlyAccruals.invalidate({ loanId })
+      utils.loans.list.invalidate()
+      utils.loans.getDashboardMetrics.invalidate()
+      setEditInstId(null)
+      toast({ title: 'Cuota actualizada' })
+    },
+  })
+
   const [payInstId, setPayInstId] = useState<string | null>(null)
   const [payInstDate, setPayInstDate] = useState(formatDateToInput(new Date()))
 
@@ -1313,18 +1328,35 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             {!inst.isPaid && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-muted-foreground hover:text-accent-positive"
-                                title="Cobrar esta cuota"
-                                onClick={() => {
-                                  setPayInstId(inst.id)
-                                  setPayInstDate(formatDateToInput(new Date()))
-                                }}
-                              >
-                                <Banknote className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center justify-center gap-0.5">
+                                {paidAmount === 0 && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                    title="Editar cuota"
+                                    onClick={() => {
+                                      setEditInstId(inst.id)
+                                      setEditInstAmount(String(Number(inst.amount)))
+                                      setEditInstDate(formatDateToInput(dueDate))
+                                    }}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-muted-foreground hover:text-accent-positive"
+                                  title="Cobrar esta cuota"
+                                  onClick={() => {
+                                    setPayInstId(inst.id)
+                                    setPayInstDate(formatDateToInput(new Date()))
+                                  }}
+                                >
+                                  <Banknote className="h-4 w-4" />
+                                </Button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -1386,18 +1418,35 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                         </p>
                       </div>
                       {!inst.isPaid && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-accent-positive"
-                          title="Cobrar esta cuota"
-                          onClick={() => {
-                            setPayInstId(inst.id)
-                            setPayInstDate(formatDateToInput(new Date()))
-                          }}
-                        >
-                          <Banknote className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          {paidAmount === 0 && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              title="Editar cuota"
+                              onClick={() => {
+                                setEditInstId(inst.id)
+                                setEditInstAmount(String(Number(inst.amount)))
+                                setEditInstDate(formatDateToInput(dueDate))
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-muted-foreground hover:text-accent-positive"
+                            title="Cobrar esta cuota"
+                            onClick={() => {
+                              setPayInstId(inst.id)
+                              setPayInstDate(formatDateToInput(new Date()))
+                            }}
+                          >
+                            <Banknote className="h-4 w-4" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )
@@ -1410,6 +1459,65 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           <MonthlyAccrualsTable loanId={loanId} cur={cur} />
         </TabsContent>
       </Tabs>
+
+      {/* Edit installment dialog */}
+      {editInstId && (() => {
+        const inst = loan.loanInstallments.find((i) => i.id === editInstId)
+        if (!inst) return null
+        return (
+          <Dialog open onOpenChange={(open) => { if (!open) setEditInstId(null) }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar cuota {inst.number}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Monto</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={editInstAmount}
+                    onChange={(e) => setEditInstAmount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fecha de vencimiento</Label>
+                  <Input
+                    type="date"
+                    value={editInstDate}
+                    onChange={(e) => setEditInstDate(e.target.value)}
+                  />
+                </div>
+                <Button
+                  className="w-full"
+                  disabled={updateInstallmentMutation.isPending}
+                  onClick={() => {
+                    const changes: { installmentId: string; amount?: number; dueDate?: string } = {
+                      installmentId: editInstId,
+                    }
+                    const newAmount = parseFloat(editInstAmount)
+                    if (!isNaN(newAmount) && newAmount !== Number(inst.amount)) {
+                      changes.amount = newAmount
+                    }
+                    const origDate = formatDateToInput(new Date(inst.dueDate))
+                    if (editInstDate !== origDate) {
+                      changes.dueDate = editInstDate
+                    }
+                    if (!changes.amount && !changes.dueDate) {
+                      setEditInstId(null)
+                      return
+                    }
+                    updateInstallmentMutation.mutate(changes)
+                  }}
+                >
+                  {updateInstallmentMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )
+      })()}
 
       {/* Pay installment dialog */}
       {payInstId && (() => {

@@ -1055,6 +1055,71 @@ export const loansRouter = router({
       })
     }),
 
+  updateInstallment: protectedProcedure
+    .input(z.object({
+      installmentId: z.string(),
+      amount: z.number().positive().optional(),
+      dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const installment = await ctx.prisma.loanInstallment.findFirst({
+        where: { id: input.installmentId, loan: { userId: ctx.user.id } },
+        include: { loan: true },
+      })
+
+      if (!installment) throw new Error('Cuota no encontrada')
+      if (installment.isPaid) throw new Error('No se puede editar una cuota cobrada')
+      if (Number(installment.paidAmount ?? 0) > 0) throw new Error('No se puede editar una cuota con pagos parciales')
+      if (!input.amount && !input.dueDate) throw new Error('Debe indicar monto o fecha a modificar')
+
+      const updates: Record<string, any> = {}
+
+      if (input.amount !== undefined) {
+        const loan = installment.loan
+        if (loan.loanType === 'interest_only') {
+          // For interest-only: amount = interest, principal stays 0
+          updates.amount = input.amount
+          updates.interest = input.amount
+        } else {
+          // For amortized: update amount, recalculate interest/principal split
+          // Find the previous installment's balance to determine interest portion
+          const prevInstallment = await ctx.prisma.loanInstallment.findFirst({
+            where: {
+              loanId: loan.id,
+              number: installment.number - 1,
+            },
+          })
+          const prevBalance = prevInstallment ? Number(prevInstallment.balance) : Number(loan.capital)
+          const monthlyRate = Number(loan.monthlyRate)
+          const interest = prevBalance * monthlyRate
+          const principal = Math.max(input.amount - interest, 0)
+          const balance = Math.max(prevBalance - principal, 0)
+
+          updates.amount = input.amount
+          updates.interest = interest
+          updates.principal = principal
+          updates.balance = balance
+        }
+      }
+
+      if (input.dueDate !== undefined) {
+        updates.dueDate = new Date(input.dueDate + 'T00:00:00')
+      }
+
+      await ctx.prisma.loanInstallment.update({
+        where: { id: input.installmentId },
+        data: updates,
+      })
+
+      // Trigger full recalculation
+      const service = new LoanAccountingService(ctx.prisma)
+      await service.reconcileInstallmentStates(installment.loanId)
+      await service.rebuildMonthlyAccruals(installment.loanId)
+      await service.recalculateIrrCache(installment.loanId)
+
+      return { success: true }
+    }),
+
   recalculate: protectedProcedure
     .input(z.object({ loanId: z.string() }))
     .mutation(async ({ ctx, input }) => {
