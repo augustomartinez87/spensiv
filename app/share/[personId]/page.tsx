@@ -58,8 +58,8 @@ export default function SharePersonPage() {
           {data.loans.map((loan) => {
             const paid = loan.installments.filter((i) => i.isPaid)
             const pending = loan.installments.filter((i) => !i.isPaid)
-            const totalPaid = paid.reduce((s, i) => s + (i.paidAmount ?? i.amount), 0)
-            const totalPending = pending.reduce((s, i) => s + i.amount, 0)
+            const totalPaid = loan.installments.reduce((s, i) => s + (i.paidAmount ?? 0), 0)
+            const totalPending = loan.installments.reduce((s, i) => s + Math.max(i.amount - (i.paidAmount ?? 0), 0), 0)
             const nextDue = pending.find((i) => new Date(i.dueDate) >= now) ?? pending[0]
 
             return (
@@ -78,6 +78,9 @@ export default function SharePersonPage() {
                       const due = new Date(inst.dueDate)
                       const isOverdue = !inst.isPaid && due < now
                       const isNext = nextDue?.id === inst.id
+                      const paid = inst.paidAmount ?? 0
+                      const remaining = Math.max(inst.amount - paid, 0)
+                      const isPartial = !inst.isPaid && paid > 0
 
                       return (
                         <div
@@ -86,11 +89,14 @@ export default function SharePersonPage() {
                             'flex items-center gap-3 px-3 py-2 rounded-lg text-sm',
                             isNext && 'bg-primary/10 border border-primary/30',
                             isOverdue && !isNext && 'bg-red-500/10',
+                            isPartial && !isNext && !isOverdue && 'bg-amber-500/10',
                           )}
                         >
                           {/* Status icon */}
                           {inst.isPaid ? (
                             <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                          ) : isPartial ? (
+                            <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
                           ) : isOverdue ? (
                             <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
                           ) : (
@@ -109,16 +115,31 @@ export default function SharePersonPage() {
                           </span>
 
                           {/* Amount */}
-                          <span className={cn(
-                            'font-semibold shrink-0',
-                            inst.isPaid ? 'text-muted-foreground line-through' : isOverdue ? 'text-red-400' : 'text-foreground',
-                          )}>
-                            {formatCurrency(inst.amount, loan.currency)}
-                          </span>
+                          <div className="text-right shrink-0">
+                            {isPartial ? (
+                              <>
+                                <span className="font-semibold text-foreground">
+                                  {formatCurrency(remaining, loan.currency)}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground ml-1">
+                                  / {formatCurrency(inst.amount, loan.currency)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className={cn(
+                                'font-semibold',
+                                inst.isPaid ? 'text-muted-foreground line-through' : isOverdue ? 'text-red-400' : 'text-foreground',
+                              )}>
+                                {formatCurrency(inst.amount, loan.currency)}
+                              </span>
+                            )}
+                          </div>
 
                           {/* Status badge */}
                           {inst.isPaid ? (
                             <Badge variant="secondary" className="text-[10px] shrink-0">Pagada</Badge>
+                          ) : isPartial ? (
+                            <Badge className="text-[10px] shrink-0 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30">Parcial</Badge>
                           ) : isOverdue ? (
                             <Badge variant="destructive" className="text-[10px] shrink-0">Vencida</Badge>
                           ) : isNext ? (
