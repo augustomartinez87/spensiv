@@ -43,7 +43,9 @@ import {
   AlertCircle,
   TrendingUp,
   TrendingDown,
+  Link2,
 } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   amigo: 'Amigo',
@@ -185,6 +187,7 @@ function PersonDetail({ personId, onBack }: { personId: string; onBack: () => vo
   const { data: person, isLoading } = trpc.persons.getById.useQuery({ id: personId })
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const { toast } = useToast()
 
   const deleteMutation = trpc.persons.delete.useMutation({
     onSuccess: () => {
@@ -232,6 +235,18 @@ function PersonDetail({ personId, onBack }: { personId: string; onBack: () => vo
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              const url = `${window.location.origin}/share/${personId}`
+              navigator.clipboard.writeText(url)
+              toast({ description: 'Link copiado al portapapeles' })
+            }}
+          >
+            <Link2 className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => setEditOpen(true)} className="text-muted-foreground hover:text-foreground">
             <Pencil className="h-4 w-4" />
           </Button>
