@@ -160,8 +160,27 @@ export class LoanAccountingService {
         currentPeriodPrincipal = Decimal.max(principalPending.minus(futurePrincipalSum), ZERO)
       }
 
-      // Current dues: everything owed up to and including this month
-      const currentDues = overduePending.plus(currentInterestPending).plus(currentPeriodPrincipal)
+      // Current dues from accrual engine
+      const currentDuesAccrual = overduePending.plus(currentInterestPending).plus(currentPeriodPrincipal)
+
+      // Current dues from installment amounts (overdue + current month remaining)
+      // This is the true cap: when installment amounts are edited, the accrual engine
+      // may disagree with the installment amounts, so we use the minimum to avoid
+      // spilling cents into future installments.
+      const currentInstKey = yearMonthKey(paymentDate)
+      const currentMonthInstallments = unpaidInstallments.filter(
+        (i) => yearMonthKey(new Date(i.dueDate)) === currentInstKey,
+      )
+      const overdueInstallmentsRemaining = overdueInstallments.reduce((s, i) => {
+        return s.plus(Decimal.max(money(i.amount).minus(money(i.paidAmount ?? 0)), ZERO))
+      }, ZERO)
+      const currentMonthInstRemaining = currentMonthInstallments.reduce((s, i) => {
+        return s.plus(Decimal.max(money(i.amount).minus(money(i.paidAmount ?? 0)), ZERO))
+      }, ZERO)
+      const currentDuesFromInstallments = overdueInstallmentsRemaining.plus(currentMonthInstRemaining)
+
+      // Use the minimum: accrual-based vs installment-based cap
+      const currentDues = Decimal.min(currentDuesAccrual, currentDuesFromInstallments)
 
       // Max payable: current dues + remaining future installment amounts
       const futureInstallmentsTotal = futureInstallments.reduce((s, i) => {
@@ -313,7 +332,6 @@ export class LoanAccountingService {
 
       // Update current-period installment (dueDate in same month as paymentDate)
       let currentInstNowPaid = false
-      const currentInstKey = yearMonthKey(paymentDate)
       const currentInst = unpaidInstallments.find(
         (i) => yearMonthKey(new Date(i.dueDate)) === currentInstKey,
       )
