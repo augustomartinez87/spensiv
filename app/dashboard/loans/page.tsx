@@ -842,22 +842,6 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
     updateMutation.mutate(changes)
   }
 
-  const markPaid = trpc.loans.markInstallmentPaid.useMutation({
-    onSuccess: () => {
-      utils.loans.getById.invalidate({ id: loanId })
-      utils.loans.list.invalidate()
-      utils.loans.getDashboardMetrics.invalidate()
-    },
-  })
-
-  const unmarkPaid = trpc.loans.unmarkInstallmentPaid.useMutation({
-    onSuccess: () => {
-      utils.loans.getById.invalidate({ id: loanId })
-      utils.loans.list.invalidate()
-      utils.loans.getDashboardMetrics.invalidate()
-    },
-  })
-
   const recalculateMutation = trpc.loans.recalculate.useMutation({
     onSuccess: () => {
       utils.loans.getById.invalidate({ id: loanId })
@@ -1290,14 +1274,10 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                           <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(Number(inst.balance), cur)}</td>
                           <td className="py-2.5 px-3 text-center">
                             {inst.isPaid ? (
-                              <button
-                                onClick={() => unmarkPaid.mutate({ installmentId: inst.id })}
-                                className="inline-flex items-center gap-1.5 text-accent-positive hover:opacity-70 transition-opacity"
-                                title="Desmarcar como cobrada"
-                              >
+                              <span className="inline-flex items-center gap-1.5 text-accent-positive">
                                 <CheckCircle2 className="h-5 w-5" />
                                 <span className="text-xs">Cobrada</span>
-                              </button>
+                              </span>
                             ) : isPartial ? (
                               <TooltipProvider>
                                 <UITooltip>
@@ -1313,17 +1293,13 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                                 </UITooltip>
                               </TooltipProvider>
                             ) : (
-                              <button
-                                onClick={() => markPaid.mutate({ installmentId: inst.id })}
-                                className={cn(
-                                  "inline-flex items-center gap-1.5 hover:text-green-400 transition-colors",
-                                  isOverdue ? "text-red-500" : "text-muted-foreground"
-                                )}
-                                title="Marcar como cobrada"
-                              >
+                              <span className={cn(
+                                "inline-flex items-center gap-1.5",
+                                isOverdue ? "text-red-500" : "text-muted-foreground"
+                              )}>
                                 <Circle className="h-5 w-5" />
                                 <span className="text-xs">{isOverdue ? 'Vencida' : 'Pendiente'}</span>
-                              </button>
+                              </span>
                             )}
                           </td>
                           <td className="py-2.5 px-3 text-center">
@@ -1377,24 +1353,16 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
 
                   return (
                     <div key={inst.id} className={cn("py-3 flex items-center gap-3", inst.isPaid && "opacity-60")}>
-                      <button
-                        onClick={() => inst.isPaid
-                          ? unmarkPaid.mutate({ installmentId: inst.id })
-                          : !isPartial
-                            ? markPaid.mutate({ installmentId: inst.id })
-                            : undefined
-                        }
-                        className={cn(
-                          "shrink-0",
-                          inst.isPaid
-                            ? "text-accent-positive"
-                            : isPartial
-                              ? "text-amber-400"
-                              : isOverdue
-                                ? "text-red-500"
-                                : "text-muted-foreground"
-                        )}
-                      >
+                      <span className={cn(
+                        "shrink-0",
+                        inst.isPaid
+                          ? "text-accent-positive"
+                          : isPartial
+                            ? "text-amber-400"
+                            : isOverdue
+                              ? "text-red-500"
+                              : "text-muted-foreground"
+                      )}>
                         {inst.isPaid ? (
                           <CheckCircle2 className="h-6 w-6" />
                         ) : isPartial ? (
@@ -1402,7 +1370,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                         ) : (
                           <Circle className="h-6 w-6" />
                         )}
-                      </button>
+                      </span>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between">
                           <p className="text-sm font-medium">Cuota {inst.number}</p>
