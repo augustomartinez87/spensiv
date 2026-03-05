@@ -1103,7 +1103,7 @@ export const loansRouter = router({
       }
 
       if (input.dueDate !== undefined) {
-        updates.dueDate = new Date(input.dueDate + 'T00:00:00')
+        updates.dueDate = new Date(input.dueDate + 'T12:00:00')
       }
 
       await ctx.prisma.loanInstallment.update({
