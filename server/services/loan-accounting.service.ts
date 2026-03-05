@@ -131,21 +131,34 @@ export class LoanAccountingService {
         : ZERO
       const principalPending = money(preState.principalOutstanding)
 
-      // Future installments: dueDate strictly after end of payment month
+      // Overdue installments: dueDate strictly before start of payment month
+      const paymentMonthStart = new Date(paymentDate.getFullYear(), paymentDate.getMonth(), 1)
       const paymentMonthEnd = new Date(paymentDate.getFullYear(), paymentDate.getMonth() + 1, 0, 23, 59, 59)
+      const overdueInstallments = unpaidInstallments.filter(
+        (i) => new Date(i.dueDate) < paymentMonthStart,
+      )
+      // Future installments: dueDate strictly after end of payment month
       const futureInstallments = unpaidInstallments.filter(
         (i) => new Date(i.dueDate) > paymentMonthEnd,
       )
 
+      // Interest-only loans: principal never decreases via regular payments
       // Current-period principal = outstanding minus future installments' remaining principals
-      const futurePrincipalSum = futureInstallments.reduce((s, i) => {
-        const paid = money(i.paidAmount ?? 0)
-        const interestAlreadyPaid = Decimal.min(paid, money(i.interest))
-        const principalAlreadyPaid = Decimal.max(paid.minus(interestAlreadyPaid), ZERO)
-        const remainingPrincipal = Decimal.max(money(i.principal).minus(principalAlreadyPaid), ZERO)
-        return s.plus(remainingPrincipal)
-      }, ZERO)
-      const currentPeriodPrincipal = Decimal.max(principalPending.minus(futurePrincipalSum), ZERO)
+      const isInterestOnly = loan.loanType === 'interest_only'
+      let currentPeriodPrincipal: Decimal
+
+      if (isInterestOnly) {
+        currentPeriodPrincipal = ZERO
+      } else {
+        const futurePrincipalSum = futureInstallments.reduce((s, i) => {
+          const paid = money(i.paidAmount ?? 0)
+          const interestAlreadyPaid = Decimal.min(paid, money(i.interest))
+          const principalAlreadyPaid = Decimal.max(paid.minus(interestAlreadyPaid), ZERO)
+          const remainingPrincipal = Decimal.max(money(i.principal).minus(principalAlreadyPaid), ZERO)
+          return s.plus(remainingPrincipal)
+        }, ZERO)
+        currentPeriodPrincipal = Decimal.max(principalPending.minus(futurePrincipalSum), ZERO)
+      }
 
       // Current dues: everything owed up to and including this month
       const currentDues = overduePending.plus(currentInterestPending).plus(currentPeriodPrincipal)
@@ -318,6 +331,30 @@ export class LoanAccountingService {
         if (fullyPaid) currentInstNowPaid = true
       }
 
+      // Update paidAmount for overdue installments (past months) — FIFO order
+      let overdueRemaining = money(waterfall.interestOverdueApplied)
+      for (const inst of overdueInstallments) {
+        if (overdueRemaining.lte(CENT_TOLERANCE)) break
+
+        const alreadyPaid = money(inst.paidAmount ?? 0)
+        const instAmount = money(inst.amount)
+        const remaining = Decimal.max(instAmount.minus(alreadyPaid), ZERO)
+        if (remaining.lte(CENT_TOLERANCE)) continue
+
+        const toApply = Decimal.min(overdueRemaining, remaining)
+        overdueRemaining = overdueRemaining.minus(toApply)
+
+        const newTotal = alreadyPaid.plus(toApply)
+        const fullyPaid = newTotal.gte(instAmount.minus(CENT_TOLERANCE))
+        await tx.loanInstallment.update({
+          where: { id: inst.id },
+          data: {
+            paidAmount: { increment: round2(toApply) },
+            ...(fullyPaid ? { isPaid: true, paidAt: paymentDate } : {}),
+          },
+        })
+      }
+
       const advancedCount = advancePaid.filter((a) => a.fullyPaid).length
 
       // Auto-complete amortized loan if all installments are now paid
@@ -354,6 +391,10 @@ export class LoanAccountingService {
 
   async recalculateIrrCache(loanId: string) {
     return this.prisma.$transaction((tx) => this.recalculateIrrCacheTx(tx, loanId))
+  }
+
+  async reconcileInstallmentStates(loanId: string): Promise<void> {
+    await this.prisma.$transaction((tx) => this.reconcileInstallmentStatesTx(tx, loanId))
   }
 
   async ensureInitialDisbursementCashflow(loanId: string): Promise<void> {
@@ -654,17 +695,24 @@ export class LoanAccountingService {
       data: { isPaid: false, paidAt: null, paidAmount: 0 },
     })
 
-    // Get remaining cashflows (interest_current + principal) to derive paid amounts
+    // Get remaining cashflows to derive paid amounts
     const cashflows = await tx.loanRealCashflow.findMany({
-      where: { loanId, component: { in: ['interest_current', 'principal'] } },
-      select: { flowDate: true, amountSigned: true },
+      where: { loanId, component: { in: ['interest_current', 'interest_overdue', 'principal'] } },
+      select: { flowDate: true, amountSigned: true, component: true },
     })
 
-    // Group by yearMonth of flowDate
+    // Group by yearMonth of flowDate (interest_current + principal go to their month)
     const paidByMonth = new Map<string, Decimal>()
+    // interest_overdue flows need to be applied to the oldest unpaid installment, not their flowDate month
+    let totalOverduePaid = ZERO
     for (const flow of cashflows) {
-      const key = yearMonthKey(new Date(flow.flowDate))
-      paidByMonth.set(key, (paidByMonth.get(key) ?? ZERO).plus(money(flow.amountSigned).abs()))
+      const amount = money(flow.amountSigned).abs()
+      if (flow.component === 'interest_overdue') {
+        totalOverduePaid = totalOverduePaid.plus(amount)
+      } else {
+        const key = yearMonthKey(new Date(flow.flowDate))
+        paidByMonth.set(key, (paidByMonth.get(key) ?? ZERO).plus(amount))
+      }
     }
 
     // Match installments by yearMonth of dueDate and update states
@@ -674,6 +722,7 @@ export class LoanAccountingService {
       orderBy: { number: 'asc' },
     })
 
+    // First pass: apply current-month payments
     for (const inst of installments) {
       const key = yearMonthKey(new Date(inst.dueDate))
       const paid = paidByMonth.get(key) ?? ZERO
@@ -689,6 +738,39 @@ export class LoanAccountingService {
           paidAt: fullyPaid ? new Date() : null,
         },
       })
+      // Reduce available amount in map so it doesn't double-count
+      paidByMonth.set(key, paid.minus(clampedPaid))
+    }
+
+    // Second pass: distribute overdue interest payments to oldest unpaid installments (FIFO)
+    if (totalOverduePaid.gt(CENT_TOLERANCE)) {
+      const updatedInstallments = await tx.loanInstallment.findMany({
+        where: { loanId, isPaid: false },
+        select: { id: true, dueDate: true, amount: true, paidAmount: true },
+        orderBy: { number: 'asc' },
+      })
+
+      let overdueRemaining = totalOverduePaid
+      for (const inst of updatedInstallments) {
+        if (overdueRemaining.lte(CENT_TOLERANCE)) break
+        const alreadyPaid = money(inst.paidAmount ?? 0)
+        const instAmt = money(inst.amount)
+        const remaining = Decimal.max(instAmt.minus(alreadyPaid), ZERO)
+        if (remaining.lte(CENT_TOLERANCE)) continue
+
+        const toApply = Decimal.min(overdueRemaining, remaining)
+        overdueRemaining = overdueRemaining.minus(toApply)
+        const newTotal = alreadyPaid.plus(toApply)
+        const fullyPaid = newTotal.gte(instAmt.minus(CENT_TOLERANCE))
+        await tx.loanInstallment.update({
+          where: { id: inst.id },
+          data: {
+            paidAmount: round2(newTotal),
+            isPaid: fullyPaid,
+            paidAt: fullyPaid ? new Date() : null,
+          },
+        })
+      }
     }
   }
 

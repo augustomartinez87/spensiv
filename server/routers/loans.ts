@@ -1059,6 +1059,7 @@ export const loansRouter = router({
     .input(z.object({ loanId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const service = new LoanAccountingService(ctx.prisma)
+      await service.reconcileInstallmentStates(input.loanId)
       await service.rebuildMonthlyAccruals(input.loanId)
       await service.recalculateIrrCache(input.loanId)
       return { success: true }

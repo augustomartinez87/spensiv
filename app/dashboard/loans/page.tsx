@@ -874,6 +874,9 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
       utils.loans.getById.invalidate({ id: loanId })
       utils.loans.getLoanPayments.invalidate({ loanId })
       utils.loans.getMonthlyAccruals.invalidate({ loanId })
+      utils.loans.list.invalidate()
+      utils.loans.getDashboardMetrics.invalidate()
+
       setPayInstId(null)
     },
   })
@@ -1471,6 +1474,9 @@ function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; cur: str
       utils.loans.getById.invalidate({ id: loanId })
       utils.loans.getMonthlyAccruals.invalidate({ loanId })
       utils.loans.getLoanPayments.invalidate({ loanId })
+      utils.loans.list.invalidate()
+      utils.loans.getDashboardMetrics.invalidate()
+
       setOpen(false)
       setAmount('')
     },
