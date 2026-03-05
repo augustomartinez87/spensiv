@@ -89,7 +89,7 @@ export const loansRouter = router({
   create: protectedProcedure
     .input(createLoanInput)
     .mutation(async ({ ctx, input }) => {
-      const startDate = new Date(input.startDate + 'T00:00:00')
+      const startDate = new Date(input.startDate + 'T12:00:00')
 
       if (input.loanType === 'interest_only') {
         // Interest-only: no fixed term, monthly interest payments
@@ -179,7 +179,7 @@ export const loansRouter = router({
             loanInstallments: {
               create: smart.rows.map((row) => ({
                 number: row.month,
-                dueDate: new Date(row.date + 'T00:00:00'),
+                dueDate: new Date(row.date + 'T12:00:00'),
                 amount: row.installment,
                 interest: row.interest,
                 principal: row.principal,
@@ -242,7 +242,7 @@ export const loansRouter = router({
           loanInstallments: {
             create: table.map((row) => ({
               number: row.month,
-              dueDate: new Date(row.date + 'T00:00:00'),
+              dueDate: new Date(row.date + 'T12:00:00'),
               amount: row.installment,
               interest: row.interest,
               principal: row.principal,
@@ -401,7 +401,7 @@ export const loansRouter = router({
 
       const updates: Record<string, any> = {}
       if (input.borrowerName) updates.borrowerName = input.borrowerName
-      if (input.startDate) updates.startDate = new Date(input.startDate + 'T00:00:00')
+      if (input.startDate) updates.startDate = new Date(input.startDate + 'T12:00:00')
       if (input.personId !== undefined) updates.personId = input.personId
 
       const updated = await ctx.prisma.loan.update({
@@ -411,7 +411,7 @@ export const loansRouter = router({
 
       // If start date changed, recalculate all installment due dates
       if (input.startDate) {
-        const newStart = new Date(input.startDate + 'T00:00:00')
+        const newStart = new Date(input.startDate + 'T12:00:00')
         await Promise.all(
           loan.loanInstallments.map((inst) =>
             ctx.prisma.loanInstallment.update({
@@ -475,7 +475,7 @@ export const loansRouter = router({
       return service.registerPayment({
         loanId: input.loanId,
         userId: ctx.user.id,
-        paymentDate: new Date(input.paymentDate + 'T00:00:00'),
+        paymentDate: new Date(input.paymentDate + 'T12:00:00'),
         amount: input.amount,
         note: input.note,
         externalRef: input.externalRef,
@@ -606,7 +606,7 @@ export const loansRouter = router({
   createPreApproved: protectedProcedure
     .input(createLoanInput)
     .mutation(async ({ ctx, input }) => {
-      const startDate = new Date(input.startDate + 'T00:00:00')
+      const startDate = new Date(input.startDate + 'T12:00:00')
 
       if (input.loanType === 'interest_only') {
         const rate = input.monthlyInterestRate
@@ -701,7 +701,7 @@ export const loansRouter = router({
 
       if (!loan) throw new Error('Préstamo preaprobado no encontrado')
 
-      const startDate = new Date(input.startDate + 'T00:00:00')
+      const startDate = new Date(input.startDate + 'T12:00:00')
 
       if (loan.loanType === 'interest_only') {
         const monthlyInterest = Number(loan.installmentAmount)
@@ -787,7 +787,7 @@ export const loansRouter = router({
         }, 0)
       }
 
-      const startDate = new Date(input.startDate + 'T00:00:00')
+      const startDate = new Date(input.startDate + 'T12:00:00')
       let monthlyRate = tnaToMonthlyRate(input.tna)
       const exactInstallment = frenchInstallment(newCapital, monthlyRate, input.termMonths)
       const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
@@ -1049,7 +1049,7 @@ export const loansRouter = router({
       return service.registerPayment({
         loanId: installment.loanId,
         userId: ctx.user.id,
-        paymentDate: new Date(input.paymentDate + 'T00:00:00'),
+        paymentDate: new Date(input.paymentDate + 'T12:00:00'),
         amount: remaining,
         note: input.note,
       })
