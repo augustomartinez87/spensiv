@@ -59,6 +59,7 @@ import {
   Info,
   MinusCircle,
   ChevronDown,
+  Ban,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
@@ -880,6 +881,19 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
     },
   })
 
+  const [waiveInstId, setWaiveInstId] = useState<string | null>(null)
+  const waiveMutation = trpc.loans.waiveInstallmentBalance.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.getLoanPayments.invalidate({ loanId })
+      utils.loans.getMonthlyAccruals.invalidate({ loanId })
+      utils.loans.list.invalidate()
+      utils.loans.getDashboardMetrics.invalidate()
+      setWaiveInstId(null)
+      toast({ title: 'Quita aplicada' })
+    },
+  })
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -1332,6 +1346,15 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                                 >
                                   <Banknote className="h-4 w-4" />
                                 </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-muted-foreground hover:text-red-400"
+                                  title="Condonar saldo restante"
+                                  onClick={() => setWaiveInstId(inst.id)}
+                                >
+                                  <Ban className="h-3.5 w-3.5" />
+                                </Button>
                               </div>
                             )}
                           </td>
@@ -1413,6 +1436,15 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                             }}
                           >
                             <Banknote className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-muted-foreground hover:text-red-400"
+                            title="Condonar saldo restante"
+                            onClick={() => setWaiveInstId(inst.id)}
+                          >
+                            <Ban className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       )}
@@ -1520,6 +1552,48 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                   })}
                 >
                   {payInstMutation.isPending ? 'Registrando...' : 'Confirmar Cobro'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )
+      })()}
+
+      {/* Waive installment dialog */}
+      {waiveInstId && (() => {
+        const inst = loan.loanInstallments.find((i: any) => i.id === waiveInstId)
+        if (!inst) return null
+        const remaining = Math.max(Number(inst.amount) - Number(inst.paidAmount ?? 0), 0)
+        return (
+          <Dialog open onOpenChange={(open) => { if (!open) setWaiveInstId(null) }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Condonar cuota {inst.number}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <p className="text-sm text-muted-foreground">
+                  Se condonará el saldo restante de esta cuota. El monto no se cobrará y la cuota quedará marcada como saldada.
+                </p>
+                <div className="rounded-lg bg-muted/50 px-3 py-2.5 text-sm flex justify-between">
+                  <span className="text-muted-foreground">Monto a condonar</span>
+                  <span className="font-bold text-red-400">{formatCurrency(remaining, cur)}</span>
+                </div>
+                {Number(inst.paidAmount ?? 0) > 0 && (
+                  <div className="rounded-lg bg-muted/50 px-3 py-2.5 text-sm flex justify-between">
+                    <span className="text-muted-foreground">Cobrado previamente</span>
+                    <span className="font-medium">{formatCurrency(Number(inst.paidAmount ?? 0), cur)}</span>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Esto impactará la TIR proyectada del préstamo.
+                </p>
+                <Button
+                  className="w-full"
+                  variant="destructive"
+                  disabled={waiveMutation.isPending}
+                  onClick={() => waiveMutation.mutate({ installmentId: waiveInstId })}
+                >
+                  {waiveMutation.isPending ? 'Aplicando quita...' : `Condonar ${formatCurrency(remaining, cur)}`}
                 </Button>
               </div>
             </DialogContent>

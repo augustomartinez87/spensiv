@@ -125,7 +125,7 @@ export function generateSmartAmortizationTable(
   startDate: string,
   termMonths: number,
   roundingMultiple = 0,
-): { rows: AmortizationRow[]; installmentAmount: number; totalPaid: number } {
+): { rows: AmortizationRow[]; installmentAmount: number; totalPaid: number; effectiveTna: number } {
   const start = parseIsoDate(startDate)
   const dueDates = getSmartDueDates(start, termMonths)
   const smart = generateSmartSchedule(capital, tna, start, dueDates, roundingMultiple)
@@ -144,7 +144,7 @@ export function generateSmartAmortizationTable(
     }
   })
 
-  return { rows, installmentAmount: smart.installmentAmount, totalPaid: smart.totalPaid }
+  return { rows, installmentAmount: smart.installmentAmount, totalPaid: smart.totalPaid, effectiveTna: smart.effectiveTna }
 }
 
 export function reverseFromInstallment(
@@ -397,15 +397,10 @@ function simulateAmortizedSmart(
   const tirEffective = xirr
   const spread = round2((tirTNA - input.hurdleRate) * 100)
 
-  const roundedInstallment =
-    input.roundingMultiple && input.roundingMultiple > 0
-      ? Math.ceil(smart.installmentAmount / input.roundingMultiple) * input.roundingMultiple
-      : smart.installmentAmount
-
   return {
     ...base,
     installmentAmount: round2(smart.installmentAmount),
-    roundedInstallmentAmount: round2(roundedInstallment),
+    roundedInstallmentAmount: round2(smart.installmentAmount),
     amortizationTable: table,
     totalPaid: round2(smart.totalPaid),
     tirEffective,

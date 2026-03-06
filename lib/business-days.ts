@@ -87,8 +87,9 @@ export interface SmartScheduleRow {
 
 export interface SmartScheduleResult {
   schedule: SmartScheduleRow[]
-  installmentAmount: number  // exact (before rounding); last period may differ
+  installmentAmount: number
   totalPaid: number
+  effectiveTna: number  // TNA recalculated after rounding (equals input TNA if no rounding)
 }
 
 /**
@@ -133,10 +134,44 @@ export function generateSmartSchedule(
   // Exact installment (closed-form)
   const exactInstallment = capital / sumDF
 
+  let effectiveDailyRate = dailyRate
+
   // Apply rounding (ceiling to multiple)
-  const installment = roundingMultiple > 0
+  let installment = roundingMultiple > 0
     ? Math.ceil(exactInstallment / roundingMultiple) * roundingMultiple
     : exactInstallment
+
+  // If rounding changed the installment, recalculate the daily rate so all
+  // installments (including the last) are exactly equal.
+  // Solve: capital = installment × Σ_i DF_i(dr), where DF_i = Π_{k=0..i} 1/(1+dr×days_k)
+  if (roundingMultiple > 0 && installment !== exactInstallment) {
+    let dr = dailyRate
+    for (let iter = 0; iter < 300; iter++) {
+      let cumDF = 1, sumDF = 0, dSumDF = 0
+      for (let j = 0; j < n; j++) {
+        cumDF /= (1 + dr * periodDays[j])
+        sumDF += cumDF
+        // d(DF_j)/d(dr) = DF_j × (−Σ_{k=0..j} days_k / (1 + dr×days_k))
+        let innerSum = 0
+        for (let k = 0; k <= j; k++) {
+          innerSum += periodDays[k] / (1 + dr * periodDays[k])
+        }
+        dSumDF += -cumDF * innerSum
+      }
+      const f = installment * sumDF - capital
+      const df = installment * dSumDF
+      if (Math.abs(df) < 1e-20) break
+      const delta = f / df
+      dr -= delta
+      if (dr < 1e-12) dr = 1e-12
+      if (Math.abs(delta) < 1e-14) break
+    }
+    for (let i = 0; i < n; i++) {
+      periodRates[i] = dr * periodDays[i]
+    }
+    // Update effective daily rate for TNA output
+    effectiveDailyRate = dr
+  }
 
   // Build schedule
   const schedule: SmartScheduleRow[] = []
@@ -146,7 +181,7 @@ export function generateSmartSchedule(
   for (let i = 0; i < n; i++) {
     const interest = balance * periodRates[i]
     const isLast = i === n - 1
-    // Last period: close balance regardless of rounding
+    // Last period: close balance (may differ by sub-cent due to float)
     const cuota = isLast ? balance + interest : installment
     const principal = cuota - interest
 
@@ -164,7 +199,7 @@ export function generateSmartSchedule(
     })
   }
 
-  return { schedule, installmentAmount: exactInstallment, totalPaid }
+  return { schedule, installmentAmount: installment, totalPaid, effectiveTna: effectiveDailyRate * 365 }
 }
 
 // ─── XIRR ────────────────────────────────────────────────────────────────────

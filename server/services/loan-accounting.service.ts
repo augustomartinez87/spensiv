@@ -636,7 +636,7 @@ export class LoanAccountingService {
     await this.ensureInitialDisbursementCashflowTx(tx, loan)
 
     const cashflows = await tx.loanRealCashflow.findMany({
-      where: { loanId },
+      where: { loanId, component: { notIn: ['waiver_interest', 'waiver_principal'] } },
       orderBy: [{ flowDate: 'asc' }, { id: 'asc' }],
     })
 
@@ -687,6 +687,101 @@ export class LoanAccountingService {
       irrStatus: updated.irrStatus,
       irrCalculatedAt: updated.irrCalculatedAt,
     }
+  }
+
+  async applyWaiver(input: { loanId: string; userId: string; installmentId: string; note?: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const installment = await tx.loanInstallment.findFirst({
+        where: { id: input.installmentId, loan: { id: input.loanId, userId: input.userId } },
+        include: { loan: true },
+      })
+      if (!installment) throw new Error('Cuota no encontrada')
+      if (installment.isPaid) throw new Error('La cuota ya está completamente pagada')
+
+      const paidAmount = money(installment.paidAmount ?? 0)
+      const totalAmount = money(installment.amount)
+      const remaining = Decimal.max(totalAmount.minus(paidAmount), ZERO)
+
+      if (remaining.lte(CENT_TOLERANCE)) {
+        throw new Error('No hay saldo pendiente para condonar')
+      }
+
+      const loan = installment.loan
+      await this.ensureInitialDisbursementCashflowTx(tx, loan)
+
+      // Decompose remaining into interest and principal portions
+      const instInterest = money(installment.interest)
+      const instPrincipal = money(installment.principal)
+      const paidInterest = Decimal.min(paidAmount, instInterest)
+      const paidPrincipal = Decimal.max(paidAmount.minus(paidInterest), ZERO)
+      const remainingInterest = Decimal.max(instInterest.minus(paidInterest), ZERO)
+      const remainingPrincipal = Decimal.max(instPrincipal.minus(paidPrincipal), ZERO)
+
+      const cashflows: Prisma.LoanRealCashflowCreateManyInput[] = []
+      const flowDate = installment.dueDate instanceof Date ? installment.dueDate : new Date(installment.dueDate)
+
+      // Waiver cashflows carry the actual amount so the accrual engine can subtract
+      // them from overdue interest / principal. They are excluded from IRR calculation.
+      if (remainingInterest.gt(CENT_TOLERANCE)) {
+        cashflows.push({
+          loanId: loan.id,
+          flowDate,
+          amountSigned: round2(remainingInterest),
+          component: 'waiver_interest',
+        })
+      }
+      if (remainingPrincipal.gt(CENT_TOLERANCE)) {
+        cashflows.push({
+          loanId: loan.id,
+          flowDate,
+          amountSigned: round2(remainingPrincipal),
+          component: 'waiver_principal',
+        })
+      }
+
+      if (cashflows.length > 0) {
+        await tx.loanRealCashflow.createMany({ data: cashflows })
+      }
+
+      // Mark installment as fully paid
+      await tx.loanInstallment.update({
+        where: { id: installment.id },
+        data: {
+          isPaid: true,
+          paidAt: new Date(),
+          paidAmount: round2(totalAmount),
+        },
+      })
+
+      // Auto-complete loan if all installments are now paid
+      const remainingUnpaid = await tx.loanInstallment.count({
+        where: { loanId: loan.id, isPaid: false },
+      })
+      if (remainingUnpaid === 0) {
+        await tx.loan.update({ where: { id: loan.id }, data: { status: 'completed' } })
+      }
+
+      // Rebuild accruals and IRR
+      await this.rebuildMonthlyAccrualsTx(tx, loan.id, new Date())
+      await this.recalculateIrrCacheTx(tx, loan.id)
+      await tx.loan.update({
+        where: { id: loan.id },
+        data: { cashflowRevision: { increment: 1 } },
+      })
+
+      // Log activity
+      const waivedTotal = round2(remaining)
+      await tx.loanActivityLog.create({
+        data: {
+          loanId: loan.id,
+          userId: input.userId,
+          tag: 'acuerdo',
+          note: input.note || `Quita de ${waivedTotal} en cuota ${installment.number}`,
+        },
+      })
+
+      return { success: true, waivedAmount: waivedTotal }
+    })
   }
 
   async deletePayment(input: { paymentId: string; userId: string }) {
@@ -797,6 +892,50 @@ export class LoanAccountingService {
             paidAt: fullyPaid ? new Date() : null,
           },
         })
+      }
+    }
+
+    // Third pass: apply waivers by flowDate month (mark as fully paid)
+    const waiverCashflows = await tx.loanRealCashflow.findMany({
+      where: { loanId, component: { in: ['waiver_interest', 'waiver_principal'] } },
+      select: { flowDate: true, amountSigned: true, component: true },
+    })
+    if (waiverCashflows.length > 0) {
+      const waivedByMonth = new Map<string, Decimal>()
+      for (const flow of waiverCashflows) {
+        const key = yearMonthKey(new Date(flow.flowDate))
+        waivedByMonth.set(key, (waivedByMonth.get(key) ?? ZERO).plus(money(flow.amountSigned).abs()))
+      }
+
+      const currentInstallments = await tx.loanInstallment.findMany({
+        where: { loanId },
+        select: { id: true, dueDate: true, amount: true, paidAmount: true, isPaid: true },
+        orderBy: { number: 'asc' },
+      })
+
+      for (const inst of currentInstallments) {
+        if (inst.isPaid) continue
+        const key = yearMonthKey(new Date(inst.dueDate))
+        const waived = waivedByMonth.get(key) ?? ZERO
+        if (waived.lte(CENT_TOLERANCE)) continue
+
+        const alreadyPaid = money(inst.paidAmount ?? 0)
+        const instAmt = money(inst.amount)
+        const remaining = Decimal.max(instAmt.minus(alreadyPaid), ZERO)
+        if (remaining.lte(CENT_TOLERANCE)) continue
+
+        const toApply = Decimal.min(waived, remaining)
+        const newTotal = alreadyPaid.plus(toApply)
+        const fullyPaid = newTotal.gte(instAmt.minus(CENT_TOLERANCE))
+        await tx.loanInstallment.update({
+          where: { id: inst.id },
+          data: {
+            paidAmount: round2(newTotal),
+            isPaid: fullyPaid,
+            paidAt: fullyPaid ? new Date() : null,
+          },
+        })
+        waivedByMonth.set(key, waived.minus(toApply))
       }
     }
   }

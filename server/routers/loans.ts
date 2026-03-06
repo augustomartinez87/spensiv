@@ -156,6 +156,10 @@ export const loansRouter = router({
           input.roundingMultiple ?? 0,
         )
 
+        // Use effective TNA (recalculated after rounding) so stored rate matches installments
+        const effectiveTna = smart.effectiveTna
+        const effectiveMonthlyRate = effectiveTna / 12
+
         const loan = await ctx.prisma.loan.create({
           data: {
             userId: ctx.user.id,
@@ -163,10 +167,10 @@ export const loansRouter = router({
             capital: input.capital,
             currency: input.currency,
             loanType: 'amortized',
-            tna: input.tna,
+            tna: effectiveTna,
             rateIsNominal: true,
             termMonths: input.termMonths,
-            monthlyRate,
+            monthlyRate: effectiveMonthlyRate,
             installmentAmount: smart.installmentAmount,
             totalAmount: smart.totalPaid,
             startDate,
@@ -1118,6 +1122,30 @@ export const loansRouter = router({
       await service.recalculateIrrCache(installment.loanId)
 
       return { success: true }
+    }),
+
+  waiveInstallmentBalance: protectedProcedure
+    .input(z.object({
+      installmentId: z.string(),
+      note: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const installment = await ctx.prisma.loanInstallment.findFirst({
+        where: { id: input.installmentId, loan: { userId: ctx.user.id } },
+      })
+      if (!installment) throw new Error('Cuota no encontrada')
+      if (installment.isPaid) throw new Error('La cuota ya está completamente pagada')
+
+      const remaining = Math.max(Number(installment.amount) - Number(installment.paidAmount ?? 0), 0)
+      if (remaining <= 0.01) throw new Error('No hay saldo pendiente para condonar')
+
+      const service = new LoanAccountingService(ctx.prisma)
+      return service.applyWaiver({
+        loanId: installment.loanId,
+        userId: ctx.user.id,
+        installmentId: input.installmentId,
+        note: input.note,
+      })
     }),
 
   recalculate: protectedProcedure
