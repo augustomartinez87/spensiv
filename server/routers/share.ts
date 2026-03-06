@@ -18,6 +18,10 @@ export const shareRouter = router({
               id: true,
               borrowerName: true,
               currency: true,
+              loanType: true,
+              capital: true,
+              installmentAmount: true,
+              monthlyRate: true,
               loanInstallments: {
                 select: {
                   id: true,
@@ -44,6 +48,10 @@ export const shareRouter = router({
           id: loan.id,
           borrowerName: loan.borrowerName,
           currency: loan.currency,
+          loanType: loan.loanType,
+          capital: Number(loan.capital),
+          installmentAmount: loan.installmentAmount ? Number(loan.installmentAmount) : null,
+          monthlyRate: loan.monthlyRate ? Number(loan.monthlyRate) : null,
           installments: loan.loanInstallments.map((inst) => ({
             id: inst.id,
             number: inst.number,
