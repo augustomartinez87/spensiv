@@ -190,20 +190,20 @@ function LoansDashboardSummary() {
   return (
     <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-5">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Capital activo</p>
           <p className={cn(amountClass(metrics.totalCapitalActive), 'text-foreground mt-1')}>{formatCurrency(metrics.totalCapitalActive)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{metrics.activeLoansCount} préstamo{metrics.activeLoansCount !== 1 ? 's' : ''}</p>
         </CardContent>
       </Card>
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-5">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pendiente cobro</p>
           <p className={cn(amountClass(metrics.totalPending), 'text-foreground mt-1')}>{formatCurrency(metrics.totalPending)}</p>
         </CardContent>
       </Card>
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-5">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Esta semana</p>
           <p className={cn(
             'text-xl font-bold mt-1',
@@ -217,7 +217,7 @@ function LoansDashboardSummary() {
         </CardContent>
       </Card>
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-5">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Vencidas</p>
           <p className={cn(
             'text-xl font-bold mt-1',
@@ -528,16 +528,25 @@ function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => vo
           return (
             <Card
               key={loan.id}
-              className="cursor-pointer hover:border-primary/50 transition-all duration-200"
+              className="cursor-pointer hover:border-primary/50 transition-all duration-200 flex flex-col"
               onClick={() => onSelect(loan.id)}
             >
-              <CardContent className="p-5 space-y-3">
+              <CardContent className="p-5 space-y-3 flex-1 flex flex-col">
                 {/* NIVEL 1 — Header */}
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-lg text-foreground leading-tight">{cardTitle}</h3>
+                  <div className="min-w-0 flex-1">
+                    <TooltipProvider>
+                      <UITooltip>
+                        <TooltipTrigger asChild>
+                          <h3 className="font-bold text-lg text-foreground truncate">{cardTitle}</h3>
+                        </TooltipTrigger>
+                        {cardTitle.length > 18 && (
+                          <TooltipContent><p>{cardTitle}</p></TooltipContent>
+                        )}
+                      </UITooltip>
+                    </TooltipProvider>
                     {cardSubtitle && (
-                      <p className="text-sm text-muted-foreground leading-tight">{cardSubtitle}</p>
+                      <p className="text-sm text-muted-foreground truncate">{cardSubtitle}</p>
                     )}
                   </div>
                   <Badge
@@ -633,17 +642,17 @@ function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => vo
                 {(() => {
                   const ri = loanRateInfo(loan)
                   return (
-                    <div className="flex justify-between text-xs text-muted-foreground border-t border-border/50 pt-2">
+                    <div className="grid grid-cols-2 text-xs text-muted-foreground border-t border-border/50 pt-2 mt-auto">
                       <span>
                         {isInterestOnly
                           ? isZeroRate ? 'Sin intereses' : `${(ri.tem * 100).toFixed(2)}% TEM`
                           : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
                         }
                       </span>
-                      <span>
+                      <span className="text-right">
                         {isZeroRate
                           ? 'TNA: 0%'
-                          : `TNA ${(ri.tna * 100).toFixed(1)}% · TEA ${(ri.tea * 100).toFixed(1)}%`
+                          : `TNA ${(ri.tna * 100).toFixed(1)}%`
                         }
                       </span>
                     </div>

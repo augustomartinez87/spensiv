@@ -23,6 +23,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -68,7 +74,9 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: type
 
 export default function PersonsPage() {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
+  const [sheetPersonId, setSheetPersonId] = useState<string | null>(null)
 
+  // Full-page detail for deep drill-down
   if (selectedPersonId) {
     return <PersonDetail personId={selectedPersonId} onBack={() => setSelectedPersonId(null)} />
   }
@@ -76,7 +84,20 @@ export default function PersonsPage() {
   return (
     <div className="space-y-8">
       <PersonsHeader />
-      <PersonsList onSelect={setSelectedPersonId} />
+      <PersonsList onSelect={setSheetPersonId} />
+      <Sheet open={!!sheetPersonId} onOpenChange={(open) => !open && setSheetPersonId(null)}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          {sheetPersonId && (
+            <PersonDrawerContent
+              personId={sheetPersonId}
+              onViewFull={() => {
+                setSelectedPersonId(sheetPersonId)
+                setSheetPersonId(null)
+              }}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
@@ -154,7 +175,19 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
                   </div>
                 </div>
                 <div className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-semibold', cat.color)}>
-                  <Icon className="h-4 w-4" />
+                  {(() => {
+                    const pct = (person.score / 12) * 100
+                    const r = 14
+                    const circ = 2 * Math.PI * r
+                    const offset = circ - (pct / 100) * circ
+                    const ringColor = person.score >= 9 ? '#22c55e' : person.score >= 6 ? '#eab308' : person.score >= 4 ? '#f97316' : '#ef4444'
+                    return (
+                      <svg width="34" height="34" viewBox="0 0 34 34" className="shrink-0">
+                        <circle cx="17" cy="17" r={r} fill="none" stroke="currentColor" strokeWidth="3" opacity="0.15" />
+                        <circle cx="17" cy="17" r={r} fill="none" stroke={ringColor} strokeWidth="3" strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" transform="rotate(-90 17 17)" />
+                      </svg>
+                    )
+                  })()}
                   {person.score}<span className="text-xs font-normal opacity-70">/12</span>
                 </div>
               </div>
@@ -176,6 +209,117 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
           </Card>
         )
       })}
+    </div>
+  )
+}
+
+// ─── Person Drawer Content ──────────────────────────────────────────
+
+function PersonDrawerContent({ personId, onViewFull }: { personId: string; onViewFull: () => void }) {
+  const { data: person, isLoading } = trpc.persons.getById.useQuery({ id: personId })
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 pt-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-32" />
+        <Skeleton className="h-24" />
+      </div>
+    )
+  }
+
+  if (!person) {
+    return <p className="text-muted-foreground pt-6">Persona no encontrada</p>
+  }
+
+  const cat = CATEGORY_CONFIG[person.category]
+  const Icon = cat.icon
+  const activeLoans = person.loans.filter((l) => l.status === 'active')
+  const score = person.score
+  const pct = (score / 12) * 100
+  const r = 28
+  const circ = 2 * Math.PI * r
+  const offset = circ - (pct / 100) * circ
+  const ringColor = score >= 9 ? '#22c55e' : score >= 6 ? '#eab308' : score >= 4 ? '#f97316' : '#ef4444'
+
+  return (
+    <div className="space-y-5 pt-2">
+      <SheetHeader>
+        <SheetTitle className="text-xl">{person.name}</SheetTitle>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-[10px]">
+            {RELATIONSHIP_LABELS[person.relationship] || person.relationship}
+          </Badge>
+          <Badge variant="outline" className="text-[10px]">
+            {INCOME_TYPE_LABELS[person.incomeType] || person.incomeType}
+          </Badge>
+        </div>
+      </SheetHeader>
+
+      {/* Score ring */}
+      <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
+        <svg width="68" height="68" viewBox="0 0 68 68" className="shrink-0">
+          <circle cx="34" cy="34" r={r} fill="none" stroke="currentColor" strokeWidth="4" opacity="0.1" />
+          <circle cx="34" cy="34" r={r} fill="none" stroke={ringColor} strokeWidth="4" strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" transform="rotate(-90 34 34)" />
+          <text x="34" y="34" textAnchor="middle" dominantBaseline="central" fill={ringColor} fontSize="16" fontWeight="bold">
+            {score.toFixed(1)}
+          </text>
+        </svg>
+        <div>
+          <p className={cn('text-sm font-semibold', cat.color.split(' ')[0])}>{cat.label}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Spread mínimo: {person.category === 'critico' ? 'BLOQUEADO' : `+${(person.minTnaSpread * 100).toFixed(0)}pp`}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Prob. default: {(person.defaultProbability * 100).toFixed(0)}%
+          </p>
+        </div>
+      </div>
+
+      {/* Risk flags */}
+      <div className="flex flex-wrap gap-1.5">
+        {person.previousDebts && <Badge variant="destructive" className="text-[10px]">Deudas previas</Badge>}
+        {person.recentJobChanges && <Badge variant="destructive" className="text-[10px]">Cambio laboral</Badge>}
+        {person.hasChildren && person.livesAlone && <Badge variant="destructive" className="text-[10px]">Hijos + vive solo</Badge>}
+        {!person.previousDebts && !person.recentJobChanges && (
+          <Badge variant="secondary" className="text-[10px]">Sin flags de riesgo</Badge>
+        )}
+      </div>
+
+      {/* Active loans */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+          Préstamos activos ({activeLoans.length})
+        </p>
+        {activeLoans.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sin préstamos activos</p>
+        ) : (
+          activeLoans.map((loan) => {
+            const paid = loan.loanInstallments.filter((i) => i.isPaid).length
+            const total = loan.loanInstallments.length
+            const progress = total > 0 ? (paid / total) * 100 : 0
+            return (
+              <div key={loan.id} className="p-3 rounded-lg bg-muted/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{loan.borrowerName}</p>
+                  <span className="text-sm font-semibold">{formatCurrency(Number(loan.capital), loan.currency)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full" style={{ width: `${progress}%` }} />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground shrink-0">{paid}/{total}</span>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* View full detail button */}
+      <Button className="w-full" variant="outline" onClick={onViewFull}>
+        Ver detalle completo
+      </Button>
     </div>
   )
 }

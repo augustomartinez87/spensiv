@@ -74,13 +74,16 @@ export default function PortfolioPage() {
           <h1 className="text-3xl font-bold text-foreground tracking-tight">Cartera</h1>
           <p className="text-muted-foreground mt-1">
             Dashboard de inversión crediticia
-            {metrics?.mepRate && (
-              <span className="ml-2 text-xs text-muted-foreground/70">· TC MEP: {formatCurrency(metrics.mepRate)}</span>
-            )}
           </p>
         </div>
         <TooltipProvider>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {metrics?.mepRate && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-sm">
+                <span className="text-muted-foreground">💱 MEP</span>
+                <span className="font-semibold text-foreground">{formatCurrency(metrics.mepRate)}</span>
+              </div>
+            )}
             <div className="flex items-center gap-1 shrink-0">
               <Label htmlFor="fciRate" className="text-sm text-muted-foreground">Tasa libre de riesgo (%)</Label>
               <UITooltip>
@@ -191,6 +194,7 @@ export default function PortfolioPage() {
             <StatCard
               label="Valor Esperado"
               value={formatCurrency(metrics.totalEV)}
+              subtitle={`${metrics.totalEV >= metrics.totalCapital ? '+' : ''}${formatCurrency(metrics.totalEV - metrics.totalCapital)} proyectado`}
               icon={TrendingUp}
               color={metrics.totalEV >= 0 ? 'text-accent-positive' : 'text-accent-danger'}
             />

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { UserButton, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -88,6 +88,18 @@ export default function DashboardLayout({
 
   const displayName = user?.fullName || user?.firstName || 'Usuario'
   const userIsAdmin = user?.publicMetadata?.role === 'admin'
+
+  // Ctrl+B keyboard shortcut to toggle sidebar
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault()
+        setSidebarCollapsed(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const visibleNavigation = navigation.filter(s => !s.adminOnly || userIsAdmin)
   const mobileNav = userIsAdmin
