@@ -173,6 +173,7 @@ function InterestOnlyCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date;
   const [showPaid, setShowPaid] = useState(false)
   const colors = LOAN_COLORS[colorIndex % LOAN_COLORS.length]
 
+  const isZeroRate = (loan.monthlyRate ?? 0) === 0
   const monthlyInterest = loan.capital * (loan.monthlyRate ?? 0)
   const paidInstallments = loan.installments.filter((i: any) => i.isPaid)
   const unpaidInstallments = loan.installments.filter((i: any) => !i.isPaid)
@@ -198,136 +199,162 @@ function InterestOnlyCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date;
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-foreground">{loanLabel}</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Pago de intereses mensuales</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {isZeroRate ? 'Préstamo sin intereses' : 'Pago de intereses mensuales'}
+            </p>
           </div>
           <Badge variant="outline" className="text-xs">{loan.currency}</Badge>
         </div>
 
-        {/* Monthly interest payment — hero */}
-        <div className="text-center py-3">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Interés mensual</p>
-          <p className="text-3xl font-bold text-foreground">
-            {formatCurrency(monthlyInterest, loan.currency)}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            sobre capital de {formatCurrency(loan.capital, loan.currency)}
-          </p>
-        </div>
-
-        {/* Overdue alert */}
-        {overdueInstallments.length > 0 && (
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-            <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
-            <span className="text-sm text-amber-300">
-              {overdueInstallments.length === 1
-                ? 'Tenés 1 pago de interés vencido'
-                : `Tenés ${overdueInstallments.length} pagos de interés vencidos`}
-            </span>
-          </div>
-        )}
-
-        {/* Next interest payment */}
-        {nextInst && (
-          <div className={cn('rounded-lg border p-3', colors.accent)}>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <CalendarClock className="h-3.5 w-3.5" />
-              Próximo pago de interés
+        {/* === Zero-rate: simple capital view === */}
+        {isZeroRate ? (
+          <>
+            <div className="text-center py-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Capital pendiente</p>
+              <p className="text-3xl font-bold text-foreground">
+                {formatCurrency(loan.capital, loan.currency)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Sin intereses · devolvés solo el capital
+              </p>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-foreground">
-                {format(new Date(nextInst.dueDate), "d 'de' MMMM yyyy", { locale: es })}
-              </span>
-              <span className="text-sm font-semibold text-foreground">
+
+            <div className={cn('rounded-lg border p-3 text-center', colors.accent)}>
+              <p className="text-sm text-foreground">
+                ✨ Sin cuotas mensuales — arreglás la devolución directamente
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+
+            {/* Monthly interest payment — hero */}
+            <div className="text-center py-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Interés mensual</p>
+              <p className="text-3xl font-bold text-foreground">
                 {formatCurrency(monthlyInterest, loan.currency)}
-              </span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                sobre capital de {formatCurrency(loan.capital, loan.currency)}
+              </p>
             </div>
-          </div>
-        )}
 
-        {/* Pending interest payments */}
-        {unpaidInstallments.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground mb-2">
-              {unpaidInstallments.length === 1
-                ? '1 pago pendiente'
-                : `${unpaidInstallments.length} pagos pendientes`}
-            </p>
-            {unpaidInstallments.map((inst: any) => {
-              const due = new Date(inst.dueDate)
-              const isOverdue = due < now
-              const isNext = nextInst?.id === inst.id
-
-              return (
-                <div
-                  key={inst.id}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm',
-                    isNext && 'bg-primary/10 border border-primary/20',
-                    isOverdue && !isNext && 'bg-amber-500/[0.07]',
-                  )}
-                >
-                  <span className="text-muted-foreground w-7 shrink-0 text-xs">#{inst.number}</span>
-                  <span className={cn(
-                    'flex-1',
-                    isOverdue ? 'text-amber-300' : 'text-foreground',
-                  )}>
-                    {format(due, "d MMM yyyy", { locale: es })}
-                  </span>
-                  <span className={cn(
-                    'font-medium shrink-0',
-                    isOverdue ? 'text-amber-300' : 'text-foreground',
-                  )}>
-                    {formatCurrency(monthlyInterest, loan.currency)}
-                  </span>
-                  {isOverdue && (
-                    <Badge className="text-[10px] shrink-0 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border-0">
-                      Vencido
-                    </Badge>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Paid interest payments - collapsible */}
-        {paidInstallments.length > 0 && (
-          <div>
-            <button
-              onClick={() => setShowPaid(!showPaid)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
-            >
-              {showPaid ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              {showPaid ? 'Ocultar' : 'Ver'} pagos realizados ({paidInstallments.length})
-            </button>
-            {showPaid && (
-              <div className="space-y-1 mt-2">
-                {paidInstallments.map((inst: any) => (
-                  <div
-                    key={inst.id}
-                    className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm opacity-50"
-                  >
-                    <span className="text-muted-foreground w-7 shrink-0 text-xs">#{inst.number}</span>
-                    <span className="flex-1 text-muted-foreground">
-                      {format(new Date(inst.dueDate), "d MMM yyyy", { locale: es })}
-                    </span>
-                    <span className="text-muted-foreground shrink-0">
-                      {formatCurrency(monthlyInterest, loan.currency)}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground shrink-0">✓</span>
-                  </div>
-                ))}
+            {/* Overdue alert */}
+            {overdueInstallments.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                <span className="text-sm text-amber-300">
+                  {overdueInstallments.length === 1
+                    ? 'Tenés 1 pago de interés vencido'
+                    : `Tenés ${overdueInstallments.length} pagos de interés vencidos`}
+                </span>
               </div>
             )}
-          </div>
-        )}
 
-        {/* All paid celebration */}
-        {unpaidInstallments.length === 0 && paidInstallments.length > 0 && (
-          <div className="text-center py-4">
-            <p className="text-lg">🎉</p>
-            <p className="text-sm text-green-400 font-medium">¡Todo al día!</p>
-          </div>
+            {/* Next interest payment */}
+            {nextInst && (
+              <div className={cn('rounded-lg border p-3', colors.accent)}>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                  <CalendarClock className="h-3.5 w-3.5" />
+                  Próximo pago de interés
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground">
+                    {format(new Date(nextInst.dueDate), "d 'de' MMMM yyyy", { locale: es })}
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatCurrency(monthlyInterest, loan.currency)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Pending interest payments */}
+            {unpaidInstallments.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground mb-2">
+                  {unpaidInstallments.length === 1
+                    ? '1 pago pendiente'
+                    : `${unpaidInstallments.length} pagos pendientes`}
+                </p>
+                {unpaidInstallments.map((inst: any) => {
+                  const due = new Date(inst.dueDate)
+                  const isOverdue = due < now
+                  const isNext = nextInst?.id === inst.id
+
+                  return (
+                    <div
+                      key={inst.id}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm',
+                        isNext && 'bg-primary/10 border border-primary/20',
+                        isOverdue && !isNext && 'bg-amber-500/[0.07]',
+                      )}
+                    >
+                      <span className="text-muted-foreground w-7 shrink-0 text-xs">#{inst.number}</span>
+                      <span className={cn(
+                        'flex-1',
+                        isOverdue ? 'text-amber-300' : 'text-foreground',
+                      )}>
+                        {format(due, "d MMM yyyy", { locale: es })}
+                      </span>
+                      <span className={cn(
+                        'font-medium shrink-0',
+                        isOverdue ? 'text-amber-300' : 'text-foreground',
+                      )}>
+                        {formatCurrency(monthlyInterest, loan.currency)}
+                      </span>
+                      {isOverdue && (
+                        <Badge className="text-[10px] shrink-0 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border-0">
+                          Vencido
+                        </Badge>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Paid interest payments - collapsible */}
+            {paidInstallments.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setShowPaid(!showPaid)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+                >
+                  {showPaid ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  {showPaid ? 'Ocultar' : 'Ver'} pagos realizados ({paidInstallments.length})
+                </button>
+                {showPaid && (
+                  <div className="space-y-1 mt-2">
+                    {paidInstallments.map((inst: any) => (
+                      <div
+                        key={inst.id}
+                        className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm opacity-50"
+                      >
+                        <span className="text-muted-foreground w-7 shrink-0 text-xs">#{inst.number}</span>
+                        <span className="flex-1 text-muted-foreground">
+                          {format(new Date(inst.dueDate), "d MMM yyyy", { locale: es })}
+                        </span>
+                        <span className="text-muted-foreground shrink-0">
+                          {formatCurrency(monthlyInterest, loan.currency)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground shrink-0">✓</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* All paid celebration */}
+            {unpaidInstallments.length === 0 && paidInstallments.length > 0 && (
+              <div className="text-center py-4">
+                <p className="text-lg">🎉</p>
+                <p className="text-sm text-green-400 font-medium">¡Todo al día!</p>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
