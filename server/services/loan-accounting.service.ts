@@ -143,30 +143,12 @@ export class LoanAccountingService {
       )
 
       // Interest-only loans: principal never decreases via regular payments
-      // Current-period principal = outstanding minus future installments' remaining principals
       const isInterestOnly = loan.loanType === 'interest_only'
-      let currentPeriodPrincipal: Decimal
 
-      if (isInterestOnly) {
-        currentPeriodPrincipal = ZERO
-      } else {
-        const futurePrincipalSum = futureInstallments.reduce((s, i) => {
-          const paid = money(i.paidAmount ?? 0)
-          const interestAlreadyPaid = Decimal.min(paid, money(i.interest))
-          const principalAlreadyPaid = Decimal.max(paid.minus(interestAlreadyPaid), ZERO)
-          const remainingPrincipal = Decimal.max(money(i.principal).minus(principalAlreadyPaid), ZERO)
-          return s.plus(remainingPrincipal)
-        }, ZERO)
-        currentPeriodPrincipal = Decimal.max(principalPending.minus(futurePrincipalSum), ZERO)
-      }
-
-      // Current dues from accrual engine
-      const currentDuesAccrual = overduePending.plus(currentInterestPending).plus(currentPeriodPrincipal)
-
-      // Current dues from installment amounts (overdue + current month remaining)
-      // This is the true cap: when installment amounts are edited, the accrual engine
-      // may disagree with the installment amounts, so we use the minimum to avoid
-      // spilling cents into future installments.
+      // Current dues: use installment amounts as authoritative source.
+      // The accrual engine may disagree due to rounding drift in interest/principal
+      // decomposition, especially after installment amounts are edited.
+      // Installment amounts are what the debtor actually owes per period.
       const currentInstKey = yearMonthKey(paymentDate)
       const currentMonthInstallments = unpaidInstallments.filter(
         (i) => yearMonthKey(new Date(i.dueDate)) === currentInstKey,
@@ -177,10 +159,20 @@ export class LoanAccountingService {
       const currentMonthInstRemaining = currentMonthInstallments.reduce((s, i) => {
         return s.plus(Decimal.max(money(i.amount).minus(money(i.paidAmount ?? 0)), ZERO))
       }, ZERO)
-      const currentDuesFromInstallments = overdueInstallmentsRemaining.plus(currentMonthInstRemaining)
+      const currentDues = overdueInstallmentsRemaining.plus(currentMonthInstRemaining)
 
-      // Use the minimum: accrual-based vs installment-based cap
-      const currentDues = Decimal.min(currentDuesAccrual, currentDuesFromInstallments)
+      // For the waterfall: interest buckets come from the accrual engine,
+      // but principal absorbs the remainder so the total matches installment amounts.
+      // This prevents rounding drift from spilling cents into future installments.
+      let currentPeriodPrincipal: Decimal
+      if (isInterestOnly) {
+        currentPeriodPrincipal = ZERO
+      } else {
+        currentPeriodPrincipal = Decimal.max(
+          currentDues.minus(overduePending).minus(currentInterestPending),
+          ZERO,
+        )
+      }
 
       // Max payable: current dues + remaining future installment amounts
       const futureInstallmentsTotal = futureInstallments.reduce((s, i) => {
