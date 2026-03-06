@@ -399,7 +399,10 @@ function StatCard({
           <Icon className="h-4 w-4 text-muted-foreground" />
           <p className="text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
         </div>
-        <p className={cn('text-xl font-bold mt-1', color)}>{value}</p>
+        <p className={cn(
+          value.length > 14 ? 'text-base font-bold' : value.length > 10 ? 'text-lg font-bold' : 'text-xl font-bold',
+          'mt-1', color
+        )}>{value}</p>
         {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
       </CardContent>
     </Card>

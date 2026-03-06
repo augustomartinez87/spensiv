@@ -73,6 +73,14 @@ import { useToast } from '@/hooks/use-toast'
 import { calculatePersonScore } from '@/lib/loan-scoring'
 import { tnaToMonthlyRate, frenchInstallment, generateAmortizationTable } from '@/lib/loan-calculator'
 
+/** Auto-scale font size for currency amounts that may overflow their container */
+function amountClass(amount: number) {
+  const abs = Math.abs(amount)
+  if (abs >= 10_000_000) return 'text-base font-bold'
+  if (abs >= 1_000_000) return 'text-lg font-bold'
+  return 'text-xl font-bold'
+}
+
 function loanRateInfo(loan: { rateIsNominal: boolean | null; tna: any; monthlyRate: any }) {
   const tem = Number(loan.monthlyRate)
   const tea = Math.pow(1 + tem, 12) - 1
@@ -184,14 +192,14 @@ function LoansDashboardSummary() {
       <Card>
         <CardContent className="p-4">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Capital activo</p>
-          <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalCapitalActive)}</p>
+          <p className={cn(amountClass(metrics.totalCapitalActive), 'text-foreground mt-1')}>{formatCurrency(metrics.totalCapitalActive)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{metrics.activeLoansCount} préstamo{metrics.activeLoansCount !== 1 ? 's' : ''}</p>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="p-4">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pendiente cobro</p>
-          <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalPending)}</p>
+          <p className={cn(amountClass(metrics.totalPending), 'text-foreground mt-1')}>{formatCurrency(metrics.totalPending)}</p>
         </CardContent>
       </Card>
       <Card>
@@ -246,14 +254,14 @@ function DebtsDashboardSummary() {
       <Card>
         <CardContent className="p-4">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Deuda total</p>
-          <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalDebt)}</p>
+          <p className={cn(amountClass(metrics.totalDebt), 'text-foreground mt-1')}>{formatCurrency(metrics.totalDebt)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{metrics.activeDebtsCount} deuda{metrics.activeDebtsCount !== 1 ? 's' : ''}</p>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="p-4">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pendiente pago</p>
-          <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(metrics.totalPending)}</p>
+          <p className={cn(amountClass(metrics.totalPending), 'text-foreground mt-1')}>{formatCurrency(metrics.totalPending)}</p>
         </CardContent>
       </Card>
       <Card>
@@ -384,11 +392,11 @@ function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => vo
   if (!loans || loans.length === 0) {
     const emptyLabel =
       statusFilter === 'completed' ? 'Sin préstamos finalizados' :
-      statusFilter === 'refinanced' ? 'Sin préstamos refinanciados' :
-      direction === 'lender' ? 'Sin préstamos' : 'Sin deudas'
+        statusFilter === 'refinanced' ? 'Sin préstamos refinanciados' :
+          direction === 'lender' ? 'Sin préstamos' : 'Sin deudas'
     const emptySubLabel =
       statusFilter !== 'active' ? null :
-      direction === 'lender' ? 'Creá tu primer préstamo o usa el simulador' : 'Registrá una deuda que tengas con alguien'
+        direction === 'lender' ? 'Creá tu primer préstamo o usa el simulador' : 'Registrá una deuda que tengas con alguien'
 
     return (
       <div className="space-y-4">
@@ -527,9 +535,9 @@ function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => vo
                 {/* NIVEL 1 — Header */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="font-bold text-lg text-foreground truncate">{cardTitle}</h3>
+                    <h3 className="font-bold text-lg text-foreground leading-tight">{cardTitle}</h3>
                     {cardSubtitle && (
-                      <p className="text-sm text-muted-foreground truncate">{cardSubtitle}</p>
+                      <p className="text-sm text-muted-foreground leading-tight">{cardSubtitle}</p>
                     )}
                   </div>
                   <Badge
@@ -1926,8 +1934,16 @@ function MonthlyAccrualsTable({ loanId, cur }: { loanId: string; cur: string }) 
                   <td className="py-2.5 px-3 text-right">{formatCurrency(Number(a.openingPrincipal), cur)}</td>
                   <td className="py-2.5 px-3 text-right text-accent-blue">{formatCurrency(Number(a.interestExpected), cur)}</td>
                   <td className="py-2.5 px-3 text-right text-accent-positive">{formatCurrency(Number(a.interestCollectedCurrent), cur)}</td>
-                  <td className={cn("py-2.5 px-3 text-right", Number(a.deviationAmount) < 0 ? "text-red-400" : "text-foreground")}>
-                    {formatCurrency(Number(a.deviationAmount), cur)}
+                  <td className={cn("py-2.5 px-3 text-right", (() => {
+                    const isFuture = new Date(a.year, a.month - 1) > new Date()
+                    if (isFuture) return 'text-muted-foreground/50'
+                    return Number(a.deviationAmount) < 0 ? 'text-red-400' : 'text-foreground'
+                  })())}>
+                    {(() => {
+                      const isFuture = new Date(a.year, a.month - 1) > new Date()
+                      if (isFuture) return <span className="text-muted-foreground">—</span>
+                      return formatCurrency(Number(a.deviationAmount), cur)
+                    })()}
                   </td>
                   <td className="py-2.5 px-3 text-right">{formatCurrency(Number(a.principalCollected), cur)}</td>
                   <td className={cn("py-2.5 px-3 text-right font-medium", Number(a.overdueInterestClosing) > 0 ? "text-red-400" : "text-foreground")}>
@@ -2935,8 +2951,8 @@ function CreateLoanDialog({
                 {!reverseMutation.isPending && impliedTna === null && customInstallment !== '' &&
                   parseFloat(customInstallment) > 0 && parseFloat(capital) > 0 && parseInt(termMonths) > 0 &&
                   parseFloat(customInstallment) <= parseFloat(capital) / parseInt(termMonths) && (
-                  <p className="text-xs text-red-500">Cuota insuficiente para amortizar</p>
-                )}
+                    <p className="text-xs text-red-500">Cuota insuficiente para amortizar</p>
+                  )}
               </div>
             </div>
           )}
