@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { PrivateAmount } from '@/lib/privacy-context'
 import { ResponsiveContainer, AreaChart, Area } from 'recharts'
 
 interface StatCardProps {
@@ -89,10 +90,12 @@ export function StatCard({
                 </div>
 
                 {/* Fila 2: valor principal */}
-                <div className={cn('text-2xl font-bold tracking-tight break-all mt-2', valueColor)}>
-                    {isBalance && !isPositive && '-'}
-                    ${Math.abs(value).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
+                <PrivateAmount>
+                    <div className={cn('text-2xl font-bold tracking-tight break-all mt-2 tabular-nums', valueColor)}>
+                        {isBalance && !isPositive && '-'}
+                        ${Math.abs(value).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                </PrivateAmount>
 
                 {/* Sparkline */}
                 {mounted && sparkPoints.length > 1 && (

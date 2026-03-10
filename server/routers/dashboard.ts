@@ -3,8 +3,12 @@ import { router, protectedProcedure } from '@/lib/trpc'
 import { startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { getMonthlyBalance, getCashFlowProjection } from '@/lib/balance'
 import { formatPeriod } from '@/lib/periods'
+import { getDolarMep } from '@/lib/dolar'
 
 export const dashboardRouter = router({
+  getMepRate: protectedProcedure.query(async () => {
+    return { rate: await getDolarMep() }
+  }),
   /**
    * Balance mensual completo (Ingresos - Egresos)
    */

@@ -3,6 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { formatCurrency, cn } from '@/lib/utils'
+import { PrivateAmount } from '@/lib/privacy-context'
 import { CheckCircle2, AlertTriangle } from 'lucide-react'
 
 interface CompactProjectionProps {
@@ -73,9 +74,11 @@ export function CompactProjection({
           <Icon className={cn("h-5 w-5", status.color)} />
         </div>
 
-        <p className="text-3xl font-bold text-white mt-3 tracking-tight">
-          {formatCurrency(balance)}
-        </p>
+        <PrivateAmount>
+          <p className="text-3xl font-bold text-white mt-3 tracking-tight tabular-nums">
+            {formatCurrency(balance)}
+          </p>
+        </PrivateAmount>
         <p className="text-xs text-white/50 mt-1">
           {daysRemaining} {daysRemaining === 1 ? 'día restante' : 'días restantes'}
         </p>

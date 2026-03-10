@@ -22,9 +22,13 @@ import {
   Target,
   Tags,
   ShieldCheck,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { PrivacyProvider, usePrivacy } from '@/lib/privacy-context'
+import { CurrencyProvider } from '@/lib/currency-context'
 
 type NavItem = { name: string; href: string; icon: typeof LayoutDashboard }
 type NavSection = { label: string; items: NavItem[]; adminOnly?: boolean }
@@ -82,9 +86,24 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
+  return (
+    <PrivacyProvider>
+      <CurrencyProvider>
+        <DashboardLayoutInner>{children}</DashboardLayoutInner>
+      </CurrencyProvider>
+    </PrivacyProvider>
+  )
+}
+
+function DashboardLayoutInner({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const pathname = usePathname()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { user } = useUser()
+  const { isPrivate, togglePrivacy } = usePrivacy()
 
   const displayName = user?.fullName || user?.firstName || 'Usuario'
   const userIsAdmin = user?.publicMetadata?.role === 'admin'
@@ -213,6 +232,15 @@ export default function DashboardLayout({
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-9 w-9", isPrivate ? "text-primary" : "text-muted-foreground hover:text-foreground")}
+              onClick={togglePrivacy}
+              title={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
+            >
+              {isPrivate ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
             <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
               <Bell className="h-4 w-4" />
             </Button>
@@ -231,6 +259,15 @@ export default function DashboardLayout({
             <span className="font-bold text-lg text-foreground">Spensiv</span>
           </Link>
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-9 w-9", isPrivate ? "text-primary" : "text-muted-foreground")}
+              onClick={togglePrivacy}
+              title={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
+            >
+              {isPrivate ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
             <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground">
               <Bell className="h-4 w-4" />
             </Button>

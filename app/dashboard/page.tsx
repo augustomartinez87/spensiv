@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc-client'
 import { MonthSelector } from '@/components/dashboard/month-selector'
@@ -9,6 +9,10 @@ import { CompactProjection } from '@/components/dashboard/compact-projection'
 
 const MonthlyEvolutionChart = dynamic(
   () => import('@/components/dashboard/monthly-evolution-chart').then((m) => m.MonthlyEvolutionChart),
+  { ssr: false }
+)
+const CategoryDonutChart = dynamic(
+  () => import('@/components/dashboard/category-donut-chart').then((m) => m.CategoryDonutChart),
   { ssr: false }
 )
 const TransactionForm = dynamic(
@@ -25,20 +29,13 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatCurrency, cn, formatExpenseType } from '@/lib/utils'
+import { PrivateAmount } from '@/lib/privacy-context'
+import { useCurrency } from '@/lib/currency-context'
 import {
   AlertCircle,
   ArrowRight,
-  CreditCard,
-  Star,
-  Home,
-  GraduationCap,
-  ShoppingBag,
-  Heart,
-  Utensils,
-  Car,
-  Wifi,
-  DollarSign,
 } from 'lucide-react'
+import { getCategoryIconInfo } from '@/lib/category-icons'
 import Link from 'next/link'
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -50,25 +47,6 @@ function getPreviousPeriod(period: string): string {
   return `${prevYear}-${String(prevMonth).padStart(2, '0')}`
 }
 
-function getCategoryIcon(category: string) {
-  const map: Record<string, typeof Star> = {
-    Lujos: Star,
-    'Gastos Fijos': Home,
-    Educacion: GraduationCap,
-    Educación: GraduationCap,
-    Deudas: CreditCard,
-    Compras: ShoppingBag,
-    Salud: Heart,
-    Comida: Utensils,
-    Transporte: Car,
-    Servicios: Wifi,
-    Ingresos: DollarSign,
-    'Ingresos Activos': DollarSign,
-    'Ingresos Pasivos': DollarSign,
-    'Otros Ingresos': DollarSign,
-  }
-  return map[category] || ShoppingBag
-}
 
 /** Compact currency display: $1.4M / $821k / $12.5k */
 function formatHero(value: number): string {
@@ -88,10 +66,16 @@ export default function DashboardPage() {
   )
 
   const previousPeriod = getPreviousPeriod(period)
+  const { mode, setMode, mepRate, setMepRate, convert, symbol } = useCurrency()
 
   const { data: balance, isLoading: isLoadingBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period })
   const { data: prevBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period: previousPeriod })
   const { data: evolutionData } = trpc.dashboard.getEvolutionData.useQuery({ months: 6 })
+  const { data: mepData } = trpc.dashboard.getMepRate.useQuery()
+
+  useEffect(() => {
+    if (mepData?.rate) setMepRate(mepData.rate)
+  }, [mepData?.rate, setMepRate])
 
   if (isLoadingBalance) {
     return (
@@ -169,6 +153,27 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-foreground tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-2 flex-wrap">
           <MonthSelector value={period} onChange={setPeriod} />
+          <div className="flex bg-muted rounded-md p-0.5">
+            {(['ARS', 'USD'] as const).map((c) => (
+              <button
+                key={c}
+                onClick={() => setMode(c)}
+                className={cn(
+                  'px-2.5 py-1 text-xs font-medium rounded transition-colors',
+                  mode === c
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {c === 'ARS' ? '$ ARS' : 'US$ USD'}
+              </button>
+            ))}
+          </div>
+          {mepRate && (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              MEP {formatCurrency(mepRate)}
+            </span>
+          )}
           <IncomeForm />
           <TransactionForm />
         </div>
@@ -178,44 +183,56 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           title="Egresos del mes"
-          value={balance.totalExpense}
+          value={convert(balance.totalExpense)}
           count={balance.installments.length + (balance.cashTransactions?.length || 0)}
           type="expense"
-          previousValue={prevBalance?.totalExpense}
-          dailyAverage={dailyExpenseAverage}
+          previousValue={prevBalance ? convert(prevBalance.totalExpense) : undefined}
+          dailyAverage={convert(dailyExpenseAverage)}
           lastTransactionDaysAgo={lastExpenseDaysAgo}
           sparklineData={expenseSparkline}
         />
         <StatCard
           title="Ingresos del mes"
-          value={balance.totalIncome}
+          value={convert(balance.totalIncome)}
           count={balance.incomes.length}
           type="income"
-          previousValue={prevBalance?.totalIncome}
+          previousValue={prevBalance ? convert(prevBalance.totalIncome) : undefined}
           nextEstimatedDate={nextIncomeEstimate}
           sparklineData={incomeSparkline}
         />
         <CompactProjection
-          balance={balance.balance}
-          totalIncome={balance.totalIncome}
-          totalExpense={balance.totalExpense}
+          balance={convert(balance.balance)}
+          totalIncome={convert(balance.totalIncome)}
+          totalExpense={convert(balance.totalExpense)}
         />
       </div>
 
-      {/* ── ROW 2: Evolución (50%) + Distribución de categorías (50%) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="overflow-hidden">
-          {evolutionData && evolutionData.length > 1 ? (
-            <MonthlyEvolutionChart data={evolutionData} />
-          ) : (
-            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground italic">
-              Sin suficientes datos para el gráfico
-            </div>
-          )}
-        </Card>
-        <CategoryBreakdown
+      {/* ── ROW 2: Evolución mensual ── */}
+      <Card className="overflow-hidden">
+        {evolutionData && evolutionData.length > 1 ? (
+          <MonthlyEvolutionChart data={evolutionData} />
+        ) : (
+          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground italic">
+            Sin suficientes datos para el gráfico
+          </div>
+        )}
+      </Card>
+
+      {/* ── ROW 3: Donut charts ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CategoryDonut
+          title="A dónde va la plata"
           data={balance.aggregations.expensesByCategory}
-          totalExpense={balance.totalExpense}
+          total={balance.totalExpense}
+          emptyMessage="Sin egresos registrados"
+          convert={convert}
+        />
+        <CategoryDonut
+          title="De dónde viene la plata"
+          data={balance.aggregations.incomesByCategory}
+          total={balance.totalIncome}
+          emptyMessage="Sin ingresos registrados"
+          convert={convert}
         />
       </div>
 
@@ -229,96 +246,70 @@ export default function DashboardPage() {
   )
 }
 
-// ── Category Breakdown ───────────────────────────────────────────────
+// ── Category Donut Wrapper ───────────────────────────────────────────
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Gastos Fijos': '#1f6c9c',
+const DONUT_COLORS: Record<string, string> = {
+  'Gastos Fijos': '#22c55e',
   Servicios: '#2a89bf',
   Transporte: '#348bb5',
-  Educacion: '#7c3aed',
-  Educación: '#7c3aed',
+  Educacion: '#a855f7',
+  'Educación': '#a855f7',
   Salud: '#feb92e',
   Comida: '#e8a820',
   Compras: '#f0953a',
-  Deudas: '#feb92e',
-  Lujos: '#e54352',
+  Deudas: '#f97316',
+  Lujos: '#f43f5e',
+  Inversiones: '#06b6d4',
+  'Ingresos Activos': '#22c55e',
+  'Ingresos Pasivos': '#10b981',
+  'Otros Ingresos': '#3b82f6',
+  Ingresos: '#22c55e',
 }
 const FALLBACK_COLORS = ['#1f6c9c', '#feb92e', '#e54352', '#2a89bf', '#e8a820', '#f0953a', '#348bb5']
 
-function CategoryBreakdown({
+function CategoryDonut({
+  title,
   data,
-  totalExpense,
+  total,
+  emptyMessage,
+  convert,
 }: {
+  title: string
   data: Record<string, number>
-  totalExpense: number
+  total: number
+  emptyMessage: string
+  convert: (v: number) => number
 }) {
   const MAX_SHOW = 6
 
   const sorted = Object.entries(data)
     .map(([name, amount], i) => ({
       name,
-      amount,
-      color: CATEGORY_COLORS[name] || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+      value: convert(amount),
+      color: DONUT_COLORS[name] || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
     }))
-    .sort((a, b) => b.amount - a.amount)
+    .sort((a, b) => b.value - a.value)
 
   const top = sorted.slice(0, MAX_SHOW)
   const rest = sorted.slice(MAX_SHOW)
   if (rest.length > 0) {
-    const othersAmount = rest.reduce((s, c) => s + c.amount, 0)
-    top.push({ name: 'Otros', amount: othersAmount, color: '#6b7280' })
+    const othersAmount = rest.reduce((s, c) => s + c.value, 0)
+    top.push({ name: 'Otros', value: othersAmount, color: '#6b7280' })
   }
-
-  const maxAmount = Math.max(...top.map((c) => c.amount), 1)
 
   return (
     <Card className="flex flex-col h-full">
       <CardHeader className="py-2.5 px-4">
-        <CardTitle className="text-sm font-semibold">Distribución de categorías</CardTitle>
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
       </CardHeader>
       <CardContent className="px-4 pt-0 pb-4 flex flex-col flex-1">
-        <div className="space-y-3 flex-1">
-          {top.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic text-center py-8">
-              Sin egresos registrados en este período
-            </p>
-          ) : (
-            top.map(({ name, amount, color }) => {
-              const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0
-              const barWidth = (amount / maxAmount) * 100
-              return (
-                <div key={name}>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
-                      <span className="font-medium text-foreground truncate">{name}</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 shrink-0 ml-2">
-                      <span className="text-muted-foreground tabular-nums">{formatHero(amount)}</span>
-                      <span className="text-muted-foreground tabular-nums w-7 text-right">
-                        {Math.round(pct)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${barWidth}%`, background: color, opacity: 0.75 }}
-                    />
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-        <div className="mt-4 pt-3 border-t border-border/40">
-          <Link
-            href="/dashboard/budget"
-            className="text-xs text-muted-foreground hover:text-foreground hover:underline flex items-center gap-1 transition-colors"
-          >
-            Ver presupuesto <ArrowRight className="h-3 w-3" />
-          </Link>
-        </div>
+        {top.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic text-center py-8">
+            {emptyMessage}
+          </p>
+        ) : (
+          <CategoryDonutChart data={top} total={convert(total)} formatHero={formatHero} />
+        )}
       </CardContent>
     </Card>
   )
@@ -347,6 +338,7 @@ function UnifiedRecentMovements({
   incomes: any[]
 }) {
   const [filter, setFilter] = useState<'both' | 'expense' | 'income'>('both')
+  const { convert } = useCurrency()
 
   const allMovements: UnifiedMovement[] = [
     ...installments.map((inst) => ({
@@ -431,7 +423,8 @@ function UnifiedRecentMovements({
         ) : (
           <div className="divide-y divide-border">
             {display.map((m) => {
-              const CatIcon = getCategoryIcon(m.category)
+              const catInfo = getCategoryIconInfo(m.category)
+              const CatIcon = catInfo.icon
               const isIncome = m.type === 'income'
               return (
                 <div
@@ -440,16 +433,12 @@ function UnifiedRecentMovements({
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div
-                      className={cn(
-                        'h-7 w-7 rounded-lg flex items-center justify-center shrink-0',
-                        isIncome ? 'bg-green-500/10' : 'bg-muted'
-                      )}
+                      className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: `${catInfo.color}15` }}
                     >
                       <CatIcon
-                        className={cn(
-                          'h-3.5 w-3.5',
-                          isIncome ? 'text-green-400' : 'text-muted-foreground'
-                        )}
+                        className="h-3.5 w-3.5"
+                        style={{ color: catInfo.color }}
                       />
                     </div>
                     <div className="min-w-0">
@@ -464,15 +453,17 @@ function UnifiedRecentMovements({
                       </p>
                     </div>
                   </div>
-                  <p
-                    className={cn(
-                      'font-semibold text-sm shrink-0 ml-3 tabular-nums',
-                      isIncome ? 'text-green-400' : 'text-red-400'
-                    )}
-                  >
-                    {isIncome ? '+' : '-'}
-                    {formatCurrency(m.amount)}
-                  </p>
+                  <PrivateAmount>
+                    <p
+                      className={cn(
+                        'font-semibold text-sm shrink-0 ml-3 tabular-nums',
+                        isIncome ? 'text-green-400' : 'text-red-400'
+                      )}
+                    >
+                      {isIncome ? '+' : '-'}
+                      {formatCurrency(convert(m.amount))}
+                    </p>
+                  </PrivateAmount>
                 </div>
               )
             })}

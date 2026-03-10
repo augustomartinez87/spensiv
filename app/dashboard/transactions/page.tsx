@@ -17,8 +17,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard, Banknote, ArrowRightLeft, TrendingUp, Pencil, Trash2, LayoutGrid, Table, Download } from 'lucide-react'
+import { Plus, ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard, Banknote, ArrowRightLeft, TrendingUp, Pencil, Trash2, LayoutGrid, Table, Download, Search } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { PrivateAmount } from '@/lib/privacy-context'
+import { getCategoryIconInfo } from '@/lib/category-icons'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -407,84 +409,66 @@ export default function TransactionsPage() {
 
       {/* Filtros - solo mostrar en pestaña de gastos */}
       {activeTab === 'gastos' && (
-        <div className="bg-muted/50 p-4 rounded-lg space-y-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            {/* Filtro por tarjeta */}
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Tarjeta</Label>
-              <select
-                value={filters.cardId}
-                onChange={(e) => setFilters({ ...filters, cardId: e.target.value })}
-                className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
-              >
-                <option value="">Todas las tarjetas</option>
-                {cards?.map((card: any) => (
-                  <option key={card.id} value={card.id}>{card.name}</option>
-                ))}
-              </select>
-            </div>
+        <div className="bg-muted/50 p-3 rounded-lg space-y-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            <select
+              value={filters.cardId}
+              onChange={(e) => setFilters({ ...filters, cardId: e.target.value })}
+              className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
+            >
+              <option value="">Todas las tarjetas</option>
+              {cards?.map((card: any) => (
+                <option key={card.id} value={card.id}>{card.name}</option>
+              ))}
+            </select>
 
-            {/* Filtro por categoría */}
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Categoría</Label>
-              <select
-                value={filters.categoryId}
-                onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}
-                className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
-              >
-                <option value="">Todas las categorías</option>
-                <option value={PENDING_CLASSIFICATION_FILTER}>
-                  {PENDING_CLASSIFICATION_LABEL}
-                </option>
-                {categories?.map((cat: any) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={filters.categoryId}
+              onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}
+              className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
+            >
+              <option value="">Todas las categorías</option>
+              <option value={PENDING_CLASSIFICATION_FILTER}>
+                {PENDING_CLASSIFICATION_LABEL}
+              </option>
+              {categories?.map((cat: any) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
 
-            {/* Filtro por tipo de gasto */}
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Tipo de gasto</Label>
-              <select
-                value={filters.expenseType}
-                onChange={(e) => setFilters({ ...filters, expenseType: e.target.value })}
-                className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
-              >
-                <option value="">Todos los tipos</option>
-                <option value="structural">Estructural</option>
-                <option value="emotional_recurrent">Emocional Recurrente</option>
-                <option value="emotional_impulsive">Emocional Impulsivo</option>
-              </select>
-            </div>
+            <select
+              value={filters.expenseType}
+              onChange={(e) => setFilters({ ...filters, expenseType: e.target.value })}
+              className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
+            >
+              <option value="">Todos los tipos</option>
+              <option value="structural">Estructural</option>
+              <option value="emotional_recurrent">Emocional Recurrente</option>
+              <option value="emotional_impulsive">Emocional Impulsivo</option>
+            </select>
 
-            {/* Búsqueda */}
-            <div className="space-y-1.5 flex-1 min-w-[200px]">
-              <Label className="text-xs text-muted-foreground">Buscar</Label>
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder="Descripción, categoría, monto..."
                 value={filters.searchQuery}
                 onChange={(e) => setFilters({ ...filters, searchQuery: e.target.value })}
-                className="h-9"
+                className="h-9 pl-8"
               />
             </div>
 
-            {/* Ordenamiento */}
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Ordenar por</Label>
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
-              >
-                <option value="date-desc">Fecha: Más reciente</option>
-                <option value="date-asc">Fecha: Más antigua</option>
-                <option value="amount-desc">Monto: Mayor a menor</option>
-                <option value="amount-asc">Monto: Menor a mayor</option>
-              </select>
-            </div>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+              className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
+            >
+              <option value="date-desc">Fecha: Más reciente</option>
+              <option value="date-asc">Fecha: Más antigua</option>
+              <option value="amount-desc">Monto: Mayor a menor</option>
+              <option value="amount-asc">Monto: Menor a mayor</option>
+            </select>
 
-            {/* Botón limpiar filtros */}
             {hasActiveFilters && (
               <Button
                 variant="ghost"
@@ -505,7 +489,6 @@ export default function TransactionsPage() {
             )}
           </div>
 
-          {/* Contador de resultados */}
           {hasActiveFilters && (
             <p className="text-xs text-muted-foreground">
               Mostrando {sortedTransactions?.length || 0} de {transactions?.length || 0} movimientos
@@ -557,9 +540,28 @@ export default function TransactionsPage() {
                             <td className="py-2.5 px-4 text-muted-foreground whitespace-nowrap">
                               {format(new Date(transaction.purchaseDate), 'd MMM yy', { locale: es })}
                             </td>
-                            <td className="py-2.5 px-4 font-medium text-foreground max-w-[200px] truncate">
-                              {transaction.description}
-                              {transaction.isVoided && <span className="ml-1 text-red-500 text-xs">ANULADO</span>}
+                            <td className="py-2.5 px-4 font-medium text-foreground max-w-[250px]">
+                              <div className="flex items-center gap-2">
+                                {(() => {
+                                  const catInfo = getCategoryIconInfo(
+                                    getTransactionCategoryLabel(transaction),
+                                    transaction.subcategory?.name
+                                  )
+                                  const Icon = catInfo.icon
+                                  return (
+                                    <div
+                                      className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0"
+                                      style={{ backgroundColor: `${catInfo.color}15` }}
+                                    >
+                                      <Icon className="h-3.5 w-3.5" style={{ color: catInfo.color }} />
+                                    </div>
+                                  )
+                                })()}
+                                <span className="truncate">
+                                  {transaction.description}
+                                  {transaction.isVoided && <span className="ml-1 text-red-500 text-xs">ANULADO</span>}
+                                </span>
+                              </div>
                             </td>
                             <td className="py-2.5 px-4">
                               {isTransactionPendingClassification(transaction) ? (
@@ -587,8 +589,8 @@ export default function TransactionsPage() {
                             <td className="py-2.5 px-4 text-muted-foreground">
                               {getPaymentMethodLabel((transaction as any).paymentMethod || 'credit_card')}
                             </td>
-                            <td className="py-2.5 px-4 text-right font-semibold whitespace-nowrap">
-                              {formatCurrency(Number(transaction.totalAmount))}
+                            <td className="py-2.5 px-4 text-right font-semibold whitespace-nowrap tabular-nums">
+                              <PrivateAmount>{formatCurrency(Number(transaction.totalAmount))}</PrivateAmount>
                             </td>
                             <td className="py-2.5 px-4 text-right">
                               <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -673,11 +675,11 @@ export default function TransactionsPage() {
                           </CardDescription>
                         </div>
                         <div className="text-right">
-                          <div className="text-lg font-bold">
-                            {formatCurrency(Number(transaction.totalAmount))}
+                          <div className="text-lg font-bold tabular-nums">
+                            <PrivateAmount>{formatCurrency(Number(transaction.totalAmount))}</PrivateAmount>
                           </div>
                           {(transaction as any).paymentMethod === 'credit_card' && transaction.installments > 1 && (
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm text-muted-foreground tabular-nums">
                               {transaction.installments} cuotas de{' '}
                               {formatCurrency(Number(transaction.totalAmount) / transaction.installments)}
                             </div>
@@ -885,8 +887,8 @@ export default function TransactionsPage() {
                               <span className="text-xs text-muted-foreground">-</span>
                             )}
                           </td>
-                          <td className="py-2.5 px-4 text-right font-bold text-green-400 whitespace-nowrap">
-                            +{formatCurrency(Number(income.amount))}
+                          <td className="py-2.5 px-4 text-right font-bold text-green-400 whitespace-nowrap tabular-nums">
+                            <PrivateAmount>+{formatCurrency(Number(income.amount))}</PrivateAmount>
                           </td>
                           <td className="py-2.5 px-4 text-right">
                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -951,8 +953,8 @@ export default function TransactionsPage() {
                         </CardDescription>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold text-green-400">
-                          +{formatCurrency(Number(income.amount))}
+                        <div className="text-lg font-bold text-green-400 tabular-nums">
+                          <PrivateAmount>+{formatCurrency(Number(income.amount))}</PrivateAmount>
                         </div>
                       </div>
                     </div>
