@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { formatPeriod } from './periods'
-import { getNonCreditPaymentMethodLabel } from './payment-methods'
+import { getNonCreditPaymentMethodLabel, type NonCreditPaymentMethod } from './payment-methods'
+import { formatExpenseType } from './utils'
 
 /**
  * Obtener balance mensual (Ingresos - Egresos)
@@ -53,11 +54,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
                         card: true,
                     },
                 },
-                billingCycle: {
-                    include: {
-                        card: true,
-                    },
-                },
+                billingCycle: true,
             },
             orderBy: {
                 impactDate: 'asc',
@@ -84,13 +81,13 @@ export async function getMonthlyBalance(userId: string, period: string) {
         }),
     ])
 
-    const totalIncome = incomes.reduce((sum: number, inc: any) => sum + Number(inc.amount), 0)
+    const totalIncome = incomes.reduce((sum, inc) => sum + Number(inc.amount), 0)
     const totalCreditExpense = installments.reduce(
-        (sum: number, inst: any) => sum + Number(inst.amount),
+        (sum, inst) => sum + Number(inst.amount),
         0
     )
     const totalCashExpense = cashTransactions.reduce(
-        (sum: number, tx: any) => sum + Number(tx.totalAmount),
+        (sum, tx) => sum + Number(tx.totalAmount),
         0
     )
     const totalExpense = totalCreditExpense + totalCashExpense
@@ -99,7 +96,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
 
     // Gastos por categoría
     const expensesByCategory = installments.reduce(
-        (acc: Record<string, number>, inst: any) => {
+        (acc: Record<string, number>, inst) => {
             const catName = inst.transaction.category?.name || 'Sin categoría'
             acc[catName] = (acc[catName] || 0) + Number(inst.amount)
             return acc
@@ -108,21 +105,14 @@ export async function getMonthlyBalance(userId: string, period: string) {
     )
     // Sumar transacciones no-crédito a categorías
     for (const tx of cashTransactions) {
-        const catName = (tx as any).category?.name || 'Sin categoría'
+        const catName = tx.category?.name || 'Sin categoría'
         expensesByCategory[catName] = (expensesByCategory[catName] || 0) + Number(tx.totalAmount)
     }
 
     // Gastos por tipo (con traducción a español)
-    const expenseTypeLabels: Record<string, string> = {
-        structural: 'Estructural',
-        emotional_recurrent: 'Emocional - Recurrente',
-        emotional_impulsive: 'Emocional - Impulsivo',
-        sin_clasificar: 'Sin clasificar',
-    }
     const expensesByType = installments.reduce(
-        (acc: Record<string, number>, inst: any) => {
-            const rawType = inst.transaction.expenseType || 'sin_clasificar'
-            const type = expenseTypeLabels[rawType] || rawType
+        (acc: Record<string, number>, inst) => {
+            const type = formatExpenseType(inst.transaction.expenseType)
             acc[type] = (acc[type] || 0) + Number(inst.amount)
             return acc
         },
@@ -130,15 +120,14 @@ export async function getMonthlyBalance(userId: string, period: string) {
     )
     // Sumar transacciones no-crédito a tipos
     for (const tx of cashTransactions) {
-        const rawType = (tx as any).expenseType || 'sin_clasificar'
-        const type = expenseTypeLabels[rawType] || rawType
+        const type = formatExpenseType(tx.expenseType)
         expensesByType[type] = (expensesByType[type] || 0) + Number(tx.totalAmount)
     }
 
     // Gastos por tarjeta/medio de pago
     const expensesByCard = installments.reduce(
-        (acc: Record<string, number>, inst: any) => {
-            const cardName = inst.billingCycle.card.name
+        (acc: Record<string, number>, inst) => {
+            const cardName = inst.transaction.card?.name || 'Sin tarjeta'
             acc[cardName] = (acc[cardName] || 0) + Number(inst.amount)
             return acc
         },
@@ -146,13 +135,13 @@ export async function getMonthlyBalance(userId: string, period: string) {
     )
     // Sumar transacciones no-crédito agrupadas por medio de pago
     for (const tx of cashTransactions) {
-        const label = getNonCreditPaymentMethodLabel((tx as any).paymentMethod)
+        const label = getNonCreditPaymentMethodLabel(tx.paymentMethod as NonCreditPaymentMethod)
         expensesByCard[label] = (expensesByCard[label] || 0) + Number(tx.totalAmount)
     }
 
     // Ingresos por categoría
     const incomesByCategory = incomes.reduce(
-        (acc: Record<string, number>, inc: any) => {
+        (acc: Record<string, number>, inc) => {
             acc[inc.category] = (acc[inc.category] || 0) + Number(inc.amount)
             return acc
         },
@@ -198,7 +187,7 @@ export async function getCashFlowProjection(
 
     // Calcular el promedio de ingresos recurrentes
     const avgRecurringIncome = recurringIncomes.length > 0
-        ? recurringIncomes.reduce((sum: number, inc: any) => sum + Number(inc.amount), 0) / recurringIncomes.length
+        ? recurringIncomes.reduce((sum, inc) => sum + Number(inc.amount), 0) / recurringIncomes.length
         : 0
 
     // Generar los periodos

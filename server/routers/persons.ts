@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { calculatePersonScore } from '@/lib/loan-scoring'
 
@@ -47,7 +48,7 @@ export const personsRouter = router({
       const existing = await ctx.prisma.person.findFirst({
         where: { id, userId: ctx.user.id },
       })
-      if (!existing) throw new Error('Persona no encontrada')
+      if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Persona no encontrada' })
 
       const person = await ctx.prisma.person.update({
         where: { id },
@@ -65,9 +66,9 @@ export const personsRouter = router({
         where: { id: input.id, userId: ctx.user.id },
         include: { loans: { where: { status: 'active' } } },
       })
-      if (!person) throw new Error('Persona no encontrada')
+      if (!person) throw new TRPCError({ code: 'NOT_FOUND', message: 'Persona no encontrada' })
       if (person.loans.length > 0) {
-        throw new Error('No se puede eliminar una persona con prestamos activos')
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No se puede eliminar una persona con préstamos activos' })
       }
 
       await ctx.prisma.person.delete({ where: { id: input.id } })
@@ -132,7 +133,7 @@ export const personsRouter = router({
         },
       })
 
-      if (!person) throw new Error('Persona no encontrada')
+      if (!person) throw new TRPCError({ code: 'NOT_FOUND', message: 'Persona no encontrada' })
 
       const score = calculatePersonScore(person)
       const activeLoans = person.loans.filter((l) => l.status === 'active')

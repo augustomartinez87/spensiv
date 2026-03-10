@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TRPCError } from '@trpc/server'
 import { router, publicProcedure } from '@/lib/trpc'
 
 export const shareRouter = router({
@@ -39,7 +40,7 @@ export const shareRouter = router({
       })
 
       if (!person) {
-        throw new Error('Persona no encontrada')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Persona no encontrada' })
       }
 
       return {

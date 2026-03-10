@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { simulateLoan, compareLoanTypes, reverseFromInstallment, tnaToMonthlyRate, frenchInstallment, generateAmortizationTable, generateSmartAmortizationTable, strategicRoundInstallment } from '@/lib/loan-calculator'
 import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
@@ -94,7 +95,7 @@ export const loansRouter = router({
       if (input.loanType === 'interest_only') {
         // Interest-only: no fixed term, monthly interest payments
         const rate = input.monthlyInterestRate
-        if (rate === undefined || rate === null) throw new Error('La tasa mensual es requerida para prestamos interest-only')
+        if (rate === undefined || rate === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La tasa mensual es requerida para préstamos interest-only' })
 
         const monthlyInterest = input.capital * rate
         // Store TNA nominal: TNA = rate * 12
@@ -141,8 +142,8 @@ export const loansRouter = router({
       }
 
       // Amortized loan
-      if (!input.termMonths) throw new Error('El plazo es requerido para prestamos amortizados')
-      if (input.tna === undefined || input.tna === null) throw new Error('La TNA es requerida para prestamos amortizados')
+      if (!input.termMonths) throw new TRPCError({ code: 'BAD_REQUEST', message: 'El plazo es requerido para préstamos amortizados' })
+      if (input.tna === undefined || input.tna === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La TNA es requerida para préstamos amortizados' })
 
       const monthlyRate = tnaToMonthlyRate(input.tna)
 
@@ -270,10 +271,10 @@ export const loansRouter = router({
         },
       })
 
-      if (!loan) throw new Error('Prestamo interest-only no encontrado')
+      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Prestamo interest-only no encontrado' })
 
       const lastInstallment = loan.loanInstallments[0]
-      if (!lastInstallment) throw new Error('No hay cuotas existentes')
+      if (!lastInstallment) throw new TRPCError({ code: 'NOT_FOUND', message: 'No hay cuotas existentes' })
 
       const monthlyInterest = Number(loan.installmentAmount)
       const startNumber = lastInstallment.number + 1
@@ -301,7 +302,7 @@ export const loansRouter = router({
         where: { id: input.loanId, userId: ctx.user.id, status: 'active' },
       })
 
-      if (!loan) throw new Error('Prestamo no encontrado')
+      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Prestamo no encontrado' })
 
       return ctx.prisma.loan.update({
         where: { id: input.loanId },
@@ -400,7 +401,7 @@ export const loansRouter = router({
       })
 
       if (!loan) {
-        throw new Error('Préstamo no encontrado')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
       }
 
       const updates: Record<string, any> = {}
@@ -437,7 +438,7 @@ export const loansRouter = router({
       })
 
       if (!loan) {
-        throw new Error('Préstamo no encontrado')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
       }
 
       await ctx.prisma.loan.delete({ where: { id: input.id } })
@@ -460,7 +461,7 @@ export const loansRouter = router({
       })
 
       if (!loan) {
-        throw new Error('Préstamo no encontrado')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
       }
 
       return loan
@@ -492,7 +493,7 @@ export const loansRouter = router({
       const loan = await ctx.prisma.loan.findFirst({
         where: { id: input.loanId, userId: ctx.user.id },
       })
-      if (!loan) throw new Error('Préstamo no encontrado')
+      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
 
       return ctx.prisma.loanPayment.findMany({
         where: { loanId: input.loanId },
@@ -516,7 +517,7 @@ export const loansRouter = router({
       const loan = await ctx.prisma.loan.findFirst({
         where: { id: input.loanId, userId: ctx.user.id },
       })
-      if (!loan) throw new Error('Préstamo no encontrado')
+      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
 
       return ctx.prisma.loanActivityLog.create({
         data: {
@@ -535,7 +536,7 @@ export const loansRouter = router({
       const log = await ctx.prisma.loanActivityLog.findFirst({
         where: { id: input.logId, userId: ctx.user.id },
       })
-      if (!log) throw new Error('Log no encontrado')
+      if (!log) throw new TRPCError({ code: 'NOT_FOUND', message: 'Log no encontrado' })
 
       await ctx.prisma.loanActivityLog.delete({ where: { id: input.logId } })
       return { success: true }
@@ -553,7 +554,7 @@ export const loansRouter = router({
       })
 
       if (!installment) {
-        throw new Error('Cuota no encontrada')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Cuota no encontrada' })
       }
 
       const updated = await ctx.prisma.loanInstallment.update({
@@ -590,7 +591,7 @@ export const loansRouter = router({
       })
 
       if (!installment) {
-        throw new Error('Cuota no encontrada')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Cuota no encontrada' })
       }
 
       const updated = await ctx.prisma.loanInstallment.update({
@@ -614,7 +615,7 @@ export const loansRouter = router({
 
       if (input.loanType === 'interest_only') {
         const rate = input.monthlyInterestRate
-        if (rate === undefined || rate === null) throw new Error('La tasa mensual es requerida para prestamos interest-only')
+        if (rate === undefined || rate === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La tasa mensual es requerida para préstamos interest-only' })
 
         const monthlyInterest = input.capital * rate
         const tna = rate * 12  // Store TNA nominal
@@ -646,8 +647,8 @@ export const loansRouter = router({
       }
 
       // Amortized
-      if (!input.termMonths) throw new Error('El plazo es requerido para prestamos amortizados')
-      if (input.tna === undefined || input.tna === null) throw new Error('La TNA es requerida para prestamos amortizados')
+      if (!input.termMonths) throw new TRPCError({ code: 'BAD_REQUEST', message: 'El plazo es requerido para préstamos amortizados' })
+      if (input.tna === undefined || input.tna === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La TNA es requerida para préstamos amortizados' })
 
       let monthlyRate = tnaToMonthlyRate(input.tna)
       const exactInstallment = frenchInstallment(input.capital, monthlyRate, input.termMonths)
@@ -703,7 +704,7 @@ export const loansRouter = router({
         where: { id: input.loanId, userId: ctx.user.id, status: 'pre_approved' },
       })
 
-      if (!loan) throw new Error('Préstamo preaprobado no encontrado')
+      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo preaprobado no encontrado' })
 
       const startDate = new Date(input.startDate + 'T12:00:00')
 
@@ -774,7 +775,7 @@ export const loansRouter = router({
           loanInstallments: { where: { isPaid: false }, orderBy: { number: 'asc' } },
         },
       })
-      if (!loan) throw new Error('Préstamo activo no encontrado')
+      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo activo no encontrado' })
 
       // Calculate new capital: sum of remaining unpaid principal (accounting for partial payments)
       let newCapital = loan.loanInstallments.reduce((sum, i) => {
@@ -1019,7 +1020,7 @@ export const loansRouter = router({
       const payment = await ctx.prisma.loanPayment.findFirst({
         where: { id: input.paymentId, loan: { userId: ctx.user.id } },
       })
-      if (!payment) throw new Error('Pago no encontrado')
+      if (!payment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Pago no encontrado' })
       return ctx.prisma.loanPayment.update({
         where: { id: input.paymentId },
         data: { note: input.note || null },
@@ -1043,11 +1044,11 @@ export const loansRouter = router({
       const installment = await ctx.prisma.loanInstallment.findFirst({
         where: { id: input.installmentId, loan: { userId: ctx.user.id } },
       })
-      if (!installment) throw new Error('Cuota no encontrada')
-      if (installment.isPaid) throw new Error('La cuota ya está cobrada')
+      if (!installment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cuota no encontrada' })
+      if (installment.isPaid) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'La cuota ya está cobrada' })
 
       const remaining = Math.max(Number(installment.amount) - Number(installment.paidAmount ?? 0), 0)
-      if (remaining <= 0.01) throw new Error('La cuota ya está completamente pagada')
+      if (remaining <= 0.01) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'La cuota ya está completamente pagada' })
 
       const service = new LoanAccountingService(ctx.prisma)
       return service.registerPayment({
@@ -1071,10 +1072,10 @@ export const loansRouter = router({
         include: { loan: true },
       })
 
-      if (!installment) throw new Error('Cuota no encontrada')
-      if (installment.isPaid) throw new Error('No se puede editar una cuota cobrada')
-      if (Number(installment.paidAmount ?? 0) > 0) throw new Error('No se puede editar una cuota con pagos parciales')
-      if (!input.amount && !input.dueDate) throw new Error('Debe indicar monto o fecha a modificar')
+      if (!installment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cuota no encontrada' })
+      if (installment.isPaid) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No se puede editar una cuota cobrada' })
+      if (Number(installment.paidAmount ?? 0) > 0) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No se puede editar una cuota con pagos parciales' })
+      if (!input.amount && !input.dueDate) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Debe indicar monto o fecha a modificar' })
 
       const updates: Record<string, any> = {}
 
@@ -1133,11 +1134,11 @@ export const loansRouter = router({
       const installment = await ctx.prisma.loanInstallment.findFirst({
         where: { id: input.installmentId, loan: { userId: ctx.user.id } },
       })
-      if (!installment) throw new Error('Cuota no encontrada')
-      if (installment.isPaid) throw new Error('La cuota ya está completamente pagada')
+      if (!installment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cuota no encontrada' })
+      if (installment.isPaid) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'La cuota ya está completamente pagada' })
 
       const remaining = Math.max(Number(installment.amount) - Number(installment.paidAmount ?? 0), 0)
-      if (remaining <= 0.01) throw new Error('No hay saldo pendiente para condonar')
+      if (remaining <= 0.01) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No hay saldo pendiente para condonar' })
 
       const service = new LoanAccountingService(ctx.prisma)
       return service.applyWaiver({

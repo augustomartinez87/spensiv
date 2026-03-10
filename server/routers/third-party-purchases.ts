@@ -99,7 +99,7 @@ export const thirdPartyPurchasesRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const where: any = { userId: ctx.user.id }
+      const where: { userId: string; status?: string; cardId?: string } = { userId: ctx.user.id }
       if (input.status !== 'all') {
         where.status = input.status
       }
