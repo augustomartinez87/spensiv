@@ -15,6 +15,10 @@ const CategoryDonutChart = dynamic(
   () => import('@/components/dashboard/category-donut-chart').then((m) => m.CategoryDonutChart),
   { ssr: false }
 )
+const LoansWidget = dynamic(
+  () => import('@/components/dashboard/loans-widget').then((m) => m.LoansWidget),
+  { ssr: false }
+)
 const TransactionForm = dynamic(
   () => import('@/components/transactions/transaction-form').then((m) => m.TransactionForm),
   { ssr: false }
@@ -236,7 +240,10 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* ── ROW 3: Movimientos recientes (ancho completo) ── */}
+      {/* ── ROW 3b: Loans portfolio widget ── */}
+      <LoansWidget />
+
+      {/* ── ROW 4: Movimientos recientes (ancho completo) ── */}
       <UnifiedRecentMovements
         installments={balance.installments}
         cashTransactions={balance.cashTransactions || []}

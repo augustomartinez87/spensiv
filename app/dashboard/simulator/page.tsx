@@ -294,6 +294,51 @@ export default function SimulatorPage() {
     }
   }
 
+  // Auto-simulate on parameter change with debounce
+  const autoSimTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => {
+    clearTimeout(autoSimTimerRef.current)
+    autoSimTimerRef.current = setTimeout(() => {
+      const cap = parseFloat(capital)
+      const tna = parseFloat(tnaTarget)
+      const hurdle = parseFloat(hurdleRate)
+      if (!cap || cap <= 0 || !tna || tna <= 0 || !hurdle) return
+
+      if (viewMode === 'compare' && compareTerms.length > 0) {
+        compareTermsMutation.mutate({
+          capital: cap,
+          tnaTarget: tna / 100,
+          hurdleRate: hurdle / 100,
+          accrualType: 'exponential',
+          startDate,
+          roundingMultiple: roundEnabled ? roundingMultiple : 0,
+          smartDueDate,
+          terms: compareTerms,
+        })
+        setSingleResult(null)
+      } else if (viewMode === 'single') {
+        const term = parseInt(termMonths)
+        if (!term || term <= 0) return
+        simulateMutation.mutate({
+          capital: cap,
+          tnaTarget: tna / 100,
+          hurdleRate: hurdle / 100,
+          accrualType: 'exponential',
+          startDate,
+          roundingMultiple: roundEnabled ? roundingMultiple : 0,
+          smartDueDate,
+          termMonths: term,
+          loanType: 'amortized',
+          ...(customInstallment ? { customInstallment: parseFloat(customInstallment) } : {}),
+        })
+        setCompareResults(null)
+      }
+      setActiveTab('results')
+    }, 600)
+    return () => clearTimeout(autoSimTimerRef.current)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capital, currency, tnaTarget, hurdleRate, startDate, roundEnabled, roundingMultiple, smartDueDate, compareTerms, viewMode, termMonths, customInstallment])
+
   const hasResults = singleResult || compareResults
 
   return (
@@ -334,30 +379,47 @@ export default function SimulatorPage() {
             </Button>
           </div>
 
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="capital">Capital ({currency})</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="capital"
-                  type="number"
-                  value={capital}
-                  onChange={(e) => setCapital(e.target.value)}
-                  placeholder="1000000"
-                  className="flex-1"
-                />
-                <Select value={currency} onValueChange={(v) => setCurrency(v as 'ARS' | 'USD')}>
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ARS">ARS</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* ── Capital slider ── */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm text-muted-foreground">Capital</Label>
+              <Select value={currency} onValueChange={(v) => setCurrency(v as 'ARS' | 'USD')}>
+                <SelectTrigger className="w-24 h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ARS">ARS</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            <p className="text-3xl font-black text-foreground tabular-nums tracking-tight text-center">
+              {formatCurrency(parseFloat(capital) || 0, currency)}
+            </p>
+            <input
+              type="range"
+              min={currency === 'USD' ? 100 : 50000}
+              max={currency === 'USD' ? 50000 : 20000000}
+              step={currency === 'USD' ? 100 : 50000}
+              value={capital}
+              onChange={(e) => setCapital(e.target.value)}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer bg-muted accent-primary"
+            />
+            <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
+              <span>{formatCurrency(currency === 'USD' ? 100 : 50000, currency)}</span>
+              <span>{formatCurrency(currency === 'USD' ? 50000 : 20000000, currency)}</span>
+            </div>
+            {/* Direct input fallback */}
+            <Input
+              type="number"
+              value={capital}
+              onChange={(e) => setCapital(e.target.value)}
+              placeholder="Monto exacto"
+              className="h-8 text-sm text-center"
+            />
+          </div>
 
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {viewMode === 'single' && (
               <div className="space-y-2">
                 <Label htmlFor="termMonths">Plazo (meses)</Label>
@@ -374,7 +436,7 @@ export default function SimulatorPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="tnaTarget">TNA Mínima (%)</Label>
+              <Label htmlFor="tnaTarget">¿Qué tasa querés cobrar? (TNA %)</Label>
               <Input
                 id="tnaTarget"
                 type="number"
@@ -483,50 +545,63 @@ export default function SimulatorPage() {
             )}
           </div>
 
-          {/* Compare terms chips */}
+          {/* Compare terms pill buttons */}
           {viewMode === 'compare' && (
-            <div className="space-y-2">
-              <Label>Plazos a comparar (meses)</Label>
-              <div className="flex flex-wrap items-center gap-2">
-                {compareTerms.map((term) => (
-                  <span
-                    key={term}
-                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium"
-                  >
-                    {term} meses
-                    <button onClick={() => removeCompareTerm(term)} className="hover:text-red-500 transition-colors">
-                      <X className="h-3 w-3" />
+            <div className="space-y-3">
+              <Label>¿En cuántas cuotas?</Label>
+              <div className="flex flex-wrap gap-2">
+                {[3, 6, 9, 12, 18, 24].map((term) => {
+                  const isSelected = compareTerms.includes(term)
+                  return (
+                    <button
+                      key={term}
+                      onClick={() => {
+                        if (isSelected) {
+                          removeCompareTerm(term)
+                        } else if (compareTerms.length < 4) {
+                          setCompareTerms([...compareTerms, term].sort((a, b) => a - b))
+                        }
+                      }}
+                      className={cn(
+                        "px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200",
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-md"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      )}
+                    >
+                      {term} meses
                     </button>
-                  </span>
-                ))}
-                {compareTerms.length < 4 && (
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      value={compareTermsInput}
-                      onChange={(e) => setCompareTermsInput(e.target.value)}
-                      placeholder="Ej: 24"
-                      className="w-24 h-8 text-sm"
-                      min="1"
-                      max="360"
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCompareTerm() } }}
-                    />
-                    <Button variant="outline" size="sm" className="h-8" onClick={addCompareTerm}>
-                      Agregar
-                    </Button>
-                  </div>
+                  )
+                })}
+              </div>
+              {/* Custom term input */}
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={compareTermsInput}
+                  onChange={(e) => setCompareTermsInput(e.target.value)}
+                  placeholder="Otro plazo..."
+                  className="w-32 h-8 text-sm"
+                  min="1"
+                  max="360"
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCompareTerm() } }}
+                />
+                <Button variant="outline" size="sm" className="h-8" onClick={addCompareTerm} disabled={compareTerms.length >= 4}>
+                  Agregar
+                </Button>
+                {compareTerms.length >= 4 && (
+                  <span className="text-xs text-muted-foreground">Máx. 4 plazos</span>
                 )}
               </div>
             </div>
           )}
 
-          <Button
-            onClick={handleSimulate}
-            disabled={isLoading || (viewMode === 'compare' && compareTerms.length === 0)}
-            className="w-full sm:w-auto"
-          >
-            {isLoading ? 'Calculando...' : 'Simular'}
-          </Button>
+          {isLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              Calculando...
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -8,13 +8,107 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Banknote, Clock, AlertCircle, Infinity } from 'lucide-react'
-import { format } from 'date-fns'
+import { Banknote, Clock, Infinity, ChevronRight } from 'lucide-react'
+import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { calculatePersonScore } from '@/lib/loan-scoring'
 import { loanRateInfo } from './helpers'
 import { CreateLoanDialog } from './create-loan-dialog'
 import { PreApprovedLoanCard } from './pre-approved-loan-card'
+
+/* ── Progress Ring ── */
+function ProgressRing({
+    paid,
+    total,
+    color,
+}: {
+    paid: number
+    total: number
+    color: string
+}) {
+    const size = 48
+    const strokeWidth = 3.5
+    const radius = (size - strokeWidth) / 2
+    const circumference = 2 * Math.PI * radius
+    const progress = total > 0 ? paid / total : 0
+    const offset = circumference * (1 - progress)
+
+    return (
+        <div className="relative shrink-0" style={{ width: size, height: size }}>
+            <svg width={size} height={size} className="-rotate-90">
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    className="stroke-muted"
+                    strokeWidth={strokeWidth}
+                />
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={circumference}
+                    strokeDashoffset={offset}
+                    strokeLinecap="round"
+                    className="transition-all duration-500"
+                />
+            </svg>
+            <span
+                className="absolute inset-0 flex items-center justify-center font-semibold text-foreground select-none"
+                style={{ fontSize: 10 }}
+            >
+                {paid}/{total}
+            </span>
+        </div>
+    )
+}
+
+/* ── Interest-only status dot ── */
+function StatusDot({ color }: { color: string }) {
+    return (
+        <span
+            className="shrink-0 inline-block rounded-full"
+            style={{ width: 12, height: 12, backgroundColor: color }}
+        />
+    )
+}
+
+/* ── Ring color logic ── */
+function getRingColor(loan: {
+    status: string
+    paidCount: number
+    totalCount: number
+    nextDueDate: Date | string | null
+    loanType: string
+}) {
+    const now = new Date()
+    const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
+    const isOverdue = nextDue && nextDue < now
+
+    if (isOverdue) return '#ef4444' // red
+
+    if (nextDue) {
+        const daysUntil = differenceInDays(nextDue, now)
+        if (daysUntil < 3) return '#f59e0b' // amber
+    }
+
+    // Ahead of schedule: more paid than expected by time
+    if (loan.loanType !== 'interest_only' && loan.totalCount > 0 && loan.status === 'active') {
+        const startRatio = loan.paidCount / loan.totalCount
+        // Simple heuristic: if paid > 50% and more than halfway through count
+        // More accurate: compare paid vs expected. We approximate "ahead" as paidCount > expected linear pace.
+        // Without start date info, we just check if paidCount > 0 and completed status or high ratio
+        if (loan.paidCount === loan.totalCount) return '#22c55e' // green — completed
+    }
+
+    if (loan.status === 'completed') return '#22c55e' // green
+
+    return 'hsl(var(--primary))' // blue / default primary
+}
 
 export function LoanListContent({ onSelect, direction }: { onSelect: (id: string) => void; direction: 'lender' | 'borrower' }) {
     const utils = trpc.useUtils()
@@ -143,8 +237,9 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                     const isOverdue = nextDue && nextDue < now
                     const isInterestOnly = loan.loanType === 'interest_only'
                     const isZeroRate = Number(loan.monthlyRate) === 0
-                    const progress = !isInterestOnly && loan.totalCount > 0 ? (loan.paidCount / loan.totalCount) * 100 : 0
                     const cur = loan.currency
+
+                    const ringColor = getRingColor(loan)
 
                     // Parse title/subtitle from borrowerName
                     let cardTitle: string
@@ -184,11 +279,14 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                     return (
                         <Card
                             key={loan.id}
-                            className="cursor-pointer hover:border-primary/50 transition-all duration-200 flex flex-col"
+                            className={cn(
+                                "cursor-pointer hover:border-primary/50 transition-all duration-200 flex flex-col",
+                                isOverdue && "border-l-4 border-l-red-500"
+                            )}
                             onClick={() => onSelect(loan.id)}
                         >
                             <CardContent className="p-5 space-y-3 flex-1 flex flex-col">
-                                {/* NIVEL 1 — Header */}
+                                {/* NIVEL 1 — Header with Progress Ring */}
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
                                         <TooltipProvider>
@@ -205,18 +303,16 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                                             <p className="text-sm text-muted-foreground truncate">{cardSubtitle}</p>
                                         )}
                                     </div>
-                                    <Badge
-                                        variant={
-                                            loan.status === 'active' ? 'default' :
-                                                loan.status === 'completed' ? 'secondary' :
-                                                    loan.status === 'refinanced' ? 'secondary' : 'destructive'
-                                        }
-                                        className="shrink-0"
-                                    >
-                                        {loan.status === 'active' ? 'Activo' :
-                                            loan.status === 'completed' ? 'Completado' :
-                                                loan.status === 'refinanced' ? 'Refinanciado' : 'Moroso'}
-                                    </Badge>
+                                    {/* Progress ring or status dot */}
+                                    {isInterestOnly ? (
+                                        <StatusDot color={ringColor} />
+                                    ) : (
+                                        <ProgressRing
+                                            paid={loan.paidCount}
+                                            total={loan.totalCount}
+                                            color={ringColor}
+                                        />
+                                    )}
                                 </div>
 
                                 {/* NIVEL 2 — Info + Chips */}
@@ -240,23 +336,7 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                                     )}
                                 </div>
 
-                                {/* NIVEL 3 — Footer */}
-                                {/* Progress bar - only for amortized */}
-                                {!isInterestOnly && (
-                                    <div className="space-y-1.5">
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-muted-foreground">Cuotas pagadas</span>
-                                            <span className="font-medium text-foreground">{loan.paidCount}/{loan.totalCount}</span>
-                                        </div>
-                                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-primary rounded-full transition-all duration-500"
-                                                style={{ width: `${progress}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
+                                {/* NIVEL 3 — Due date info */}
                                 {/* Next due for amortized */}
                                 {nextDue && loan.status === 'active' && !isInterestOnly && (
                                     <div className={cn(
@@ -265,11 +345,7 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                                             ? "bg-red-500/10 text-red-400"
                                             : "bg-muted text-muted-foreground"
                                     )}>
-                                        {isOverdue ? (
-                                            <AlertCircle className="h-4 w-4 shrink-0" />
-                                        ) : (
-                                            <Clock className="h-4 w-4 shrink-0" />
-                                        )}
+                                        <Clock className="h-4 w-4 shrink-0" />
                                         <span className="text-xs">
                                             {isOverdue ? 'Vencida: ' : 'Próxima: '}
                                             {format(nextDue, "d 'de' MMM", { locale: es })} · {formatCurrency(loan.nextAmount, cur)}
@@ -295,6 +371,7 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                                     </div>
                                 )}
 
+                                {/* Rate info grid */}
                                 {(() => {
                                     const ri = loanRateInfo(loan)
                                     return (
@@ -314,6 +391,35 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                                         </div>
                                     )
                                 })()}
+
+                                {/* NIVEL 4 — Inline CTA buttons */}
+                                <div className="flex items-center justify-between pt-1">
+                                    {loan.status === 'active' ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onSelect(loan.id)
+                                            }}
+                                        >
+                                            Registrar cobro
+                                        </Button>
+                                    ) : (
+                                        <span />
+                                    )}
+                                    <button
+                                        className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            onSelect(loan.id)
+                                        }}
+                                    >
+                                        Ver detalle
+                                        <ChevronRight className="h-3 w-3" />
+                                    </button>
+                                </div>
                             </CardContent>
                         </Card>
                     )
