@@ -96,16 +96,9 @@ function getRingColor(loan: {
         if (daysUntil < 3) return '#f59e0b' // amber
     }
 
-    // Ahead of schedule: more paid than expected by time
-    if (loan.loanType !== 'interest_only' && loan.totalCount > 0 && loan.status === 'active') {
-        const startRatio = loan.paidCount / loan.totalCount
-        // Simple heuristic: if paid > 50% and more than halfway through count
-        // More accurate: compare paid vs expected. We approximate "ahead" as paidCount > expected linear pace.
-        // Without start date info, we just check if paidCount > 0 and completed status or high ratio
-        if (loan.paidCount === loan.totalCount) return '#22c55e' // green — completed
+    if (loan.status === 'completed' || (loan.totalCount > 0 && loan.paidCount === loan.totalCount)) {
+        return '#22c55e' // green
     }
-
-    if (loan.status === 'completed') return '#22c55e' // green
 
     return 'hsl(var(--primary))' // blue / default primary
 }

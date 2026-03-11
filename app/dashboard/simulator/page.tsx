@@ -193,35 +193,6 @@ export default function SimulatorPage() {
     setCompareTerms(compareTerms.filter((t) => t !== term))
   }
 
-  function handleSimulate() {
-    const baseInput = {
-      capital: parseFloat(capital),
-      tnaTarget: parseFloat(tnaTarget) / 100,
-      hurdleRate: parseFloat(hurdleRate) / 100,
-      accrualType: 'exponential' as const,
-      startDate,
-      roundingMultiple: roundEnabled ? roundingMultiple : 0,
-      smartDueDate,
-    }
-
-    if (viewMode === 'compare') {
-      compareTermsMutation.mutate({
-        ...baseInput,
-        terms: compareTerms,
-      })
-      setSingleResult(null)
-    } else {
-      simulateMutation.mutate({
-        ...baseInput,
-        termMonths: parseInt(termMonths),
-        loanType: 'amortized',
-        ...(customInstallment ? { customInstallment: parseFloat(customInstallment) } : {}),
-      })
-      setCompareResults(null)
-    }
-    setActiveTab('results')
-  }
-
   // Create Loan dialog state
   const [createLoanOpen, setCreateLoanOpen] = useState(false)
   const [createLoanDefaults, setCreateLoanDefaults] = useState<{
@@ -294,9 +265,14 @@ export default function SimulatorPage() {
     }
   }
 
-  // Auto-simulate on parameter change with debounce
+  // Auto-simulate on parameter change with debounce (skip first render / mount)
   const autoSimTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const hasMountedRef = useRef(false)
   useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      return
+    }
     clearTimeout(autoSimTimerRef.current)
     autoSimTimerRef.current = setTimeout(() => {
       const cap = parseFloat(capital)
