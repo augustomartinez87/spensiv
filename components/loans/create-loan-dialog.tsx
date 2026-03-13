@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
-import { Plus, Zap, Shield, ShieldX, Info } from 'lucide-react'
+import { Plus, Zap, Shield, ShieldX, Info, Clock } from 'lucide-react'
 import { tnaToMonthlyRate } from '@/lib/loan-calculator'
+import { getSmartFirstDueDate } from '@/lib/business-days'
 
 export function CreateLoanDialog({
     open,
@@ -482,6 +483,30 @@ export function CreateLoanDialog({
                             )}
                         </div>
                     )}
+
+                    {/* Loan preview with first due date */}
+                    {loanType === 'amortized' && capital && tna && termMonths && startDate && (() => {
+                        const cap = parseFloat(capital)
+                        const term = parseInt(termMonths)
+                        const rate = tnaToMonthlyRate(parseFloat(tna) / 100)
+                        if (!(cap > 0 && term > 0 && rate > 0)) return null
+                        const installment = cap * rate / (1 - Math.pow(1 + rate, -term))
+                        const [y, m, d] = startDate.split('-').map(Number)
+                        const start = new Date(y, m - 1, d)
+                        const dueDate = smartDueDate
+                            ? getSmartFirstDueDate(start)
+                            : new Date(y, m, d)
+                        const dueDateStr = dueDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+                        return (
+                            <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-lg px-3 py-2">
+                                <Clock className="h-3.5 w-3.5 shrink-0" />
+                                <span>
+                                    {term} cuotas de {formatCurrency(installment, currency)} — 1er vencimiento:{' '}
+                                    <span className="font-semibold">{dueDateStr}</span>
+                                </span>
+                            </div>
+                        )
+                    })()}
 
                     {createMutation.error && (
                         <p className="text-sm text-red-500">{createMutation.error.message}</p>

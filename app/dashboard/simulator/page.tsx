@@ -44,6 +44,24 @@ import {
   Clock,
 } from 'lucide-react'
 import type { SimulationResult } from '@/lib/loan-calculator'
+import { getSmartFirstDueDate } from '@/lib/business-days'
+
+function formatFirstDueDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function computeFirstDueDate(startDateStr: string, smartDueDate: boolean): string {
+  const [y, m, d] = startDateStr.split('-').map(Number)
+  const start = new Date(y, m - 1, d)
+  if (smartDueDate) {
+    const due = getSmartFirstDueDate(start)
+    return due.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
+  const due = new Date(y, m, d) // same day next month
+  return due.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
 
 const AccrualChart = dynamic(
   () => import('@/components/simulator/accrual-chart').then(m => m.AccrualChart),
@@ -682,6 +700,15 @@ export default function SimulatorPage() {
                 </div>
               </div>
             )}
+            {createLoanDefaults && (
+              <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-lg px-3 py-2">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  {createLoanDefaults.termMonths} cuotas — 1er vencimiento:{' '}
+                  <span className="font-semibold">{computeFirstDueDate(createLoanDefaults.startDate, createLoanDefaults.smartDueDate)}</span>
+                </span>
+              </div>
+            )}
             {isPreApprove && (
               <p className="text-xs text-amber-400 bg-amber-500/10 px-3 py-2 rounded-lg">
                 El préstamo se guardará como preaprobado. Cuando se transfiera el dinero, confirmalo desde la página de préstamos para activarlo.
@@ -794,6 +821,12 @@ function ResultCardContent({ result, title, onCreateLoan, onPreApprove }: { resu
             subvalue={`Ganancia: ${formatCurrency(result.totalPaid! - result.capital)}`}
           />
         </div>
+        {result.amortizationTable?.[0]?.date && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+            <Clock className="h-3.5 w-3.5 shrink-0" />
+            <span>1er vencimiento: <span className="font-medium text-foreground">{formatFirstDueDate(result.amortizationTable[0].date)}</span></span>
+          </div>
+        )}
         <ConvenienceIndicator isConvenient={result.isConvenient} spread={result.spread} />
         {onCreateLoan && (
           <div className="flex gap-2">
@@ -900,6 +933,7 @@ interface InstallmentPlanCardProps {
   isSelected: boolean
   onSelect: () => void
   formatClean: (amount: number) => string
+  firstDueDate?: string
 }
 
 function InstallmentPlanCard({
@@ -910,6 +944,7 @@ function InstallmentPlanCard({
   isSelected,
   onSelect,
   formatClean,
+  firstDueDate,
 }: InstallmentPlanCardProps) {
   return (
     <div className="relative">
@@ -938,6 +973,11 @@ function InstallmentPlanCard({
             {formatClean(installmentAmount)}
           </p>
           <p className="text-xs text-muted-foreground">por mes</p>
+          {firstDueDate && (
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Primera cuota: {firstDueDate}
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -992,8 +1032,9 @@ function ShareableSimulationView({
       ``,
       ...results.map(r => {
         const amt = r.roundedInstallmentAmount || r.installmentAmount || r.nominalValue || 0
+        const dueDateStr = r.amortizationTable?.[0]?.date ? ` (1ra cuota: ${formatFirstDueDate(r.amortizationTable[0].date)})` : ''
         return r.loanType === 'amortized'
-          ? `${r.termMonths} cuotas de ${fmtClean(amt)}`
+          ? `${r.termMonths} cuotas de ${fmtClean(amt)}${dueDateStr}`
           : `${r.termMonths} meses → ${fmtClean(amt)}`
       }),
       ``,
@@ -1172,6 +1213,7 @@ function ShareableSimulationView({
               isSelected={selectedIndex === index}
               onSelect={() => setSelectedIndex(index)}
               formatClean={fmtClean}
+              firstDueDate={result.amortizationTable?.[0]?.date ? formatFirstDueDate(result.amortizationTable[0].date) : undefined}
             />
           )
         })}
@@ -1191,7 +1233,9 @@ function ShareableSimulationView({
                   {fmtClean(selectedResult.roundedInstallmentAmount || selectedResult.installmentAmount || selectedResult.nominalValue || 0)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Cuotas fijas.
+                  Cuotas fijas.{selectedResult.amortizationTable?.[0]?.date && (
+                    <> Primera cuota: {formatFirstDueDate(selectedResult.amortizationTable[0].date)}</>
+                  )}
                 </p>
               </div>
             </div>
