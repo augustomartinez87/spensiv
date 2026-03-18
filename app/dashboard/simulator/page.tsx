@@ -164,13 +164,12 @@ export default function SimulatorPage() {
     clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
       try {
-        const today = formatDateToInput(new Date())
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           capital,
           currency,
           tnaTarget,
           hurdleRate,
-          ...(startDate !== today ? { startDate } : {}),
+          startDate,
           roundEnabled,
           roundingMultiple,
           smartDueDate,
