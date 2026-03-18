@@ -73,6 +73,26 @@ export function getSmartDueDates(startDate: Date, termMonths: number): Date[] {
   return dates
 }
 
+/**
+ * Returns an array of N smart due dates starting from a fixed first due date.
+ * The first date is used as-is, and subsequent dates are the 2nd business day
+ * of consecutive months.
+ */
+export function getSmartDueDatesFromFirst(firstDueDate: Date, termMonths: number): Date[] {
+  const dates: Date[] = [firstDueDate]
+  const firstMonth = firstDueDate.getMonth() + 1 // 1-indexed
+  const firstYear = firstDueDate.getFullYear()
+
+  for (let i = 1; i < termMonths; i++) {
+    let m = firstMonth + i
+    let y = firstYear
+    while (m > 12) { m -= 12; y++ }
+    dates.push(getNthBusinessDay(y, m, 2))
+  }
+
+  return dates
+}
+
 // ─── Smart amortization schedule ─────────────────────────────────────────────
 
 export interface SmartScheduleRow {

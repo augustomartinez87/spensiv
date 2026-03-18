@@ -45,6 +45,7 @@ import {
 } from 'lucide-react'
 import type { SimulationResult } from '@/lib/loan-calculator'
 import { getSmartFirstDueDate } from '@/lib/business-days'
+import { getNextMonths } from '@/lib/periods'
 
 function formatFirstDueDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number)
@@ -93,6 +94,9 @@ export default function SimulatorPage() {
   // Smart due date state
   const [smartDueDate, setSmartDueDate] = useState(true)
 
+  // First installment month state
+  const [firstInstallmentMonth, setFirstInstallmentMonth] = useState<string>('')
+
   // Compare terms state
   const [compareTermsInput, setCompareTermsInput] = useState('')
   const [compareTerms, setCompareTerms] = useState<number[]>([6, 9, 12])
@@ -114,6 +118,7 @@ export default function SimulatorPage() {
       if (saved.roundEnabled !== undefined) setRoundEnabled(saved.roundEnabled)
       if (saved.roundingMultiple) setRoundingMultiple(saved.roundingMultiple)
       if (saved.smartDueDate !== undefined) setSmartDueDate(saved.smartDueDate)
+      if (saved.firstInstallmentMonth) setFirstInstallmentMonth(saved.firstInstallmentMonth)
       if (saved.compareTerms?.length) setCompareTerms(saved.compareTerms)
       if (saved.viewMode) setViewMode(saved.viewMode)
       if (saved.termMonths) setTermMonths(saved.termMonths)
@@ -169,6 +174,7 @@ export default function SimulatorPage() {
           roundEnabled,
           roundingMultiple,
           smartDueDate,
+          firstInstallmentMonth: firstInstallmentMonth || undefined,
           compareTerms,
           viewMode,
           termMonths,
@@ -177,7 +183,7 @@ export default function SimulatorPage() {
       } catch {}
     }, 300)
     return () => clearTimeout(saveTimerRef.current)
-  }, [capital, currency, tnaTarget, hurdleRate, startDate, roundEnabled, roundingMultiple, smartDueDate, compareTerms, viewMode, termMonths, customInstallment])
+  }, [capital, currency, tnaTarget, hurdleRate, startDate, roundEnabled, roundingMultiple, smartDueDate, firstInstallmentMonth, compareTerms, viewMode, termMonths, customInstallment])
 
   function handleInstallmentChange(value: string) {
     setCustomInstallment(value)
@@ -214,7 +220,7 @@ export default function SimulatorPage() {
   // Create Loan dialog state
   const [createLoanOpen, setCreateLoanOpen] = useState(false)
   const [createLoanDefaults, setCreateLoanDefaults] = useState<{
-    capital: string; tna: string; termMonths: string; startDate: string; currency: 'ARS' | 'USD'; roundingMultiple: number; smartDueDate: boolean
+    capital: string; tna: string; termMonths: string; startDate: string; currency: 'ARS' | 'USD'; roundingMultiple: number; smartDueDate: boolean; firstInstallmentMonth?: string
   } | null>(null)
   const [borrowerName, setBorrowerName] = useState('')
 
@@ -245,6 +251,7 @@ export default function SimulatorPage() {
       currency,
       roundingMultiple: roundEnabled ? roundingMultiple : 0,
       smartDueDate,
+      firstInstallmentMonth: firstInstallmentMonth || undefined,
     })
     setCreateLoanOpen(true)
   }
@@ -259,6 +266,7 @@ export default function SimulatorPage() {
       currency,
       roundingMultiple: roundEnabled ? roundingMultiple : 0,
       smartDueDate,
+      firstInstallmentMonth: firstInstallmentMonth || undefined,
     })
     setCreateLoanOpen(true)
   }
@@ -275,6 +283,7 @@ export default function SimulatorPage() {
       startDate: createLoanDefaults.startDate,
       roundingMultiple: createLoanDefaults.roundingMultiple,
       smartDueDate: createLoanDefaults.smartDueDate,
+      firstInstallmentMonth: createLoanDefaults.firstInstallmentMonth,
     }
     if (isPreApprove) {
       preApproveMutation.mutate(payload)
@@ -307,6 +316,7 @@ export default function SimulatorPage() {
           startDate,
           roundingMultiple: roundEnabled ? roundingMultiple : 0,
           smartDueDate,
+          firstInstallmentMonth: firstInstallmentMonth || undefined,
           terms: compareTerms,
         })
         setSingleResult(null)
@@ -321,6 +331,7 @@ export default function SimulatorPage() {
           startDate,
           roundingMultiple: roundEnabled ? roundingMultiple : 0,
           smartDueDate,
+          firstInstallmentMonth: firstInstallmentMonth || undefined,
           termMonths: term,
           loanType: 'amortized',
           ...(customInstallment ? { customInstallment: parseFloat(customInstallment) } : {}),
@@ -331,7 +342,7 @@ export default function SimulatorPage() {
     }, 600)
     return () => clearTimeout(autoSimTimerRef.current)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capital, currency, tnaTarget, hurdleRate, startDate, roundEnabled, roundingMultiple, smartDueDate, compareTerms, viewMode, termMonths, customInstallment])
+  }, [capital, currency, tnaTarget, hurdleRate, startDate, roundEnabled, roundingMultiple, smartDueDate, firstInstallmentMonth, compareTerms, viewMode, termMonths, customInstallment])
 
   const hasResults = singleResult || compareResults
 
@@ -537,6 +548,22 @@ export default function SimulatorPage() {
                 Las cuotas vencen el 2° día hábil de cada mes
               </p>
             )}
+          </div>
+
+          {/* First installment month selector */}
+          <div className="space-y-2">
+            <Label>Mes de primera cuota (opcional)</Label>
+            <Select value={firstInstallmentMonth || '__auto__'} onValueChange={(v) => setFirstInstallmentMonth(v === '__auto__' ? '' : v)}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__auto__">Automático</SelectItem>
+                {getNextMonths(8).map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Compare terms pill buttons */}

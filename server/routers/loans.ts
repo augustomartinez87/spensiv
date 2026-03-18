@@ -6,6 +6,7 @@ import { simulateLoan, compareLoanTypes, reverseFromInstallment, tnaToMonthlyRat
 import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
 import { addMonths } from 'date-fns'
 import { getDolarMep, pesify } from '@/lib/dolar'
+import { getSmartDueDates, getSmartDueDatesFromFirst, getNthBusinessDay } from '@/lib/business-days'
 import { LoanAccountingService } from '../services/loan-accounting.service'
 
 const simulateInput = z.object({
@@ -19,6 +20,7 @@ const simulateInput = z.object({
   customInstallment: z.number().positive().optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   roundingMultiple: z.number().int().min(0).optional(),
+  firstInstallmentMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
 })
 
 const compareTermsInput = z.object({
@@ -30,6 +32,7 @@ const compareTermsInput = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   terms: z.array(z.number().int().min(1).max(360)).min(1).max(4),
   roundingMultiple: z.number().int().min(0).optional(),
+  firstInstallmentMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
 })
 
 const createLoanInput = z.object({
@@ -44,6 +47,7 @@ const createLoanInput = z.object({
   personId: z.string().optional(),
   roundingMultiple: z.number().int().min(0).optional(),
   smartDueDate: z.boolean().optional(),
+  firstInstallmentMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   direction: z.enum(['lender', 'borrower']).default('lender'),
   creditorName: z.string().optional(),
 })
@@ -69,6 +73,7 @@ export const loansRouter = router({
           startDate: input.startDate,
           roundingMultiple: input.roundingMultiple,
           smartDueDate: input.smartDueDate,
+          firstInstallmentMonth: input.firstInstallmentMonth,
         })
       )
     }),
@@ -102,9 +107,13 @@ export const loansRouter = router({
         const tna = rate * 12
 
         // Generate 12 initial interest-only installments
-        const installments = Array.from({ length: 12 }, (_, i) => ({
+        const dueDates = input.smartDueDate
+          ? getSmartDueDates(startDate, 12)
+          : Array.from({ length: 12 }, (_, i) => addMonths(startDate, i + 1))
+
+        const installments = dueDates.map((dueDate, i) => ({
           number: i + 1,
-          dueDate: addMonths(startDate, i + 1),
+          dueDate,
           amount: monthlyInterest,
           interest: monthlyInterest,
           principal: 0,
@@ -148,13 +157,15 @@ export const loansRouter = router({
       const monthlyRate = tnaToMonthlyRate(input.tna)
 
       // ── Smart due date path: días reales, interés diario ──────────────────
-      if (input.smartDueDate) {
+      // Also force smart path when firstInstallmentMonth is set (irregular first period)
+      if (input.smartDueDate || input.firstInstallmentMonth) {
         const smart = generateSmartAmortizationTable(
           input.capital,
           input.tna,
           input.startDate,
           input.termMonths,
           input.roundingMultiple ?? 0,
+          input.firstInstallmentMonth,
         )
 
         // Use effective TNA (recalculated after rounding) so stored rate matches installments
@@ -262,7 +273,11 @@ export const loansRouter = router({
     }),
 
   generateMoreInstallments: protectedProcedure
-    .input(z.object({ loanId: z.string(), count: z.number().int().min(1).max(24).default(12) }))
+    .input(z.object({
+      loanId: z.string(),
+      count: z.number().int().min(1).max(24).default(12),
+      smartDueDate: z.boolean().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const loan = await ctx.prisma.loan.findFirst({
         where: { id: input.loanId, userId: ctx.user.id, loanType: 'interest_only' },
@@ -280,10 +295,18 @@ export const loansRouter = router({
       const startNumber = lastInstallment.number + 1
       const lastDueDate = new Date(lastInstallment.dueDate)
 
-      const newInstallments = Array.from({ length: input.count }, (_, i) => ({
+      const nextMonthDate = addMonths(lastDueDate, 1)
+      const dueDates = input.smartDueDate
+        ? getSmartDueDatesFromFirst(
+            getNthBusinessDay(nextMonthDate.getFullYear(), nextMonthDate.getMonth() + 1, 2),
+            input.count,
+          )
+        : Array.from({ length: input.count }, (_, i) => addMonths(lastDueDate, i + 1))
+
+      const newInstallments = dueDates.map((dueDate, i) => ({
         loanId: loan.id,
         number: startNumber + i,
-        dueDate: addMonths(lastDueDate, i + 1),
+        dueDate,
         amount: monthlyInterest,
         interest: monthlyInterest,
         principal: 0,

@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch'
 import { Plus, Zap, Shield, ShieldX, Info, Clock } from 'lucide-react'
 import { tnaToMonthlyRate } from '@/lib/loan-calculator'
 import { getSmartFirstDueDate } from '@/lib/business-days'
+import { getNextMonths } from '@/lib/periods'
 
 export function CreateLoanDialog({
     open,
@@ -45,6 +46,9 @@ export function CreateLoanDialog({
     const [fciRate, setFciRate] = useState('40')
     const [suggestedTna, setSuggestedTna] = useState<number | null>(null)
     const [smartDueDate, setSmartDueDate] = useState(true)
+    const [roundEnabled, setRoundEnabled] = useState(false)
+    const [roundingMultiple, setRoundingMultiple] = useState<number>(1000)
+    const [firstInstallmentMonth, setFirstInstallmentMonth] = useState<string>('')
 
     const { data: persons } = trpc.persons.list.useQuery()
 
@@ -123,6 +127,9 @@ export function CreateLoanDialog({
             setCreditorName('')
             setSuggestedTna(null)
             setFciRate('40')
+            setRoundEnabled(false)
+            setRoundingMultiple(1000)
+            setFirstInstallmentMonth('')
         },
     })
 
@@ -139,6 +146,7 @@ export function CreateLoanDialog({
                 personId: selectedPersonId || undefined,
                 direction,
                 creditorName: direction === 'borrower' ? creditorName || undefined : undefined,
+                smartDueDate,
             })
         } else {
             createMutation.mutate({
@@ -153,6 +161,8 @@ export function CreateLoanDialog({
                 direction,
                 creditorName: direction === 'borrower' ? creditorName || undefined : undefined,
                 smartDueDate,
+                roundingMultiple: roundEnabled ? roundingMultiple : 0,
+                firstInstallmentMonth: firstInstallmentMonth || undefined,
             })
         }
     }
@@ -462,25 +472,71 @@ export function CreateLoanDialog({
                         />
                     </div>
 
-                    {/* Smart due date toggle — solo aplica a préstamos amortizados */}
+                    {/* Smart due date toggle */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                            <Switch
+                                id="modal-smart-due-date"
+                                checked={smartDueDate}
+                                onCheckedChange={setSmartDueDate}
+                            />
+                            <Label htmlFor="modal-smart-due-date" className="text-sm cursor-pointer">
+                                Primer vencimiento inteligente
+                            </Label>
+                        </div>
+                        {smartDueDate && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 pl-0.5">
+                                <Info className="h-3 w-3 shrink-0" />
+                                Las cuotas vencen el 2° día hábil de cada mes
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Rounding toggle — solo amortizado */}
                     {loanType === 'amortized' && (
-                        <div className="space-y-1.5">
+                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                             <div className="flex items-center gap-2">
                                 <Switch
-                                    id="modal-smart-due-date"
-                                    checked={smartDueDate}
-                                    onCheckedChange={setSmartDueDate}
+                                    id="modal-round-installments"
+                                    checked={roundEnabled}
+                                    onCheckedChange={setRoundEnabled}
                                 />
-                                <Label htmlFor="modal-smart-due-date" className="text-sm cursor-pointer">
-                                    Primer vencimiento inteligente
+                                <Label htmlFor="modal-round-installments" className="text-sm cursor-pointer">
+                                    Redondear cuotas
                                 </Label>
                             </div>
-                            {smartDueDate && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1 pl-0.5">
-                                    <Info className="h-3 w-3 shrink-0" />
-                                    Las cuotas vencen el 2° día hábil de cada mes
-                                </p>
+                            {roundEnabled && (
+                                <Select value={roundingMultiple.toString()} onValueChange={(v) => setRoundingMultiple(parseInt(v))}>
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1000">Múltiplos de $1.000</SelectItem>
+                                        <SelectItem value="100">Múltiplos de $100</SelectItem>
+                                        <SelectItem value="500">Múltiplos de $500</SelectItem>
+                                        <SelectItem value="5000">Múltiplos de $5.000</SelectItem>
+                                        <SelectItem value="10000">Múltiplos de $10.000</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             )}
+                        </div>
+                    )}
+
+                    {/* First installment month selector — solo amortizado */}
+                    {loanType === 'amortized' && (
+                        <div className="space-y-2">
+                            <Label>Mes de primera cuota (opcional)</Label>
+                            <Select value={firstInstallmentMonth || '__auto__'} onValueChange={(v) => setFirstInstallmentMonth(v === '__auto__' ? '' : v)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__auto__">Automático</SelectItem>
+                                    {getNextMonths(8).map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     )}
 
@@ -490,7 +546,10 @@ export function CreateLoanDialog({
                         const term = parseInt(termMonths)
                         const rate = tnaToMonthlyRate(parseFloat(tna) / 100)
                         if (!(cap > 0 && term > 0 && rate > 0)) return null
-                        const installment = cap * rate / (1 - Math.pow(1 + rate, -term))
+                        let installment = cap * rate / (1 - Math.pow(1 + rate, -term))
+                        if (roundEnabled && roundingMultiple > 0) {
+                            installment = Math.ceil(installment / roundingMultiple) * roundingMultiple
+                        }
                         const [y, m, d] = startDate.split('-').map(Number)
                         const start = new Date(y, m - 1, d)
                         const dueDate = smartDueDate
@@ -501,7 +560,7 @@ export function CreateLoanDialog({
                             <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-lg px-3 py-2">
                                 <Clock className="h-3.5 w-3.5 shrink-0" />
                                 <span>
-                                    {term} cuotas de {formatCurrency(installment, currency)} — 1er vencimiento:{' '}
+                                    {term} cuotas de ~{formatCurrency(installment, currency)} — 1er vencimiento:{' '}
                                     <span className="font-semibold">{dueDateStr}</span>
                                 </span>
                             </div>

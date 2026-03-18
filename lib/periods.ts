@@ -37,3 +37,19 @@ export function addMonthsToPeriod(period: string, months: number): string {
     const date = new Date(year, month - 1 + months, 1)
     return formatPeriod(date)
 }
+
+/**
+ * Genera opciones de los próximos N meses para selectores UI.
+ * Cada opción tiene value "YYYY-MM" y label "Mes Año" en español AR.
+ */
+export function getNextMonths(count: number): { value: string; label: string }[] {
+    const now = new Date()
+    const options: { value: string; label: string }[] = []
+    for (let i = 1; i <= count; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+        const value = formatPeriod(d)
+        const label = d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+        options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) })
+    }
+    return options
+}

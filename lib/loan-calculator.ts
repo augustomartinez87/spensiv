@@ -11,7 +11,7 @@ import {
   tnaNominalToDailyRate,
   tnaNominalToMonthlyRate,
 } from './financial-engine'
-import { getSmartDueDates, generateSmartSchedule, calculateXIRR } from './business-days'
+import { getSmartDueDates, getSmartDueDatesFromFirst, getNthBusinessDay, generateSmartSchedule, calculateXIRR } from './business-days'
 
 export type AccrualType = 'linear' | 'exponential'
 export type LoanType = 'bullet' | 'amortized'
@@ -27,6 +27,7 @@ export interface LoanInput {
   startDate: string
   roundingMultiple?: number
   smartDueDate?: boolean
+  firstInstallmentMonth?: string
 }
 
 export interface AmortizationRow {
@@ -125,9 +126,10 @@ export function generateSmartAmortizationTable(
   startDate: string,
   termMonths: number,
   roundingMultiple = 0,
+  firstInstallmentMonth?: string,
 ): { rows: AmortizationRow[]; installmentAmount: number; totalPaid: number; effectiveTna: number } {
   const start = parseIsoDate(startDate)
-  const dueDates = getSmartDueDates(start, termMonths)
+  const dueDates = resolveDueDates(start, termMonths, firstInstallmentMonth)
   const smart = generateSmartSchedule(capital, tna, start, dueDates, roundingMultiple)
 
   let accrued = new Decimal(0)
@@ -310,7 +312,7 @@ function simulateAmortized(
   input: LoanInput,
   base: Omit<SimulationResult, 'tirEffective' | 'tirTNA' | 'hurdleTirTNA' | 'spread' | 'isConvenient' | 'accruedCurve'>,
 ): SimulationResult {
-  if (input.smartDueDate) {
+  if (input.smartDueDate || input.firstInstallmentMonth) {
     return simulateAmortizedSmart(input, base)
   }
 
@@ -363,7 +365,7 @@ function simulateAmortizedSmart(
   base: Omit<SimulationResult, 'tirEffective' | 'tirTNA' | 'hurdleTirTNA' | 'spread' | 'isConvenient' | 'accruedCurve'>,
 ): SimulationResult {
   const startDate = parseIsoDate(input.startDate)
-  const dueDates = getSmartDueDates(startDate, input.termMonths)
+  const dueDates = resolveDueDates(startDate, input.termMonths, input.firstInstallmentMonth)
   const smart = generateSmartSchedule(
     input.capital,
     input.tnaTarget,
@@ -467,6 +469,15 @@ export function compareLoanTypes(input: Omit<LoanInput, 'loanType'>): Comparison
   }
 
   return { amortized, bullet, tirDifference, recommendation }
+}
+
+function resolveDueDates(startDate: Date, termMonths: number, firstInstallmentMonth?: string): Date[] {
+  if (firstInstallmentMonth) {
+    const [fy, fm] = firstInstallmentMonth.split('-').map(Number)
+    const firstDueDate = getNthBusinessDay(fy, fm, 2)
+    return getSmartDueDatesFromFirst(firstDueDate, termMonths)
+  }
+  return getSmartDueDates(startDate, termMonths)
 }
 
 function round2(n: number): number {
