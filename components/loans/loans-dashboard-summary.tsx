@@ -31,12 +31,13 @@ function HealthChip({ overdueCount }: { overdueCount: number }) {
     )
 }
 
-function CollectionRing({ percentage }: { percentage: number }) {
+function ProgressRing({ percentage, color }: { percentage: number; color: string }) {
     const size = 80
     const strokeWidth = 7
     const radius = (size - strokeWidth) / 2
     const circumference = 2 * Math.PI * radius
-    const offset = circumference - (percentage / 100) * circumference
+    const clampedPct = Math.max(0, Math.min(percentage, 100))
+    const offset = circumference - (clampedPct / 100) * circumference
 
     return (
         <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
@@ -54,7 +55,7 @@ function CollectionRing({ percentage }: { percentage: number }) {
                     cy={size / 2}
                     r={radius}
                     fill="none"
-                    stroke="hsl(var(--accent-positive))"
+                    stroke={color}
                     strokeWidth={strokeWidth}
                     strokeDasharray={circumference}
                     strokeDashoffset={offset}
@@ -63,8 +64,28 @@ function CollectionRing({ percentage }: { percentage: number }) {
                 />
             </svg>
             <span className="absolute text-sm font-bold tabular-nums text-foreground">
-                {Math.round(percentage)}%
+                {Math.round(clampedPct)}%
             </span>
+        </div>
+    )
+}
+
+function MorosityBadge({ percentage }: { percentage: number }) {
+    const color =
+        percentage < 5 ? 'text-accent-positive' :
+        percentage < 15 ? 'text-yellow-500' :
+        'text-accent-danger'
+    const bgColor =
+        percentage < 5 ? 'bg-accent-positive/10' :
+        percentage < 15 ? 'bg-yellow-500/10' :
+        'bg-accent-danger/10'
+
+    return (
+        <div className={cn('flex flex-col items-center gap-1 rounded-lg px-4 py-2.5', bgColor)}>
+            <span className={cn('text-2xl font-bold tabular-nums', color)}>
+                {percentage.toFixed(1)}%
+            </span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Mora</span>
         </div>
     )
 }
@@ -78,6 +99,12 @@ function daysUntilText(date: Date) {
     return `en ${diff} día${diff !== 1 ? 's' : ''}`
 }
 
+function formatRentByCurrency(rent: Record<string, number>) {
+    const entries = Object.entries(rent).filter(([, v]) => v > 0)
+    if (entries.length === 0) return '-'
+    return entries.map(([currency, amount]) => formatCurrency(amount, currency)).join(' + ')
+}
+
 export function LoansDashboardSummary() {
     const { data: metrics, isLoading } = trpc.loans.getDashboardMetrics.useQuery()
 
@@ -87,63 +114,112 @@ export function LoansDashboardSummary() {
 
     if (!metrics || metrics.activeLoansCount === 0) return null
 
-    const collectedPct =
-        metrics.totalCapitalActive > 0
-            ? Math.min(((metrics.totalCapitalActive - metrics.totalPending) / metrics.totalCapitalActive) * 100, 100)
-            : 0
-
     const nextInstallment = metrics.upcomingInstallments?.find(
         (i) => new Date(i.dueDate) >= new Date()
     )
 
+    const hasInterestOnlyRent = Object.values(metrics.interestOnlyRent).some(v => v > 0)
+
     return (
-        <Card className="overflow-hidden bg-gradient-to-r from-card to-[hsl(217,30%,13%)] border-border/50">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 p-6 md:min-h-[160px]">
-                {/* Left: Pending amount + health */}
-                <div className="flex flex-col justify-center gap-2 min-w-0">
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
-                        Pendiente de cobro
-                    </p>
-                    <PrivateAmount>
-                        <p className="text-[28px] font-bold text-foreground leading-tight tabular-nums tracking-tight">
-                            {formatCurrency(metrics.totalPending)}
+        <div className="flex flex-col gap-3">
+            <Card className="overflow-hidden bg-gradient-to-r from-card to-[hsl(217,30%,13%)] border-border/50">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 p-6 md:min-h-[160px]">
+                    {/* Left: Pending amount + health */}
+                    <div className="flex flex-col justify-center gap-2 min-w-0">
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
+                            Pendiente de cobro
                         </p>
-                    </PrivateAmount>
-                    <HealthChip overdueCount={metrics.overdueCount} />
-                </div>
+                        <PrivateAmount>
+                            <p className="text-[28px] font-bold text-foreground leading-tight tabular-nums tracking-tight">
+                                {formatCurrency(metrics.totalPending)}
+                            </p>
+                        </PrivateAmount>
+                        <HealthChip overdueCount={metrics.overdueCount} />
+                    </div>
 
-                {/* Center: Collection donut */}
-                <div className="flex flex-col items-center gap-1.5 shrink-0">
-                    <CollectionRing percentage={collectedPct} />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                        Cobrado
-                    </p>
-                </div>
+                    {/* Center: Cobranza del mes + Mora */}
+                    <div className="flex items-center gap-6 shrink-0">
+                        <div className="flex flex-col items-center gap-1.5">
+                            {metrics.collectionPct !== null ? (
+                                <ProgressRing
+                                    percentage={metrics.collectionPct}
+                                    color="hsl(var(--accent-positive))"
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center w-[80px] h-[80px] rounded-full border-[7px] border-muted">
+                                    <span className="text-xs text-muted-foreground">-</span>
+                                </div>
+                            )}
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                                {metrics.collectionPct !== null ? 'Cobranza del mes' : 'Sin vencimientos'}
+                            </p>
+                        </div>
+                        <MorosityBadge percentage={metrics.morosityPct} />
+                    </div>
 
-                {/* Right: Mini stats */}
-                <div className="flex flex-col gap-3 min-w-[180px]">
-                    <MiniStat
-                        label="Esta semana"
-                        value={
-                            metrics.thisWeekCount > 0
-                                ? formatCurrency(metrics.thisWeekAmount)
-                                : '-'
-                        }
-                        highlight={metrics.thisWeekCount > 0}
-                    />
-                    <MiniStat
-                        label="Próximo cobro"
-                        value={nextInstallment ? daysUntilText(nextInstallment.dueDate) : '-'}
-                        highlight={false}
-                        isText
-                    />
-                    <MiniStat
-                        label="Capital activo"
-                        value={formatCurrency(metrics.totalCapitalActive)}
-                    />
+                    {/* Right: Mini stats */}
+                    <div className="flex flex-col gap-3 min-w-[180px]">
+                        <MiniStat
+                            label="Esta semana"
+                            value={
+                                metrics.thisWeekCount > 0
+                                    ? formatCurrency(metrics.thisWeekAmount)
+                                    : '-'
+                            }
+                            highlight={metrics.thisWeekCount > 0}
+                        />
+                        <MiniStat
+                            label="Próximo cobro"
+                            value={nextInstallment ? daysUntilText(nextInstallment.dueDate) : '-'}
+                            highlight={false}
+                            isText
+                        />
+                        <MiniStat
+                            label="Capital activo"
+                            value={formatCurrency(metrics.totalCapitalActive)}
+                        />
+                    </div>
                 </div>
-            </div>
-        </Card>
+            </Card>
+
+            {/* Renta mensual section for interest-only loans */}
+            {hasInterestOnlyRent && (
+                <Card className="border-border/50 bg-card/80">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                            <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
+                                Renta mensual esperada
+                            </p>
+                            <PrivateAmount>
+                                <p className="text-lg font-bold text-foreground tabular-nums">
+                                    {formatRentByCurrency(metrics.interestOnlyRent)}
+                                </p>
+                            </PrivateAmount>
+                        </div>
+                        <div className="flex flex-col gap-1 sm:items-end">
+                            <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
+                                Renta cobrada este mes
+                            </p>
+                            <PrivateAmount>
+                                <p className="text-lg font-bold text-foreground tabular-nums">
+                                    {formatRentByCurrency(metrics.interestOnlyCollected)}
+                                </p>
+                            </PrivateAmount>
+                        </div>
+                        <div className="flex flex-col gap-1 sm:items-end">
+                            <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
+                                Capital en renta
+                            </p>
+                            <PrivateAmount>
+                                <p className="text-sm font-semibold text-muted-foreground tabular-nums">
+                                    {formatRentByCurrency(metrics.interestOnlyCapital)}
+                                </p>
+                            </PrivateAmount>
+                        </div>
+                    </div>
+                </Card>
+            )}
+        </div>
     )
 }
 

@@ -893,12 +893,21 @@ export const loansRouter = router({
     }),
 
   getDashboardMetrics: protectedProcedure.query(async ({ ctx }) => {
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+
     const [activeLoans, mepRate] = await Promise.all([
       ctx.prisma.loan.findMany({
         where: { userId: ctx.user.id, status: 'active', direction: 'lender' },
         include: {
           loanInstallments: {
-            where: { isPaid: false },
+            where: {
+              OR: [
+                { isPaid: false },
+                { dueDate: { gte: startOfMonth, lte: endOfMonth } },
+              ],
+            },
             orderBy: { dueDate: 'asc' },
             select: {
               id: true,
@@ -906,6 +915,7 @@ export const loansRouter = router({
               dueDate: true,
               amount: true,
               paidAmount: true,
+              isPaid: true,
             },
           },
         },
@@ -920,28 +930,30 @@ export const loansRouter = router({
 
     const totalPending = activeLoans.reduce(
       (sum, loan) =>
-        sum + loan.loanInstallments.reduce(
-          (s, i) => s + pesify(Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0), loan.currency, mepRate),
-          0
-        ),
+        sum + loan.loanInstallments
+          .filter((i) => !i.isPaid)
+          .reduce(
+            (s, i) => s + pesify(Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0), loan.currency, mepRate),
+            0
+          ),
       0
     )
 
-    const now = new Date()
-
     // All unpaid installments flattened (keep original currency for display)
     const allUnpaid = activeLoans.flatMap((loan) =>
-      loan.loanInstallments.map((i) => {
-        const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
-        return {
-          ...i,
-          amount: remaining,
-          amountArs: pesify(remaining, loan.currency, mepRate),
-          borrowerName: loan.borrowerName,
-          loanId: loan.id,
-          currency: loan.currency,
-        }
-      })
+      loan.loanInstallments
+        .filter((i) => !i.isPaid)
+        .map((i) => {
+          const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
+          return {
+            ...i,
+            amount: remaining,
+            amountArs: pesify(remaining, loan.currency, mepRate),
+            borrowerName: loan.borrowerName,
+            loanId: loan.id,
+            currency: loan.currency,
+          }
+        })
     )
 
     // Overdue (past due date)
@@ -960,15 +972,55 @@ export const loansRouter = router({
       .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
       .slice(0, 5)
 
+    // Cobranza del mes: partition this month's installments from the combined query
+    const thisMonthInstallments = activeLoans.flatMap((loan) =>
+      loan.loanInstallments
+        .filter((i) => i.dueDate >= startOfMonth && i.dueDate <= endOfMonth)
+        .map((i) => ({ ...i, currency: loan.currency, loanType: loan.loanType }))
+    )
+
+    const totalDueThisMonth = thisMonthInstallments.reduce(
+      (sum, i) => sum + pesify(Number(i.amount), i.currency, mepRate), 0
+    )
+    const totalCollectedThisMonth = thisMonthInstallments.reduce(
+      (sum, i) => sum + pesify(Number(i.paidAmount), i.currency, mepRate), 0
+    )
+
+    // Cobranza del mes: null when no installments due, otherwise percentage
+    const collectionPct = totalDueThisMonth > 0
+      ? (totalCollectedThisMonth / totalDueThisMonth) * 100
+      : null
+
+    // Mora
+    const morosityPct = totalCapitalActive > 0 ? (overdueAmount / totalCapitalActive) * 100 : 0
+
+    // Renta mensual (interest-only loans)
+    const interestOnlyRent: Record<string, number> = {}
+    const interestOnlyCapital: Record<string, number> = {}
+    for (const loan of activeLoans.filter(l => l.loanType === 'interest_only')) {
+      interestOnlyRent[loan.currency] = (interestOnlyRent[loan.currency] || 0) + Number(loan.installmentAmount)
+      interestOnlyCapital[loan.currency] = (interestOnlyCapital[loan.currency] || 0) + Number(loan.capital)
+    }
+
+    const interestOnlyCollected: Record<string, number> = {}
+    for (const i of thisMonthInstallments.filter(i => i.loanType === 'interest_only')) {
+      interestOnlyCollected[i.currency] = (interestOnlyCollected[i.currency] || 0) + Number(i.paidAmount)
+    }
+
     return {
       activeLoansCount: activeLoans.length,
       totalCapitalActive,
       totalPending,
       overdueCount,
       overdueAmount,
+      morosityPct,
       thisWeekCount: thisWeek.length,
       thisWeekAmount: thisWeek.reduce((s, i) => s + i.amountArs, 0),
       upcomingInstallments,
+      collectionPct,
+      interestOnlyRent,
+      interestOnlyCollected,
+      interestOnlyCapital,
     }
   }),
 
