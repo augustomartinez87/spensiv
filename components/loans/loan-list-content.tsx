@@ -357,7 +357,7 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                                         <Infinity className="h-4 w-4 shrink-0" />
                                         <span className="text-xs">
                                             {isZeroRate
-                                                ? `Capital: ${formatCurrency(Number(loan.capital), cur)}`
+                                                ? `Capital pdte: ${formatCurrency(Number(loan.principalOutstanding), cur)}`
                                                 : `Interés mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
                                             }
                                         </span>

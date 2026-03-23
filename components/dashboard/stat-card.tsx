@@ -123,7 +123,7 @@ export function StatCard({
                 {/* Insights */}
                 <div className="mt-auto pt-2">
                     {type === 'expense' && (
-                        <p className="text-[11px] text-muted-foreground leading-tight">
+                        <p className="text-[11px] text-muted-foreground leading-tight tabular-nums">
                             {dailyAverage !== undefined && (
                                 <span>Prom: {fmtAvg(dailyAverage)}/día</span>
                             )}
@@ -140,7 +140,7 @@ export function StatCard({
                         </p>
                     )}
                     {type === 'income' && (
-                        <p className="text-[11px] text-muted-foreground leading-tight">
+                        <p className="text-[11px] text-muted-foreground leading-tight tabular-nums">
                             {count !== undefined && (
                                 <span>{count} {count === 1 ? 'movimiento' : 'movimientos'}</span>
                             )}

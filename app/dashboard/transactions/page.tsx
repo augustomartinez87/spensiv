@@ -414,7 +414,7 @@ export default function TransactionsPage() {
             <select
               value={filters.cardId}
               onChange={(e) => setFilters({ ...filters, cardId: e.target.value })}
-              className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
+              className={cn("h-9 w-[160px] rounded-md border px-3 py-1 text-sm shadow-sm transition-colors", filters.cardId ? "border-primary bg-primary/10 text-primary font-medium" : "border-input bg-background")}
             >
               <option value="">Todas las tarjetas</option>
               {cards?.map((card: any) => (
@@ -425,7 +425,7 @@ export default function TransactionsPage() {
             <select
               value={filters.categoryId}
               onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}
-              className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
+              className={cn("h-9 w-[160px] rounded-md border px-3 py-1 text-sm shadow-sm transition-colors", filters.categoryId ? "border-primary bg-primary/10 text-primary font-medium" : "border-input bg-background")}
             >
               <option value="">Todas las categorías</option>
               <option value={PENDING_CLASSIFICATION_FILTER}>
@@ -439,7 +439,7 @@ export default function TransactionsPage() {
             <select
               value={filters.expenseType}
               onChange={(e) => setFilters({ ...filters, expenseType: e.target.value })}
-              className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors"
+              className={cn("h-9 w-[160px] rounded-md border px-3 py-1 text-sm shadow-sm transition-colors", filters.expenseType ? "border-primary bg-primary/10 text-primary font-medium" : "border-input bg-background")}
             >
               <option value="">Todos los tipos</option>
               <option value="structural">Estructural</option>
@@ -454,7 +454,7 @@ export default function TransactionsPage() {
                 placeholder="Descripción, categoría, monto..."
                 value={filters.searchQuery}
                 onChange={(e) => setFilters({ ...filters, searchQuery: e.target.value })}
-                className="h-9 pl-8"
+                className={cn("h-9 pl-8", filters.searchQuery ? "border-primary bg-primary/10 text-primary font-medium" : "")}
               />
             </div>
 
@@ -503,12 +503,12 @@ export default function TransactionsPage() {
           {sortedTransactions?.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <ShoppingCart className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No tenés gastos registrados</h3>
-                <p className="text-muted-foreground text-center mb-4">
-                  Registrá tu primer gasto para comenzar a trackear tus finanzas
+                <ShoppingCart className="h-12 w-12 text-primary/40 mb-4" />
+                <h3 className="text-lg font-medium mb-2">¡Tomá el control de tus gastos!</h3>
+                <p className="text-muted-foreground text-center mb-6 max-w-sm">
+                  Aún no tenés movimientos en este período. Registrá tu primer gasto para entender a dónde va tu plata y mejorar tu salud financiera.
                 </p>
-                <TransactionForm triggerText="Nuevo gasto" />
+                <TransactionForm triggerText="Nuevo gasto" className="shadow-lg shadow-primary/20" />
               </CardContent>
             </Card>
           ) : viewMode === 'table' ? (

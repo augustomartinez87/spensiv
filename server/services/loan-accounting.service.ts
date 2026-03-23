@@ -179,7 +179,9 @@ export class LoanAccountingService {
         const remaining = Decimal.max(money(i.amount).minus(money(i.paidAmount ?? 0)), ZERO)
         return s.plus(remaining)
       }, ZERO)
-      const maxPayable = currentDues.plus(futureInstallmentsTotal)
+      const maxPayable = isInterestOnly 
+        ? currentDues.plus(futureInstallmentsTotal).plus(money(preState.principalOutstanding))
+        : currentDues.plus(futureInstallmentsTotal)
 
       if (amount.gt(maxPayable.plus(CENT_TOLERANCE))) {
         throw new Error(
@@ -202,12 +204,25 @@ export class LoanAccountingService {
         waterfall = { interestOverdueApplied: 0, interestCurrentApplied: 0, principalApplied: 0, totalApplied: 0, totalPending: 0 }
       }
 
-      if (waterfall.totalApplied <= 0 && futureInstallments.length === 0) {
-        throw new Error('No hay deuda pendiente para aplicar el pago')
-      }
-
       // Apply excess to future installments (adelanto de cuotas)
       let excessRemaining = amount.minus(money(waterfall.totalApplied))
+      let extraPrincipalPaid = ZERO
+
+      // If interest-only, pay principal with excess natively!
+      if (isInterestOnly && excessRemaining.gt(CENT_TOLERANCE)) {
+          const principalPending = money(preState.principalOutstanding)
+          const principalToPay = Decimal.min(excessRemaining, principalPending)
+          if (principalToPay.gt(0)) {
+              extraPrincipalPaid = principalToPay
+              // we don't deduct it from excessRemaining here because it might still try to apply to futureInstallments (which it won't since they don't have principal, but logically it's consumed).
+              // actually we should consume it:
+              excessRemaining = excessRemaining.minus(extraPrincipalPaid)
+          }
+      }
+
+      if (waterfall.totalApplied <= 0 && futureInstallments.length === 0 && extraPrincipalPaid.lte(0)) {
+        throw new Error('No hay deuda pendiente para aplicar el pago')
+      }
       type AdvancePaid = { id: string; dueDate: Date; interestPaid: number; principalPaid: number; fullyPaid: boolean }
       const advancePaid: AdvancePaid[] = []
 
@@ -279,6 +294,15 @@ export class LoanAccountingService {
           paymentId: payment.id,
           flowDate: paymentDate,
           amountSigned: round2(directionSign * waterfall.principalApplied),
+          component: 'principal',
+        })
+      }
+      if (extraPrincipalPaid.gt(0)) {
+        cashflows.push({
+          loanId: loan.id,
+          paymentId: payment.id,
+          flowDate: paymentDate,
+          amountSigned: round2(money(directionSign).times(extraPrincipalPaid)),
           component: 'principal',
         })
       }

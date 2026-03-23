@@ -178,7 +178,7 @@ export default function DashboardPage() {
               MEP {formatCurrency(mepRate)}
             </span>
           )}
-          <IncomeForm />
+          <IncomeForm variant="outline" />
           <TransactionForm />
         </div>
       </div>

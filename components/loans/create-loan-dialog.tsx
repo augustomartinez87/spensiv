@@ -49,6 +49,7 @@ export function CreateLoanDialog({
     const [roundEnabled, setRoundEnabled] = useState(false)
     const [roundingMultiple, setRoundingMultiple] = useState<number>(1000)
     const [firstInstallmentMonth, setFirstInstallmentMonth] = useState<string>('')
+    const [noInterest, setNoInterest] = useState(false)
 
     const { data: persons } = trpc.persons.list.useQuery()
 
@@ -130,6 +131,7 @@ export function CreateLoanDialog({
             setRoundEnabled(false)
             setRoundingMultiple(1000)
             setFirstInstallmentMonth('')
+            setNoInterest(false)
         },
     })
 
@@ -141,7 +143,7 @@ export function CreateLoanDialog({
                 capital: parseFloat(capital),
                 currency,
                 loanType: 'interest_only',
-                monthlyInterestRate: parseFloat(monthlyRate) / 100,
+                monthlyInterestRate: noInterest ? 0 : parseFloat(monthlyRate) / 100,
                 startDate,
                 personId: selectedPersonId || undefined,
                 direction,
@@ -154,7 +156,7 @@ export function CreateLoanDialog({
                 capital: parseFloat(capital),
                 currency,
                 loanType: 'amortized',
-                tna: parseFloat(tna) / 100,
+                tna: noInterest ? 0 : parseFloat(tna) / 100,
                 termMonths: parseInt(termMonths),
                 startDate,
                 personId: selectedPersonId || undefined,
@@ -340,6 +342,11 @@ export function CreateLoanDialog({
                         </div>
                     </div>
 
+                    <div className="flex items-center gap-2 py-1">
+                        <Switch id="no-interest" checked={noInterest} onCheckedChange={setNoInterest} />
+                        <Label htmlFor="no-interest" className="cursor-pointer">Sin intereses (Tasa 0%)</Label>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="loanCapital">Capital ({currency})</Label>
@@ -366,7 +373,7 @@ export function CreateLoanDialog({
                                     required
                                 />
                             </div>
-                        ) : (
+                        ) : !noInterest ? (
                             <div className="space-y-2">
                                 <Label htmlFor="loanMonthlyRate">Tasa Mensual (%)</Label>
                                 <Input
@@ -389,10 +396,10 @@ export function CreateLoanDialog({
                                     )
                                 })()}
                             </div>
-                        )}
+                        ) : null}
                     </div>
 
-                    {loanType === 'amortized' && (
+                    {loanType === 'amortized' && !noInterest && (
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="loanTna">TNA (%)</Label>

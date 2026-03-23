@@ -106,19 +106,22 @@ export const loansRouter = router({
         // Store TNA nominal: TNA = rate * 12
         const tna = rate * 12
 
-        // Generate 12 initial interest-only installments
-        const dueDates = input.smartDueDate
-          ? getSmartDueDates(startDate, 12)
-          : Array.from({ length: 12 }, (_, i) => addMonths(startDate, i + 1))
+        // Generate 12 initial interest-only installments (ONLY if rate > 0)
+        let installments: any[] = []
+        if (rate > 0) {
+          const dueDates = input.smartDueDate
+            ? getSmartDueDates(startDate, 12)
+            : Array.from({ length: 12 }, (_, i) => addMonths(startDate, i + 1))
 
-        const installments = dueDates.map((dueDate, i) => ({
-          number: i + 1,
-          dueDate,
-          amount: monthlyInterest,
-          interest: monthlyInterest,
-          principal: 0,
-          balance: input.capital,
-        }))
+          installments = dueDates.map((dueDate, i) => ({
+            number: i + 1,
+            dueDate,
+            amount: monthlyInterest,
+            interest: monthlyInterest,
+            principal: 0,
+            balance: input.capital,
+          }))
+        }
 
         const loan = await ctx.prisma.loan.create({
           data: {
@@ -140,7 +143,7 @@ export const loansRouter = router({
             personId: input.personId ?? null,
             direction: input.direction,
             creditorName: input.creditorName ?? null,
-            loanInstallments: { create: installments },
+            ...(installments.length > 0 ? { loanInstallments: { create: installments } } : {})
           },
           include: {
             loanInstallments: { orderBy: { number: 'asc' } },
@@ -733,17 +736,19 @@ export const loansRouter = router({
 
       if (loan.loanType === 'interest_only') {
         const monthlyInterest = Number(loan.installmentAmount)
-        const installments = Array.from({ length: 12 }, (_, i) => ({
-          loanId: loan.id,
-          number: i + 1,
-          dueDate: addMonths(startDate, i + 1),
-          amount: monthlyInterest,
-          interest: monthlyInterest,
-          principal: 0,
-          balance: Number(loan.capital),
-        }))
+        if (monthlyInterest > 0) {
+          const installments = Array.from({ length: 12 }, (_, i) => ({
+            loanId: loan.id,
+            number: i + 1,
+            dueDate: addMonths(startDate, i + 1),
+            amount: monthlyInterest,
+            interest: monthlyInterest,
+            principal: 0,
+            balance: Number(loan.capital),
+          }))
 
-        await ctx.prisma.loanInstallment.createMany({ data: installments })
+          await ctx.prisma.loanInstallment.createMany({ data: installments })
+        }
       } else {
         const monthlyRate = Number(loan.monthlyRate)
         const termMonths = loan.termMonths!

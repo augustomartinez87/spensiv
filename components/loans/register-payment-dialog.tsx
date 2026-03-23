@@ -41,6 +41,9 @@ export function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; c
         const paid = Number(i.paidAmount ?? 0)
         return s + Math.max(Number(i.amount) - paid, 0)
     }, 0)
+    
+    const principalPending = loan?.principalOutstanding ? Number(loan.principalOutstanding) : 0
+    const allowPayment = pendingCount > 0 || (loan?.loanType === 'interest_only' && principalPending > 0)
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -56,7 +59,7 @@ export function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; c
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     {/* Pending info */}
-                    {(overdueInsts.length > 0 || nextDueInst) && (
+                    {(overdueInsts.length > 0 || nextDueInst || (loan?.loanType === 'interest_only' && principalPending > 0)) && (
                         <div className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs space-y-1.5">
                             {overdueInsts.length > 0 && (
                                 <div className="flex justify-between">
@@ -80,10 +83,18 @@ export function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; c
                                     </span>
                                 </div>
                             )}
-                            <div className="flex justify-between border-t border-border/50 pt-1.5">
-                                <span className="text-muted-foreground">Cuotas pendientes: {pendingCount}</span>
-                                <span className="font-medium">{formatCurrency(totalPendingAmount, cur)}</span>
-                            </div>
+                            {pendingCount > 0 && (
+                                <div className="flex justify-between border-t border-border/50 pt-1.5">
+                                    <span className="text-muted-foreground">Cuotas pendientes ({pendingCount})</span>
+                                    <span className="font-medium">{formatCurrency(totalPendingAmount, cur)}</span>
+                                </div>
+                            )}
+                            {loan?.loanType === 'interest_only' && principalPending > 0 && (
+                                <div className="flex justify-between border-t border-border/50 pt-1.5 text-muted-foreground">
+                                    <span>Capital vivo prestado</span>
+                                    <span className="text-foreground">{formatCurrency(principalPending, cur)}</span>
+                                </div>
+                            )}
                         </div>
                     )}
                     <div className="space-y-2">
@@ -114,7 +125,7 @@ export function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; c
                     </div>
                     <Button
                         className="w-full"
-                        disabled={!amount || parseFloat(amount) <= 0 || registerMutation.isPending}
+                        disabled={!amount || parseFloat(amount) <= 0 || !allowPayment || registerMutation.isPending}
                         onClick={() => registerMutation.mutate({
                             loanId,
                             amount: parseFloat(amount),
