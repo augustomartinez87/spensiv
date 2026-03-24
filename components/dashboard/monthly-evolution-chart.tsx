@@ -66,7 +66,7 @@ export function MonthlyEvolutionChart({ data }: { data: DataPoint[] }) {
   const maxValue = Math.max(...chartData.map((d) => Math.max(d.income, d.expense)), 1)
 
   return (
-    <div className="px-1 pt-1 pb-2">
+    <div className="px-1 pt-1 pb-2 flex flex-col h-full">
       {/* Title + legend row */}
       <div className="flex items-center justify-between mb-3 px-2">
         <p className="text-sm font-semibold text-foreground">Evolución mensual</p>
@@ -82,7 +82,8 @@ export function MonthlyEvolutionChart({ data }: { data: DataPoint[] }) {
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={220}>
+      <div className="flex-1 min-h-[200px]">
+      <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -8, bottom: 0 }}>
           <defs>
             <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
@@ -140,6 +141,7 @@ export function MonthlyEvolutionChart({ data }: { data: DataPoint[] }) {
           />
         </AreaChart>
       </ResponsiveContainer>
+      </div>
     </div>
   )
 }

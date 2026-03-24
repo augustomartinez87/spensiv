@@ -213,7 +213,7 @@ export default function DashboardPage() {
 
       {/* ── ROW 2: Evolución + Donuts side by side ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <Card className="overflow-hidden lg:col-span-3">
+        <Card className="overflow-hidden lg:col-span-3 flex flex-col">
           {evolutionData && evolutionData.length > 1 ? (
             <MonthlyEvolutionChart data={evolutionData} />
           ) : (
