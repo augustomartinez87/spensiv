@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/hooks/use-toast'
@@ -328,25 +329,16 @@ export function IncomeForm({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="amount" className={errors.amount ? "text-red-500" : ""}>Monto</Label>
-              <Input
-                id="amount"
-                type="text"
-                inputMode="decimal"
-                value={formData.amount}
-                onChange={(e) => {
-                  setFormData({
-                    ...formData,
-                    amount: e.target.value.replace(/[^0-9.,]/g, ''),
-                  })
-                  if (errors.amount) setErrors({ ...errors, amount: '' })
-                }}
-                placeholder="Ej: 50000"
-                className={errors.amount ? "border-red-500 focus-visible:ring-red-500" : ""}
-              />
-              {errors.amount && <p className="text-xs text-red-500">{errors.amount}</p>}
-            </div>
+            <AmountInput
+              label="Monto"
+              value={formData.amount}
+              onChange={(value) => {
+                setFormData({ ...formData, amount: value })
+                if (errors.amount) setErrors({ ...errors, amount: '' })
+              }}
+              error={errors.amount}
+              placeholder="Ej: 50000"
+            />
 
             <div className="space-y-2">
               <Label htmlFor="date">Fecha</Label>

@@ -32,7 +32,7 @@ export const thirdPartyPurchasesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const purchaseDate = new Date(input.purchaseDate)
-      const installmentAmount = input.totalAmount / input.installments
+      const installmentAmount = new Decimal(input.totalAmount).div(input.installments).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
 
       // 1. Create the real Transaction with isForThirdParty=true
       const transaction = await createTransactionWithInstallments({
@@ -50,42 +50,48 @@ export const thirdPartyPurchasesRouter = router({
         notes: input.notes,
       })
 
-      // 2. Fetch installments with billing cycle dueDates
-      const createdInstallments = await ctx.prisma.installment.findMany({
-        where: { transactionId: transaction.id },
-        include: { billingCycle: { select: { dueDate: true } } },
-        orderBy: { installmentNumber: 'asc' },
-      })
+      try {
+        // 2. Fetch installments with billing cycle dueDates
+        const createdInstallments = await ctx.prisma.installment.findMany({
+          where: { transactionId: transaction.id },
+          include: { billingCycle: { select: { dueDate: true } } },
+          orderBy: { installmentNumber: 'asc' },
+        })
 
-      // 3. Create ThirdPartyPurchase for collection tracking
-      const thirdPartyPurchase = await ctx.prisma.thirdPartyPurchase.create({
-        data: {
-          userId: ctx.user.id,
-          description: input.description,
-          personId: input.personId || null,
-          personName: input.personName,
-          cardId: input.cardId,
-          transactionId: transaction.id,
-          totalAmount: new Decimal(input.totalAmount),
-          installments: input.installments,
-          installmentAmount: new Decimal(installmentAmount),
-          currency: input.currency,
-          purchaseDate,
-          notes: input.notes,
-          collectionInstallments: {
-            create: createdInstallments.map((inst) => ({
-              number: inst.installmentNumber,
-              amount: new Decimal(installmentAmount),
-              dueDate: inst.billingCycle.dueDate,
-            })),
+        // 3. Create ThirdPartyPurchase for collection tracking
+        const thirdPartyPurchase = await ctx.prisma.thirdPartyPurchase.create({
+          data: {
+            userId: ctx.user.id,
+            description: input.description,
+            personId: input.personId || null,
+            personName: input.personName,
+            cardId: input.cardId,
+            transactionId: transaction.id,
+            totalAmount: new Decimal(input.totalAmount),
+            installments: input.installments,
+            installmentAmount,
+            currency: input.currency,
+            purchaseDate,
+            notes: input.notes,
+            collectionInstallments: {
+              create: createdInstallments.map((inst) => ({
+                number: inst.installmentNumber,
+                amount: installmentAmount,
+                dueDate: inst.billingCycle.dueDate,
+              })),
+            },
           },
-        },
-        include: {
-          collectionInstallments: true,
-        },
-      })
+          include: {
+            collectionInstallments: true,
+          },
+        })
 
-      return thirdPartyPurchase
+        return thirdPartyPurchase
+      } catch (error) {
+        // Rollback: void the transaction if ThirdPartyPurchase creation fails
+        await voidTransaction(transaction.id)
+        throw error
+      }
     }),
 
   /**
@@ -349,7 +355,7 @@ export const thirdPartyPurchasesRouter = router({
         throw new Error('La transacción ya tiene una compra de tercero asociada')
       }
 
-      const installmentAmount = Number(transaction.totalAmount) / transaction.installments
+      const installmentAmount = new Decimal(transaction.totalAmount.toString()).div(transaction.installments).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
       const purchaseDate = transaction.purchaseDate
 
       // Fetch existing installments with billing cycle dueDates
@@ -369,14 +375,14 @@ export const thirdPartyPurchasesRouter = router({
           transactionId: transaction.id,
           totalAmount: transaction.totalAmount,
           installments: transaction.installments,
-          installmentAmount: new Decimal(installmentAmount),
+          installmentAmount,
           currency: input.currency,
           purchaseDate,
           notes: input.notes,
           collectionInstallments: {
             create: existingInstallments.map((inst) => ({
               number: inst.installmentNumber,
-              amount: new Decimal(installmentAmount),
+              amount: installmentAmount,
               dueDate: inst.billingCycle.dueDate,
             })),
           },
@@ -387,38 +393,6 @@ export const thirdPartyPurchasesRouter = router({
       })
 
       return thirdPartyPurchase
-    }),
-
-  /**
-   * Resumen de terceros por tarjeta
-   */
-  getSummaryByCard: protectedProcedure
-    .input(z.string())
-    .query(async ({ ctx, input }) => {
-      const purchases = await ctx.prisma.thirdPartyPurchase.findMany({
-        where: {
-          userId: ctx.user.id,
-          cardId: input,
-          status: 'active',
-        },
-        include: {
-          collectionInstallments: true,
-        },
-      })
-
-      const totalAmount = purchases.reduce((sum, p) => sum + Number(p.totalAmount), 0)
-      const collectedAmount = purchases.reduce((sum, p) => {
-        return sum + p.collectionInstallments
-          .filter((i) => i.isCollected)
-          .reduce((s, i) => s + Number(i.amount), 0)
-      }, 0)
-
-      return {
-        count: purchases.length,
-        totalAmount,
-        collectedAmount,
-        pendingAmount: totalAmount - collectedAmount,
-      }
     }),
 
   /**

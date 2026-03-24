@@ -305,27 +305,6 @@ export const portfolioRouter = router({
       .sort((a, b) => b.percentage - a.percentage)
   }),
 
-  getEvolutionData: protectedProcedure.query(async ({ ctx }) => {
-    const [loans, mepRate] = await Promise.all([
-      ctx.prisma.loan.findMany({
-        where: { userId: ctx.user.id, status: 'active' },
-        select: { capital: true, startDate: true, currency: true },
-        orderBy: { startDate: 'asc' },
-      }),
-      getDolarMep(),
-    ])
-
-    const byMonth = new Map<string, number>()
-    for (const loan of loans) {
-      const key = `${loan.startDate.getFullYear()}-${String(loan.startDate.getMonth() + 1).padStart(2, '0')}`
-      byMonth.set(key, (byMonth.get(key) || 0) + pesify(Number(loan.capital), loan.currency, mepRate))
-    }
-
-    return [...byMonth.entries()]
-      .map(([month, capital]) => ({ month, capital }))
-      .sort((a, b) => a.month.localeCompare(b.month))
-  }),
-
   getRiskBreakdown: protectedProcedure.query(async ({ ctx }) => {
     const [persons, mepRate] = await Promise.all([
       ctx.prisma.person.findMany({

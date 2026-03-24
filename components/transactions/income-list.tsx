@@ -18,6 +18,7 @@ import {
 import { DatePicker } from '@/components/ui/date-picker'
 import { TrendingUp, Pencil, Trash2 } from 'lucide-react'
 import { PrivateAmount } from '@/lib/privacy-context'
+import { EmptyState } from '@/components/ui/empty-state'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { IncomeForm } from '@/components/transactions/income-form'
@@ -76,16 +77,12 @@ export function IncomeList({
 
   if (!incomes || incomes.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No tenés ingresos registrados</h3>
-          <p className="text-muted-foreground text-center mb-4">
-            Registrá tu primer ingreso para comenzar a trackear tus finanzas
-          </p>
-          <IncomeForm triggerText="Nuevo ingreso" />
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon={TrendingUp}
+        title="No tenés ingresos registrados"
+        description="Registrá tu primer ingreso para comenzar a trackear tus finanzas"
+        action={<IncomeForm triggerText="Nuevo ingreso" />}
+      />
     )
   }
 

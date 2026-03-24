@@ -18,6 +18,7 @@ import {
 import { DatePicker } from '@/components/ui/date-picker'
 import { ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard, Banknote, ArrowRightLeft, Pencil, Trash2 } from 'lucide-react'
 import { PrivateAmount } from '@/lib/privacy-context'
+import { EmptyState } from '@/components/ui/empty-state'
 import { getCategoryIconInfo } from '@/lib/category-icons'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -82,18 +83,16 @@ export function ExpenseList({
   const voidMutation = trpc.transactions.void.useMutation({
     onSuccess: () => {
       utils.transactions.list.invalidate()
-      utils.dashboard.getCurrentMonth.invalidate()
-      utils.dashboard.getTotalDebt.invalidate()
       utils.dashboard.getCardBalances.invalidate()
+      utils.dashboard.getMonthlyBalance.invalidate()
     },
   })
 
   const unvoidMutation = trpc.transactions.unvoid.useMutation({
     onSuccess: () => {
       utils.transactions.list.invalidate()
-      utils.dashboard.getCurrentMonth.invalidate()
-      utils.dashboard.getTotalDebt.invalidate()
       utils.dashboard.getCardBalances.invalidate()
+      utils.dashboard.getMonthlyBalance.invalidate()
     },
   })
 
@@ -108,8 +107,6 @@ export function ExpenseList({
   const deleteMutation = trpc.transactions.delete.useMutation({
     onSuccess: () => {
       utils.transactions.list.invalidate()
-      utils.dashboard.getCurrentMonth.invalidate()
-      utils.dashboard.getTotalDebt.invalidate()
       utils.dashboard.getCardBalances.invalidate()
       utils.dashboard.getMonthlyBalance.invalidate()
     },
@@ -122,16 +119,12 @@ export function ExpenseList({
 
   if (!transactions || transactions.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <ShoppingCart className="h-12 w-12 text-primary/40 mb-4" />
-          <h3 className="text-lg font-medium mb-2">¡Tomá el control de tus gastos!</h3>
-          <p className="text-muted-foreground text-center mb-6 max-w-sm">
-            Aún no tenés movimientos en este período. Registrá tu primer gasto para entender a dónde va tu plata y mejorar tu salud financiera.
-          </p>
-          <TransactionForm triggerText="Nuevo gasto" className="shadow-lg shadow-primary/20" />
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon={ShoppingCart}
+        title="¡Tomá el control de tus gastos!"
+        description="Aún no tenés movimientos en este período. Registrá tu primer gasto para entender a dónde va tu plata y mejorar tu salud financiera."
+        action={<TransactionForm triggerText="Nuevo gasto" className="shadow-lg shadow-primary/20" />}
+      />
     )
   }
 

@@ -76,14 +76,6 @@ export function tnaToMonthlyRate(tna: number): number {
   return tnaNominalToMonthlyRate(tna)
 }
 
-export function tnaToDailyRate(tna: number): number {
-  return tnaNominalToDailyRate(tna, { dayCount: 'ACT_365' })
-}
-
-export function monthlyRateToTNA(rm: number): number {
-  return monthlyRateToTnaNominal(rm)
-}
-
 export function monthlyToAnnualRate(rm: number): number {
   return monthlyRateToTea(rm)
 }

@@ -292,11 +292,6 @@ export function isMasterExpenseSubcategory(
   )
 }
 
-export function getMasterExpenseSubcategories(categoryName: string): string[] {
-  const normalizedCategory = normalizeExpenseCategoryText(categoryName)
-  return MASTER_SUBCATEGORIES_BY_CATEGORY.get(normalizedCategory) || []
-}
-
 export function getExpenseSubcategoryCandidatesByName(
   rawSubcategoryName: string
 ): Array<{ category: string; subcategory: string }> {

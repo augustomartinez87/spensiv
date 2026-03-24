@@ -42,6 +42,7 @@ import {
   Link2,
   MinusCircle,
   Ban,
+  Wrench,
 } from 'lucide-react'
 import {
   Tooltip as UITooltip,
@@ -71,6 +72,25 @@ export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
   const [view, setView] = useState<'list' | 'calendar'>('list')
   const [tab, setTab] = useState<'lender' | 'borrower'>('lender')
+  const { toast } = useToast()
+  const utils = trpc.useUtils()
+
+  const repairMutation = trpc.loans.repairZeroRateLoans.useMutation({
+    onSuccess: (result) => {
+      if (result.loansFixed === 0) {
+        toast({ title: 'Sin cambios', description: 'No se encontraron préstamos 0% con cuotas rotas' })
+      } else {
+        toast({
+          title: 'Préstamos reparados',
+          description: `${result.loansFixed} préstamo(s) corregidos, ${result.installmentsFixed} cuotas actualizadas`,
+        })
+      }
+      utils.loans.invalidate()
+    },
+    onError: (err) => {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' })
+    },
+  })
 
   if (selectedLoanId) {
     return <LoanDetail loanId={selectedLoanId} onBack={() => setSelectedLoanId(null)} />
@@ -78,7 +98,20 @@ export default function LoansPage() {
 
   return (
     <div className="space-y-8">
-      <LoanListHeader view={view} onViewChange={setView} direction={tab} />
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <LoanListHeader view={view} onViewChange={setView} direction={tab} />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => repairMutation.mutate()}
+          disabled={repairMutation.isPending}
+        >
+          <Wrench className="h-4 w-4 mr-1" />
+          {repairMutation.isPending ? 'Reparando...' : 'Reparar cuotas 0%'}
+        </Button>
+      </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList className="grid w-full max-w-xs grid-cols-2">

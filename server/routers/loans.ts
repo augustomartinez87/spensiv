@@ -326,9 +326,23 @@ export const loansRouter = router({
     .mutation(async ({ ctx, input }) => {
       const loan = await ctx.prisma.loan.findFirst({
         where: { id: input.loanId, userId: ctx.user.id, status: 'active' },
+        include: {
+          loanInstallments: {
+            where: { isPaid: false },
+            select: { id: true },
+            take: 1,
+          },
+        },
       })
 
       if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Prestamo no encontrado' })
+
+      if (loan.loanInstallments.length > 0) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'No se puede completar un préstamo con cuotas impagas',
+        })
+      }
 
       return ctx.prisma.loan.update({
         where: { id: input.loanId },
@@ -797,57 +811,65 @@ export const loansRouter = router({
       roundingMultiple: z.number().int().min(0).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const loan = await ctx.prisma.loan.findFirst({
+      // Preliminary check outside transaction
+      const loanCheck = await ctx.prisma.loan.findFirst({
         where: { id: input.loanId, userId: ctx.user.id, status: 'active' },
-        include: {
-          loanInstallments: { where: { isPaid: false }, orderBy: { number: 'asc' } },
-        },
+        select: { id: true },
       })
-      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo activo no encontrado' })
-
-      // Calculate new capital: sum of remaining unpaid principal (accounting for partial payments)
-      let newCapital = loan.loanInstallments.reduce((sum, i) => {
-        const paid = Number(i.paidAmount ?? 0)
-        const paidInterest = Math.min(paid, Number(i.interest))
-        const paidPrincipal = Math.max(paid - paidInterest, 0)
-        return sum + Math.max(Number(i.principal) - paidPrincipal, 0)
-      }, 0)
-      if (input.capitalizeInterest) {
-        newCapital += loan.loanInstallments.reduce((sum, i) => {
-          const paid = Number(i.paidAmount ?? 0)
-          const paidInterest = Math.min(paid, Number(i.interest))
-          return sum + Math.max(Number(i.interest) - paidInterest, 0)
-        }, 0)
-      }
+      if (!loanCheck) throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo activo no encontrado' })
 
       const startDate = new Date(input.startDate + 'T12:00:00')
-      let monthlyRate = tnaToMonthlyRate(input.tna)
-      const exactInstallment = frenchInstallment(newCapital, monthlyRate, input.termMonths)
-      const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
-        ? strategicRoundInstallment(newCapital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
-        : exactInstallment
-
-      let tna = input.tna
-      if (installmentAmount !== exactInstallment) {
-        const real = reverseFromInstallment(newCapital, input.termMonths, installmentAmount)
-        if (real) {
-          tna = real.tna
-          monthlyRate = real.monthlyRate
-        }
-      }
-
-      const totalAmount = installmentAmount * input.termMonths
-      const table = generateAmortizationTable(newCapital, monthlyRate, input.termMonths, installmentAmount, input.startDate)
-
       const noteText = input.note || 'Préstamo refinanciado'
 
-      // Transaction: update original + create new
-      const [, newLoan] = await ctx.prisma.$transaction([
-        ctx.prisma.loan.update({
+      // Interactive transaction: re-read installments inside to avoid stale data
+      const newLoan = await ctx.prisma.$transaction(async (tx) => {
+        const loan = await tx.loan.findFirst({
+          where: { id: input.loanId, userId: ctx.user.id, status: 'active' },
+          include: {
+            loanInstallments: { where: { isPaid: false }, orderBy: { number: 'asc' } },
+          },
+        })
+        if (!loan) throw new TRPCError({ code: 'CONFLICT', message: 'El préstamo ya no está activo' })
+
+        // Calculate new capital: sum of remaining unpaid principal (accounting for partial payments)
+        let newCapital = loan.loanInstallments.reduce((sum, i) => {
+          const paid = Number(i.paidAmount ?? 0)
+          const paidInterest = Math.min(paid, Number(i.interest))
+          const paidPrincipal = Math.max(paid - paidInterest, 0)
+          return sum + Math.max(Number(i.principal) - paidPrincipal, 0)
+        }, 0)
+        if (input.capitalizeInterest) {
+          newCapital += loan.loanInstallments.reduce((sum, i) => {
+            const paid = Number(i.paidAmount ?? 0)
+            const paidInterest = Math.min(paid, Number(i.interest))
+            return sum + Math.max(Number(i.interest) - paidInterest, 0)
+          }, 0)
+        }
+
+        let monthlyRate = tnaToMonthlyRate(input.tna)
+        const exactInstallment = frenchInstallment(newCapital, monthlyRate, input.termMonths)
+        const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
+          ? strategicRoundInstallment(newCapital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
+          : exactInstallment
+
+        let tna = input.tna
+        if (installmentAmount !== exactInstallment) {
+          const real = reverseFromInstallment(newCapital, input.termMonths, installmentAmount)
+          if (real) {
+            tna = real.tna
+            monthlyRate = real.monthlyRate
+          }
+        }
+
+        const totalAmount = installmentAmount * input.termMonths
+        const table = generateAmortizationTable(newCapital, monthlyRate, input.termMonths, installmentAmount, input.startDate)
+
+        await tx.loan.update({
           where: { id: loan.id },
           data: { status: 'refinanced' },
-        }),
-        ctx.prisma.loan.create({
+        })
+
+        const created = await tx.loan.create({
           data: {
             userId: ctx.user.id,
             borrowerName: loan.borrowerName,
@@ -877,21 +899,21 @@ export const loansRouter = router({
               })),
             },
           },
-        }),
-      ])
+        })
 
-      // Update original with reference to new loan
-      await ctx.prisma.loan.update({
-        where: { id: loan.id },
-        data: { refinancedByLoanId: newLoan.id },
-      })
+        await tx.loan.update({
+          where: { id: loan.id },
+          data: { refinancedByLoanId: created.id },
+        })
 
-      // Auto-create activity logs
-      await ctx.prisma.loanActivityLog.createMany({
-        data: [
-          { loanId: loan.id, userId: ctx.user.id, tag: 'acuerdo', note: `Refinanciado → nuevo préstamo` },
-          { loanId: newLoan.id, userId: ctx.user.id, tag: 'acuerdo', note: `Refinanciamiento de préstamo anterior. ${noteText}` },
-        ],
+        await tx.loanActivityLog.createMany({
+          data: [
+            { loanId: loan.id, userId: ctx.user.id, tag: 'acuerdo', note: `Refinanciado → nuevo préstamo` },
+            { loanId: created.id, userId: ctx.user.id, tag: 'acuerdo', note: `Refinanciamiento de préstamo anterior. ${noteText}` },
+          ],
+        })
+
+        return created
       })
 
       return newLoan
@@ -1238,4 +1260,86 @@ export const loansRouter = router({
       await service.recalculateIrrCache(input.loanId)
       return { success: true }
     }),
+
+  /**
+   * Reparar préstamos a tasa 0% que quedaron con cuotas de $0.
+   * Recalcula: installmentAmount = capital / termMonths, interest = 0.
+   * Respeta cuotas ya pagadas (no modifica paidAmount/paidAt).
+   */
+  repairZeroRateLoans: protectedProcedure.mutation(async ({ ctx }) => {
+    const loans = await ctx.prisma.loan.findMany({
+      where: {
+        userId: ctx.user.id,
+        loanType: 'amortized',
+        tna: 0,
+        status: { in: ['active', 'completed'] },
+      },
+      include: {
+        loanInstallments: { orderBy: { number: 'asc' } },
+      },
+    })
+
+    let loansFixed = 0
+    let installmentsFixed = 0
+
+    for (const loan of loans) {
+      const capital = Number(loan.capital)
+      const termMonths = loan.termMonths!
+      const installmentAmount = Math.round((capital / termMonths) * 100) / 100
+
+      // Check if this loan actually has broken installments
+      const hasBrokenInstallments = loan.loanInstallments.some(
+        (inst) => Number(inst.amount) === 0 && !inst.isPaid
+      )
+      if (!hasBrokenInstallments) continue
+
+      // Recalculate: each installment = capital/N, interest = 0, balance decreases
+      let balance = capital
+      const updates = loan.loanInstallments.map((inst) => {
+        const isLast = inst.number === termMonths
+        const cuota = isLast ? balance : installmentAmount
+        const newBalance = isLast ? 0 : Math.round((balance - cuota) * 100) / 100
+        const result = {
+          id: inst.id,
+          amount: cuota,
+          interest: 0,
+          principal: cuota,
+          balance: newBalance,
+        }
+        balance = newBalance
+        return result
+      })
+
+      await ctx.prisma.$transaction(async (tx) => {
+        // Update loan-level amounts
+        await tx.loan.update({
+          where: { id: loan.id },
+          data: {
+            installmentAmount,
+            totalAmount: capital,
+            monthlyRate: 0,
+          },
+        })
+
+        // Update each installment
+        for (const upd of updates) {
+          await tx.loanInstallment.update({
+            where: { id: upd.id },
+            data: {
+              amount: upd.amount,
+              interest: upd.interest,
+              principal: upd.principal,
+              balance: upd.balance,
+            },
+          })
+        }
+
+        installmentsFixed += updates.length
+      })
+
+      loansFixed++
+    }
+
+    return { loansFixed, installmentsFixed }
+  }),
 })

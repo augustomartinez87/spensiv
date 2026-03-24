@@ -277,8 +277,11 @@ export async function createTransactionWithInstallments(
     },
   })
 
-  // 4. Generar cuotas
-  const installmentAmount = input.totalAmount / input.installments
+  // 4. Generar cuotas (Decimal division para evitar errores de precision flotante)
+  const totalDecimal = new Decimal(input.totalAmount)
+  const baseInstallment = totalDecimal.div(input.installments).toDecimalPlaces(2, Decimal.ROUND_DOWN)
+  // La última cuota absorbe el residuo para que sumen exactamente el total
+  const lastInstallment = totalDecimal.minus(baseInstallment.times(input.installments - 1))
 
   for (let i = 0; i < input.installments; i++) {
     // Calcular fecha de impacto de esta cuota
@@ -288,13 +291,15 @@ export async function createTransactionWithInstallments(
     // Obtener o crear billing cycle
     const billingCycle = await getOrCreateBillingCycle(input.cardId, impactDate)
 
+    const amount = i === input.installments - 1 ? lastInstallment : baseInstallment
+
     // Crear installment
     await prisma.installment.create({
       data: {
         transactionId: transaction.id,
         billingCycleId: billingCycle.id,
         installmentNumber: i + 1,
-        amount: new Decimal(installmentAmount),
+        amount,
         impactDate,
       },
     })

@@ -221,37 +221,6 @@ export const transactionsRouter = router({
     }),
 
   /**
-   * Obtener transacción por ID
-   */
-  getById: protectedProcedure.input(z.string()).query(async ({ ctx, input }) => {
-    const transaction = await ctx.prisma.transaction.findUnique({
-      where: { id: input },
-      include: {
-        card: true,
-        category: true,
-        subcategory: true,
-        installmentsList: {
-          include: {
-            billingCycle: true,
-          },
-          orderBy: {
-            installmentNumber: 'asc',
-          },
-        },
-      },
-    })
-
-    if (!transaction || transaction.userId !== ctx.user.id) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Transacción no encontrada',
-      })
-    }
-
-    return transaction
-  }),
-
-  /**
    * Anular transacción
    */
   void: protectedProcedure.input(z.string()).mutation(async ({ ctx, input }) => {
@@ -1156,89 +1125,6 @@ export const transactionsRouter = router({
     }),
 
   /**
-   * Estadísticas de gastos
-   */
-  getStats: protectedProcedure
-    .input(
-      z.object({
-        startDate: z.date(),
-        endDate: z.date(),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      const transactions = await ctx.prisma.transaction.findMany({
-        where: {
-          userId: ctx.user.id,
-          purchaseDate: {
-            gte: input.startDate,
-            lte: input.endDate,
-          },
-          isVoided: false,
-        },
-        include: {
-          category: true,
-          subcategory: true,
-          card: true,
-        },
-      })
-
-      const total = transactions.reduce(
-        (sum, t) => sum + Number(t.totalAmount),
-        0
-      )
-
-      const byCategory = transactions.reduce(
-        (acc, t) => {
-          const catName = t.category?.name || 'Sin categoría'
-          acc[catName] = (acc[catName] || 0) + Number(t.totalAmount)
-          return acc
-        },
-        {} as Record<string, number>
-      )
-
-      const byCard = transactions.reduce(
-        (acc, t) => {
-          if (t.card) {
-            const cardName = t.card.name
-            acc[cardName] = (acc[cardName] || 0) + Number(t.totalAmount)
-          }
-          return acc
-        },
-        {} as Record<string, number>
-      )
-
-      const byExpenseType = transactions.reduce(
-        (acc, t) => {
-          const type = t.expenseType || 'sin_clasificar'
-          acc[type] = (acc[type] || 0) + Number(t.totalAmount)
-          return acc
-        },
-        {} as Record<string, number>
-      )
-
-      const bySubcategory = transactions.reduce(
-        (acc, t) => {
-          if (t.subcategory) {
-            const catName = t.category?.name || 'Sin categoría'
-            const key = `${catName} > ${t.subcategory.name}`
-            acc[key] = (acc[key] || 0) + Number(t.totalAmount)
-          }
-          return acc
-        },
-        {} as Record<string, number>
-      )
-
-      return {
-        total,
-        count: transactions.length,
-        byCategory,
-        byCard,
-        byExpenseType,
-        bySubcategory,
-      }
-    }),
-
-  /**
    * Crear subcategoría
    */
   createSubcategory: protectedProcedure
@@ -1521,54 +1407,4 @@ export const transactionsRouter = router({
       })
     }),
 
-  /**
-   * Buscar o crear subcategoría por nombre (para importer)
-   */
-  getOrCreateSubcategory: protectedProcedure
-    .input(
-      z.object({
-        categoryId: z.string(),
-        name: subcategoryNameInputSchema,
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      const category = await ctx.prisma.category.findFirst({
-        where: { id: input.categoryId, userId: ctx.user.id },
-      })
-
-      if (!category) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Categoría no encontrada',
-        })
-      }
-
-      const rawName = input.name.trim()
-      if (!rawName) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Nombre de subcategoría inválido',
-        })
-      }
-
-      const name = getCanonicalExpenseSubcategoryName(category.name, rawName)
-      const normalizedName = normalizeExpenseCategoryText(name)
-
-      const existingSubcategories = await ctx.prisma.subCategory.findMany({
-        where: { categoryId: input.categoryId },
-        select: { id: true, name: true },
-      })
-
-      const existing = existingSubcategories.find(
-        (subcategory) => normalizeExpenseCategoryText(subcategory.name) === normalizedName
-      )
-      if (existing) return existing
-
-      return ctx.prisma.subCategory.create({
-        data: {
-          categoryId: input.categoryId,
-          name,
-        },
-      })
-    }),
 })

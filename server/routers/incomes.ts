@@ -292,48 +292,18 @@ export const incomesRouter = router({
         if (input.endDate) where.date.lte = input.endDate
       }
 
-      const incomes = await ctx.prisma.income.findMany({
+      if (input?.category) {
+        where.category = canonicalizeIncomeCategory(input.category).category
+      }
+
+      return ctx.prisma.income.findMany({
         where,
         orderBy: {
           date: 'desc',
         },
+        take: input?.limit || 50,
       })
-
-      if (!input?.category) {
-        return incomes.slice(0, input?.limit || 50)
-      }
-
-      const normalizedFilter = normalizeIncomeCategoryText(
-        canonicalizeIncomeCategory(input.category).category
-      )
-
-      return incomes
-        .filter((income) => {
-          const normalizedIncomeCategory = normalizeIncomeCategoryText(
-            canonicalizeIncomeCategory(income.category).category
-          )
-          return normalizedIncomeCategory === normalizedFilter
-        })
-        .slice(0, input?.limit || 50)
     }),
-
-  /**
-   * Obtener ingreso por ID
-   */
-  getById: protectedProcedure.input(z.string()).query(async ({ ctx, input }) => {
-    const income = await ctx.prisma.income.findUnique({
-      where: { id: input },
-    })
-
-    if (!income || income.userId !== ctx.user.id) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Ingreso no encontrado',
-      })
-    }
-
-    return income
-  }),
 
   /**
    * Actualizar ingreso
@@ -423,59 +393,4 @@ export const incomesRouter = router({
     })
   }),
 
-  /**
-   * Estadisticas de ingresos
-   */
-  getStats: protectedProcedure
-    .input(
-      z.object({
-        startDate: z.date(),
-        endDate: z.date(),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      const incomes = await ctx.prisma.income.findMany({
-        where: {
-          userId: ctx.user.id,
-          date: {
-            gte: input.startDate,
-            lte: input.endDate,
-          },
-        },
-      })
-
-      const total = incomes.reduce((sum, income) => sum + Number(income.amount), 0)
-
-      const byCategory = incomes.reduce(
-        (acc, income) => {
-          const canonicalCategory = canonicalizeIncomeCategory(income.category).category
-          acc[canonicalCategory] = (acc[canonicalCategory] || 0) + Number(income.amount)
-          return acc
-        },
-        {} as Record<string, number>
-      )
-
-      const bySubcategory = incomes.reduce(
-        (acc, income) => {
-          const canonical = canonicalizeIncomeCategory(income.category)
-          const canonicalCategory = canonical.category
-          const subcategory =
-            canonicalizeIncomeSubcategory(canonicalCategory, income.subcategory) ??
-            canonical.mappedSubcategory
-          if (subcategory) {
-            acc[subcategory] = (acc[subcategory] || 0) + Number(income.amount)
-          }
-          return acc
-        },
-        {} as Record<string, number>
-      )
-
-      return {
-        total,
-        count: incomes.length,
-        byCategory,
-        bySubcategory,
-        recurring: incomes.filter((income) => income.isRecurring).length,
-      }
-    }),
 })

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -182,8 +183,7 @@ export function TransactionForm({
     })
 
   const createMutation = trpc.transactions.create.useMutation({
-    onSuccess: () => {
-      const wasForThirdParty = formData.isForThirdParty
+    onSuccess: (_data, variables) => {
       setOpen(false)
       setFormData(initialFormData)
       setErrors({})
@@ -193,7 +193,7 @@ export function TransactionForm({
       utils.transactions.list.invalidate()
       utils.dashboard.getCardBalances.invalidate()
 
-      if (wasForThirdParty) {
+      if (variables.isForThirdParty) {
         utils.thirdPartyPurchases.getPendingTransactions.invalidate()
         toast({
           title: 'Compra de tercero registrada',
@@ -448,26 +448,15 @@ export function TransactionForm({
 
           {/* Monto y Fecha */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="amount" className={errors.totalAmount ? "text-red-500" : ""}>Monto total *</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                <Input
-                  id="amount"
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.totalAmount}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9.,]/g, '')
-                    setFormData({ ...formData, totalAmount: value })
-                    if (errors.totalAmount) setErrors({ ...errors, totalAmount: '' })
-                  }}
-                  placeholder="0,00"
-                  className={cn("pl-7", errors.totalAmount ? "border-red-500 focus-visible:ring-red-500" : "")}
-                />
-              </div>
-              {errors.totalAmount && <p className="text-xs text-red-500">{errors.totalAmount}</p>}
-            </div>
+            <AmountInput
+              label="Monto total *"
+              value={formData.totalAmount}
+              onChange={(value) => {
+                setFormData({ ...formData, totalAmount: value })
+                if (errors.totalAmount) setErrors({ ...errors, totalAmount: '' })
+              }}
+              error={errors.totalAmount}
+            />
 
             <div className="space-y-2">
               <Label htmlFor="date">Fecha *</Label>
