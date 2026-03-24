@@ -17,16 +17,16 @@ interface CategoryDonutChartProps {
 
 export function CategoryDonutChart({ data, total, formatHero }: CategoryDonutChartProps) {
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative w-full" style={{ height: 180 }}>
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative w-full" style={{ height: 140 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={55}
-              outerRadius={80}
+              innerRadius={45}
+              outerRadius={65}
               paddingAngle={2}
               dataKey="value"
               stroke="none"
@@ -39,7 +39,7 @@ export function CategoryDonutChart({ data, total, formatHero }: CategoryDonutCha
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <PrivateAmount>
-            <span className="text-lg font-bold text-foreground tabular-nums">
+            <span className="text-base font-bold text-foreground tabular-nums">
               {formatHero(total)}
             </span>
           </PrivateAmount>

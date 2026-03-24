@@ -564,39 +564,15 @@ export function TransactionForm({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="category">Categoría</Label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => router.push('/dashboard/categories')}
-                >
-                  Gestionar
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => seedExpenseCategoriesMutation.mutate()}
-                  disabled={seedExpenseCategoriesMutation.isPending}
-                >
-                  <Sparkles className="h-3.5 w-3.5 mr-1" />
-                  Base
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => normalizeExpenseCategoriesMutation.mutate()}
-                  disabled={normalizeExpenseCategoriesMutation.isPending || !categories?.length}
-                >
-                  <RefreshCcw className="h-3.5 w-3.5 mr-1" />
-                  Normalizar
-                </Button>
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => router.push('/dashboard/categories')}
+              >
+                Gestionar
+              </Button>
             </div>
 
             <Select
@@ -618,31 +594,6 @@ export function TransactionForm({
               </SelectContent>
             </Select>
             {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
-
-            <div className="flex gap-2">
-              <Input
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="Nueva categoría..."
-                className="text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newCategoryName.trim()) {
-                    e.preventDefault()
-                    createCategoryMutation.mutate({ name: newCategoryName.trim() })
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="shrink-0"
-                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
-                onClick={() => createCategoryMutation.mutate({ name: newCategoryName.trim() })}
-              >
-                <Check className="h-4 w-4" />
-              </Button>
-            </div>
           </div>
 
           {/* Subcategoría */}
@@ -665,38 +616,6 @@ export function TransactionForm({
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="flex gap-2">
-                  <Input
-                    value={newSubcategoryName}
-                    onChange={(e) => setNewSubcategoryName(e.target.value)}
-                    placeholder="Nueva subcategoría..."
-                    className="text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && newSubcategoryName.trim()) {
-                        e.preventDefault()
-                        createSubcategoryMutation.mutate({
-                          categoryId: formData.categoryId,
-                          name: newSubcategoryName.trim(),
-                        })
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0"
-                    disabled={!newSubcategoryName.trim() || createSubcategoryMutation.isPending}
-                    onClick={() => {
-                      createSubcategoryMutation.mutate({
-                        categoryId: formData.categoryId,
-                        name: newSubcategoryName.trim(),
-                      })
-                    }}
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                </div>
               </>
             ) : (
               <Select disabled>

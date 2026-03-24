@@ -211,44 +211,48 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* ── ROW 2: Evolución mensual ── */}
-      <Card className="overflow-hidden">
-        {evolutionData && evolutionData.length > 1 ? (
-          <MonthlyEvolutionChart data={evolutionData} />
-        ) : (
-          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground italic">
-            Sin suficientes datos para el gráfico
-          </div>
-        )}
-      </Card>
-
-      {/* ── ROW 3: Donut charts ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <CategoryDonut
-          title="A dónde va la plata"
-          data={balance.aggregations.expensesByCategory}
-          total={balance.totalExpense}
-          emptyMessage="Sin egresos registrados"
-          convert={convert}
-        />
-        <CategoryDonut
-          title="De dónde viene la plata"
-          data={balance.aggregations.incomesByCategory}
-          total={balance.totalIncome}
-          emptyMessage="Sin ingresos registrados"
-          convert={convert}
-        />
+      {/* ── ROW 2: Evolución + Donuts side by side ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <Card className="overflow-hidden lg:col-span-3">
+          {evolutionData && evolutionData.length > 1 ? (
+            <MonthlyEvolutionChart data={evolutionData} />
+          ) : (
+            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground italic">
+              Sin suficientes datos para el gráfico
+            </div>
+          )}
+        </Card>
+        <div className="lg:col-span-2 grid grid-cols-1 gap-4">
+          <CategoryDonut
+            title="A dónde va la plata"
+            data={balance.aggregations.expensesByCategory}
+            total={balance.totalExpense}
+            emptyMessage="Sin egresos registrados"
+            convert={convert}
+          />
+          <CategoryDonut
+            title="De dónde viene la plata"
+            data={balance.aggregations.incomesByCategory}
+            total={balance.totalIncome}
+            emptyMessage="Sin ingresos registrados"
+            convert={convert}
+          />
+        </div>
       </div>
 
-      {/* ── ROW 3b: Loans portfolio widget ── */}
-      <LoansWidget />
-
-      {/* ── ROW 4: Movimientos recientes (ancho completo) ── */}
-      <UnifiedRecentMovements
-        installments={balance.installments}
-        cashTransactions={balance.cashTransactions || []}
-        incomes={balance.incomes}
-      />
+      {/* ── ROW 3: Préstamos + Movimientos recientes ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div className="lg:col-span-2">
+          <LoansWidget />
+        </div>
+        <div className="lg:col-span-3">
+          <UnifiedRecentMovements
+            installments={balance.installments}
+            cashTransactions={balance.cashTransactions || []}
+            incomes={balance.incomes}
+          />
+        </div>
+      </div>
     </div>
   )
 }
