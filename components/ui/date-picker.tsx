@@ -18,6 +18,7 @@ interface DatePickerProps {
   onSelect: (date: Date | undefined) => void
   placeholder?: string
   className?: string
+  disabled?: boolean
 }
 
 export function DatePicker({
@@ -25,6 +26,7 @@ export function DatePicker({
   onSelect,
   placeholder = 'Seleccionar fecha',
   className,
+  disabled = false,
 }: DatePickerProps) {
   return (
     <Popover>
@@ -36,6 +38,7 @@ export function DatePicker({
             !date && 'text-muted-foreground',
             className
           )}
+          disabled={disabled}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {date ? format(date, 'dd/MM/yyyy', { locale: es }) : <span>{placeholder}</span>}
