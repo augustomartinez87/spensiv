@@ -106,6 +106,7 @@ export function IncomeForm({
   const utils = trpc.useUtils()
 
   const [formData, setFormData] = useState<IncomeFormState>(initialFormData)
+  const [errors, setErrors] = useState<Record<string, string>>({})
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newSubcategoryName, setNewSubcategoryName] = useState('')
   const [manualCategories, setManualCategories] = useState<IncomeCategoryOption[]>([])
@@ -241,6 +242,7 @@ export function IncomeForm({
       })
       setOpen(false)
       setFormData(initialFormData)
+      setErrors({})
       setNewCategoryName('')
       setNewSubcategoryName('')
       utils.dashboard.getMonthlyBalance.invalidate()
@@ -259,28 +261,35 @@ export function IncomeForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    const amount = parseFloat(formData.amount.replace(',', '.'))
-    if (isNaN(amount) || amount <= 0) {
-      toast({
-        title: 'Error',
-        description: 'El monto debe ser mayor a 0',
-        variant: 'destructive',
-      })
-      return
+    const newErrors: Record<string, string> = {}
+
+    if (!formData.description.trim()) {
+      newErrors.description = 'La descripción es requerida'
+    }
+
+    let parsedAmount = 0
+    if (!formData.amount) {
+      newErrors.amount = 'El monto es requerido'
+    } else {
+      parsedAmount = parseFloat(formData.amount.replace(',', '.'))
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        newErrors.amount = 'El monto debe ser mayor a 0'
+      }
     }
 
     if (!formData.category.trim()) {
-      toast({
-        title: 'Error',
-        description: 'La categoria es requerida',
-        variant: 'destructive',
-      })
+      newErrors.category = 'La categoría es requerida'
+    }
+
+    setErrors(newErrors)
+
+    if (Object.keys(newErrors).length > 0) {
       return
     }
 
     createMutation.mutate({
       description: formData.description.trim(),
-      amount,
+      amount: parsedAmount,
       date: parseInputDate(formData.date),
       category: formData.category,
       subcategory: formData.subcategory.trim() || undefined,
@@ -304,33 +313,39 @@ export function IncomeForm({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="description">Descripcion</Label>
+            <Label htmlFor="description" className={errors.description ? "text-red-500" : ""}>Descripcion</Label>
             <Input
               id="description"
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, description: e.target.value })
+                if (errors.description) setErrors({ ...errors, description: '' })
+              }}
               placeholder="Ej: Sueldo Enero"
-              required
+              className={errors.description ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
+            {errors.description && <p className="text-xs text-red-500">{errors.description}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="amount">Monto</Label>
+              <Label htmlFor="amount" className={errors.amount ? "text-red-500" : ""}>Monto</Label>
               <Input
                 id="amount"
                 type="text"
                 inputMode="decimal"
                 value={formData.amount}
-                onChange={(e) =>
+                onChange={(e) => {
                   setFormData({
                     ...formData,
                     amount: e.target.value.replace(/[^0-9.,]/g, ''),
                   })
-                }
+                  if (errors.amount) setErrors({ ...errors, amount: '' })
+                }}
                 placeholder="Ej: 50000"
-                required
+                className={errors.amount ? "border-red-500 focus-visible:ring-red-500" : ""}
               />
+              {errors.amount && <p className="text-xs text-red-500">{errors.amount}</p>}
             </div>
 
             <div className="space-y-2">
@@ -378,11 +393,12 @@ export function IncomeForm({
 
             <Select
               value={formData.category}
-              onValueChange={(value) =>
+              onValueChange={(value) => {
                 setFormData((prev) => ({ ...prev, category: value, subcategory: '' }))
-              }
+                if (errors.category) setErrors({ ...errors, category: '' })
+              }}
             >
-              <SelectTrigger id="category">
+              <SelectTrigger id="category" className={errors.category ? "border-red-500 focus-visible:ring-red-500" : ""}>
                 <SelectValue placeholder="Seleccionar categoria" />
               </SelectTrigger>
               <SelectContent>
@@ -393,6 +409,7 @@ export function IncomeForm({
                 ))}
               </SelectContent>
             </Select>
+            {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
 
             <div className="flex gap-2">
               <Input

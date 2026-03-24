@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency, formatDateToInput, parseInputDate } from '@/lib/utils'
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { DatePicker } from '@/components/ui/date-picker'
 import { TrendingUp, Pencil, Trash2 } from 'lucide-react'
 import { PrivateAmount } from '@/lib/privacy-context'
 import { format } from 'date-fns'
@@ -47,6 +48,8 @@ export function IncomeList({
     subcategory: '',
     isRecurring: false,
     notes: '',
+    amount: '',
+    date: '',
   })
 
   const incomeUpdateMutation = trpc.incomes.update.useMutation({
@@ -145,13 +148,15 @@ export function IncomeList({
                             title="Editar"
                             onClick={() => {
                               setEditingIncome(income)
-                              setEditIncomeFormData({
-                                description: income.description,
-                                category: getIncomeCategoryLabel(income.category),
-                                subcategory: income.subcategory || '',
-                                isRecurring: income.isRecurring,
-                                notes: income.notes || '',
-                              })
+                                setEditIncomeFormData({
+                                  description: income.description,
+                                  category: getIncomeCategoryLabel(income.category),
+                                  subcategory: income.subcategory || '',
+                                  isRecurring: income.isRecurring,
+                                  notes: income.notes || '',
+                                  amount: income.amount.toString(),
+                                  date: formatDateToInput(new Date(income.date)),
+                                })
                             }}
                           >
                             <Pencil className="h-4 w-4" />
@@ -229,6 +234,8 @@ export function IncomeList({
                           subcategory: income.subcategory || '',
                           isRecurring: income.isRecurring,
                           notes: income.notes || '',
+                          amount: income.amount.toString(),
+                          date: formatDateToInput(new Date(income.date)),
                         })
                       }}
                     >
@@ -261,7 +268,7 @@ export function IncomeList({
           <DialogHeader>
             <DialogTitle>Editar ingreso</DialogTitle>
             <DialogDescription>
-              Modificá los datos del ingreso. El monto y fecha no se pueden cambiar.
+              Modificá los datos del ingreso.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -272,6 +279,35 @@ export function IncomeList({
                 value={editIncomeFormData.description}
                 onChange={(e) => setEditIncomeFormData({ ...editIncomeFormData, description: e.target.value })}
               />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-inc-amount">Monto</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                  <Input
+                    id="edit-inc-amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={editIncomeFormData.amount}
+                    onChange={(e) => setEditIncomeFormData({ ...editIncomeFormData, amount: e.target.value.replace(/[^0-9.,]/g, '') })}
+                    className="pl-7"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-inc-date">Fecha</Label>
+                <DatePicker
+                  date={editIncomeFormData.date ? parseInputDate(editIncomeFormData.date) : undefined}
+                  onSelect={(date) =>
+                    setEditIncomeFormData({
+                      ...editIncomeFormData,
+                      date: date ? formatDateToInput(date) : formatDateToInput(new Date()),
+                    })
+                  }
+                />
+              </div>
             </div>
 
             <div className="grid gap-2">
@@ -338,12 +374,15 @@ export function IncomeList({
                 if (editingIncome) {
                   const description = editIncomeFormData.description.trim()
                   const category = editIncomeFormData.category.trim()
+                  const amount = parseFloat(editIncomeFormData.amount.replace(',', '.'))
 
-                  if (!description || !category) return
+                  if (!description || !category || isNaN(amount) || amount <= 0) return
 
                   incomeUpdateMutation.mutate({
                     id: editingIncome.id,
                     description,
+                    amount,
+                    date: parseInputDate(editIncomeFormData.date),
                     category,
                     subcategory: editIncomeFormData.subcategory.trim() || null,
                     isRecurring: editIncomeFormData.isRecurring,

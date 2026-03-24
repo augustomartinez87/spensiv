@@ -85,6 +85,7 @@ export function TransactionForm({
   const router = useRouter()
 
   const [formData, setFormData] = useState<TransactionFormData>(initialFormData)
+  const [errors, setErrors] = useState<Record<string, string>>({})
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newSubcategoryName, setNewSubcategoryName] = useState('')
 
@@ -185,6 +186,7 @@ export function TransactionForm({
       const wasForThirdParty = formData.isForThirdParty
       setOpen(false)
       setFormData(initialFormData)
+      setErrors({})
       setNewCategoryName('')
       setNewSubcategoryName('')
       utils.dashboard.getMonthlyBalance.invalidate()
@@ -222,6 +224,7 @@ export function TransactionForm({
     onSuccess: () => {
       setOpen(false)
       setFormData(initialFormData)
+      setErrors({})
       setNewCategoryName('')
       setNewSubcategoryName('')
       utils.dashboard.getMonthlyBalance.invalidate()
@@ -245,22 +248,37 @@ export function TransactionForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    const amount = parseFloat(formData.totalAmount.replace(',', '.'))
-    if (isNaN(amount) || amount <= 0) {
-      toast({
-        title: 'Error',
-        description: 'El monto debe ser mayor a 0',
-        variant: 'destructive',
-      })
-      return
+    const newErrors: Record<string, string> = {}
+
+    if (!formData.description.trim()) {
+      newErrors.description = 'Requerido'
+    }
+
+    let amount = 0
+    if (!formData.totalAmount) {
+      newErrors.totalAmount = 'Requerido'
+    } else {
+      amount = parseFloat(formData.totalAmount.replace(',', '.'))
+      if (isNaN(amount) || amount <= 0) {
+        newErrors.totalAmount = 'Debe ser mayor a 0'
+      }
     }
 
     if (formData.paymentMethod === 'credit_card' && !formData.cardId) {
-      toast({
-        title: 'Error',
-        description: 'Seleccioná una tarjeta',
-        variant: 'destructive',
-      })
+      newErrors.cardId = 'Requerido'
+    }
+
+    if (formData.isForThirdParty && !formData.personName.trim() && formData.paymentMethod === 'credit_card') {
+      newErrors.personName = 'Requerido'
+    }
+    
+    if (!formData.categoryId) {
+      newErrors.category = 'Requerido'
+    }
+
+    setErrors(newErrors)
+
+    if (Object.keys(newErrors).length > 0) {
       return
     }
 
@@ -384,12 +402,15 @@ export function TransactionForm({
           {/* Tarjeta (solo si es tarjeta) */}
           {isCardPayment && (
             <div className="space-y-2">
-              <Label htmlFor="card">Tarjeta *</Label>
+              <Label htmlFor="card" className={errors.cardId ? "text-red-500" : ""}>Tarjeta *</Label>
               <Select
                 value={formData.cardId}
-                onValueChange={(value) => setFormData({ ...formData, cardId: value })}
+                onValueChange={(value) => {
+                  setFormData({ ...formData, cardId: value })
+                  if (errors.cardId) setErrors({ ...errors, cardId: '' })
+                }}
               >
-                <SelectTrigger id="card">
+                <SelectTrigger id="card" className={errors.cardId ? "border-red-500 focus-visible:ring-red-500" : ""}>
                   <SelectValue placeholder="Seleccionar tarjeta" />
                 </SelectTrigger>
                 <SelectContent>
@@ -400,6 +421,7 @@ export function TransactionForm({
                   ))}
                 </SelectContent>
               </Select>
+              {errors.cardId && <p className="text-xs text-red-500">{errors.cardId}</p>}
               {!cards?.length && (
                 <p className="text-xs text-muted-foreground">
                   No tenés tarjetas. <a href="/dashboard/cards" className="text-primary underline">Agregá una</a>
@@ -410,20 +432,24 @@ export function TransactionForm({
 
           {/* Descripción */}
           <div className="space-y-2">
-            <Label htmlFor="description">Descripción *</Label>
+            <Label htmlFor="description" className={errors.description ? "text-red-500" : ""}>Descripción *</Label>
             <Input
               id="description"
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, description: e.target.value })
+                if (errors.description) setErrors({ ...errors, description: '' })
+              }}
               placeholder="Ej: Supermercado Día"
-              required
+              className={errors.description ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
+            {errors.description && <p className="text-xs text-red-500">{errors.description}</p>}
           </div>
 
           {/* Monto y Fecha */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="amount">Monto total *</Label>
+              <Label htmlFor="amount" className={errors.totalAmount ? "text-red-500" : ""}>Monto total *</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                 <Input
@@ -434,12 +460,13 @@ export function TransactionForm({
                   onChange={(e) => {
                     const value = e.target.value.replace(/[^0-9.,]/g, '')
                     setFormData({ ...formData, totalAmount: value })
+                    if (errors.totalAmount) setErrors({ ...errors, totalAmount: '' })
                   }}
                   placeholder="0,00"
-                  className="pl-7"
-                  required
+                  className={cn("pl-7", errors.totalAmount ? "border-red-500 focus-visible:ring-red-500" : "")}
                 />
               </div>
+              {errors.totalAmount && <p className="text-xs text-red-500">{errors.totalAmount}</p>}
             </div>
 
             <div className="space-y-2">
@@ -516,13 +543,17 @@ export function TransactionForm({
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Nombre *</Label>
+                    <Label className={cn("text-xs", errors.personName ? "text-red-500" : "")}>Nombre *</Label>
                     <Input
-                      className="h-8 text-xs"
+                      className={cn("h-8 text-xs", errors.personName ? "border-red-500 focus-visible:ring-red-500" : "")}
                       value={formData.personName}
-                      onChange={(e) => setFormData({ ...formData, personName: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, personName: e.target.value })
+                        if (errors.personName) setErrors({ ...errors, personName: '' })
+                      }}
                       placeholder="Nombre del tercero"
                     />
+                    {errors.personName && <p className="text-xs text-red-500">{errors.personName}</p>}
                   </div>
                 </div>
               )}
@@ -570,11 +601,12 @@ export function TransactionForm({
 
             <Select
               value={formData.categoryId}
-              onValueChange={(value) =>
+              onValueChange={(value) => {
                 setFormData({ ...formData, categoryId: value, subcategoryId: '' })
-              }
+                if (errors.category) setErrors({ ...errors, category: '' })
+              }}
             >
-              <SelectTrigger id="category">
+              <SelectTrigger id="category" className={errors.category ? "border-red-500 focus-visible:ring-red-500" : ""}>
                 <SelectValue placeholder="Seleccionar categoría" />
               </SelectTrigger>
               <SelectContent>
@@ -585,6 +617,7 @@ export function TransactionForm({
                 ))}
               </SelectContent>
             </Select>
+            {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
 
             <div className="flex gap-2">
               <Input

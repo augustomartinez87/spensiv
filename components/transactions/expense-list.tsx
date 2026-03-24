@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency, formatDateToInput, parseInputDate } from '@/lib/utils'
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { DatePicker } from '@/components/ui/date-picker'
 import { ShoppingCart, Ban, RotateCcw, ChevronDown, ChevronUp, CreditCard, Banknote, ArrowRightLeft, Pencil, Trash2 } from 'lucide-react'
 import { PrivateAmount } from '@/lib/privacy-context'
 import { getCategoryIconInfo } from '@/lib/category-icons'
@@ -74,6 +75,8 @@ export function ExpenseList({
     subcategoryId: '',
     expenseType: '',
     notes: '',
+    totalAmount: '',
+    purchaseDate: '',
   })
 
   const voidMutation = trpc.transactions.void.useMutation({
@@ -230,6 +233,8 @@ export function ExpenseList({
                                   subcategoryId: transaction.subcategoryId || '',
                                   expenseType: transaction.expenseType || '',
                                   notes: transaction.notes || '',
+                                  totalAmount: transaction.totalAmount.toString(),
+                                  purchaseDate: formatDateToInput(new Date(transaction.purchaseDate)),
                                 })
                               }}
                             >
@@ -352,6 +357,8 @@ export function ExpenseList({
                                 subcategoryId: transaction.subcategoryId || '',
                                 expenseType: transaction.expenseType || '',
                                 notes: transaction.notes || '',
+                                totalAmount: transaction.totalAmount.toString(),
+                                purchaseDate: formatDateToInput(new Date(transaction.purchaseDate)),
                               })
                             }}
                           >
@@ -489,7 +496,9 @@ export function ExpenseList({
           <DialogHeader>
             <DialogTitle>Editar gasto</DialogTitle>
             <DialogDescription>
-              Modificá los datos del gasto. El monto, fecha y cuotas no se pueden cambiar.
+              {editingTransaction && (editingTransaction as any).paymentMethod === 'credit_card'
+                ? "Modificá los datos del gasto. El monto y la fecha no se pueden cambiar en gastos con tarjeta."
+                : "Modificá los datos del gasto."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -500,6 +509,38 @@ export function ExpenseList({
                 value={editFormData.description}
                 onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-amount">Monto</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                  <Input
+                    id="edit-amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={editFormData.totalAmount}
+                    onChange={(e) => setEditFormData({ ...editFormData, totalAmount: e.target.value.replace(/[^0-9.,]/g, '') })}
+                    disabled={editingTransaction && (editingTransaction as any).paymentMethod === 'credit_card'}
+                    className="pl-7"
+                    title={editingTransaction && (editingTransaction as any).paymentMethod === 'credit_card' ? "No se puede editar el monto de gastos con tarjeta" : ""}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-date">Fecha</Label>
+                <DatePicker
+                  date={editFormData.purchaseDate ? parseInputDate(editFormData.purchaseDate) : undefined}
+                  onSelect={(date) =>
+                    setEditFormData({
+                      ...editFormData,
+                      purchaseDate: date ? formatDateToInput(date) : formatDateToInput(new Date()),
+                    })
+                  }
+                  disabled={editingTransaction && (editingTransaction as any).paymentMethod === 'credit_card'}
+                />
+              </div>
             </div>
 
             <div className="grid gap-2">
@@ -573,14 +614,24 @@ export function ExpenseList({
             <Button
               onClick={() => {
                 if (editingTransaction) {
-                  updateMutation.mutate({
+                  const data: any = {
                     id: editingTransaction.id,
                     description: editFormData.description,
                     categoryId: editFormData.categoryId || null,
                     subcategoryId: editFormData.subcategoryId || null,
                     expenseType: (editFormData.expenseType as any) || null,
                     notes: editFormData.notes || null,
-                  })
+                  }
+
+                  if ((editingTransaction as any).paymentMethod !== 'credit_card') {
+                    const amount = parseFloat(editFormData.totalAmount.replace(',', '.'))
+                    if (!isNaN(amount) && amount > 0) {
+                      data.totalAmount = amount
+                    }
+                    data.purchaseDate = parseInputDate(editFormData.purchaseDate)
+                  }
+
+                  updateMutation.mutate(data)
                 }
               }}
               disabled={updateMutation.isPending}

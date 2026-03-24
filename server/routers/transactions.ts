@@ -305,6 +305,8 @@ export const transactionsRouter = router({
           .optional()
           .nullable(),
         notes: z.string().optional().nullable(),
+        totalAmount: z.number().positive().optional(),
+        purchaseDate: z.date().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -321,6 +323,16 @@ export const transactionsRouter = router({
         })
       }
 
+      if (
+        transaction.paymentMethod === 'credit_card' &&
+        (data.totalAmount !== undefined || data.purchaseDate !== undefined)
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No se puede modificar monto o fecha de gastos con tarjeta de crédito.',
+        })
+      }
+
       return ctx.prisma.transaction.update({
         where: { id },
         data: {
@@ -329,6 +341,8 @@ export const transactionsRouter = router({
           subcategoryId: data.subcategoryId,
           expenseType: data.expenseType,
           notes: data.notes,
+          ...(data.totalAmount !== undefined && { totalAmount: data.totalAmount }),
+          ...(data.purchaseDate !== undefined && { purchaseDate: data.purchaseDate }),
         },
       })
     }),
