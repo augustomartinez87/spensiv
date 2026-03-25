@@ -53,6 +53,19 @@ export function IncomeList({
     date: '',
   })
 
+  const startEditingIncome = (income: any) => {
+    setEditingIncome(income)
+    setEditIncomeFormData({
+      description: income.description,
+      category: getIncomeCategoryLabel(income.category),
+      subcategory: income.subcategory || '',
+      isRecurring: income.isRecurring,
+      notes: income.notes || '',
+      amount: income.amount.toString(),
+      date: formatDateToInput(new Date(income.date)),
+    })
+  }
+
   const incomeUpdateMutation = trpc.incomes.update.useMutation({
     onSuccess: () => {
       utils.incomes.list.invalidate()
@@ -143,18 +156,7 @@ export function IncomeList({
                             size="icon"
                             className="h-8 w-8"
                             title="Editar"
-                            onClick={() => {
-                              setEditingIncome(income)
-                                setEditIncomeFormData({
-                                  description: income.description,
-                                  category: getIncomeCategoryLabel(income.category),
-                                  subcategory: income.subcategory || '',
-                                  isRecurring: income.isRecurring,
-                                  notes: income.notes || '',
-                                  amount: income.amount.toString(),
-                                  date: formatDateToInput(new Date(income.date)),
-                                })
-                            }}
+                            onClick={() => startEditingIncome(income)}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -223,18 +225,7 @@ export function IncomeList({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        setEditingIncome(income)
-                        setEditIncomeFormData({
-                          description: income.description,
-                          category: getIncomeCategoryLabel(income.category),
-                          subcategory: income.subcategory || '',
-                          isRecurring: income.isRecurring,
-                          notes: income.notes || '',
-                          amount: income.amount.toString(),
-                          date: formatDateToInput(new Date(income.date)),
-                        })
-                      }}
+                      onClick={() => startEditingIncome(income)}
                     >
                       <Pencil className="h-4 w-4 mr-1" />
                       Editar

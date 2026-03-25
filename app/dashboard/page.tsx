@@ -73,9 +73,11 @@ export default function DashboardPage() {
   const { mode, setMode, mepRate, setMepRate, convert, symbol } = useCurrency()
 
   const { data: balance, isLoading: isLoadingBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period })
-  const { data: prevBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period: previousPeriod })
   const { data: evolutionData } = trpc.dashboard.getEvolutionData.useQuery({ months: 6 })
   const { data: mepData } = trpc.dashboard.getMepRate.useQuery()
+
+  // Derive previous period data from evolution instead of a separate query
+  const prevBalance = evolutionData?.find((d) => d.period === previousPeriod)
 
   useEffect(() => {
     if (mepData?.rate) setMepRate(mepData.rate)
@@ -190,7 +192,7 @@ export default function DashboardPage() {
           value={convert(balance.totalExpense)}
           count={balance.installments.length + (balance.cashTransactions?.length || 0)}
           type="expense"
-          previousValue={prevBalance ? convert(prevBalance.totalExpense) : undefined}
+          previousValue={prevBalance ? convert(prevBalance.expense) : undefined}
           dailyAverage={convert(dailyExpenseAverage)}
           lastTransactionDaysAgo={lastExpenseDaysAgo}
           sparklineData={expenseSparkline}
@@ -200,7 +202,7 @@ export default function DashboardPage() {
           value={convert(balance.totalIncome)}
           count={balance.incomes.length}
           type="income"
-          previousValue={prevBalance ? convert(prevBalance.totalIncome) : undefined}
+          previousValue={prevBalance ? convert(prevBalance.income) : undefined}
           nextEstimatedDate={nextIncomeEstimate}
           sparklineData={incomeSparkline}
         />

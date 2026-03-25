@@ -283,27 +283,28 @@ export async function createTransactionWithInstallments(
   // La última cuota absorbe el residuo para que sumen exactamente el total
   const lastInstallment = totalDecimal.minus(baseInstallment.times(input.installments - 1))
 
+  // Pre-resolve all billing cycles (batch instead of N+1)
+  const impactDates: Date[] = []
   for (let i = 0; i < input.installments; i++) {
-    // Calcular fecha de impacto de esta cuota
     const impactDate = new Date(firstImpactDate)
     impactDate.setMonth(impactDate.getMonth() + i)
-
-    // Obtener o crear billing cycle
-    const billingCycle = await getOrCreateBillingCycle(input.cardId, impactDate)
-
-    const amount = i === input.installments - 1 ? lastInstallment : baseInstallment
-
-    // Crear installment
-    await prisma.installment.create({
-      data: {
-        transactionId: transaction.id,
-        billingCycleId: billingCycle.id,
-        installmentNumber: i + 1,
-        amount,
-        impactDate,
-      },
-    })
+    impactDates.push(impactDate)
   }
+
+  const billingCycles = await Promise.all(
+    impactDates.map((d) => getOrCreateBillingCycle(input.cardId!, d))
+  )
+
+  // Batch create all installments
+  await prisma.installment.createMany({
+    data: impactDates.map((impactDate, i) => ({
+      transactionId: transaction.id,
+      billingCycleId: billingCycles[i].id,
+      installmentNumber: i + 1,
+      amount: i === input.installments - 1 ? lastInstallment : baseInstallment,
+      impactDate,
+    })),
+  })
 
   // 5. Recalcular totales de billing cycles afectados
   await recalculateBillingCycleTotals(input.cardId)

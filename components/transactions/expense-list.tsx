@@ -80,6 +80,19 @@ export function ExpenseList({
     purchaseDate: '',
   })
 
+  const startEditingTransaction = (transaction: any) => {
+    setEditingTransaction(transaction)
+    setEditFormData({
+      description: transaction.description,
+      categoryId: transaction.categoryId || '',
+      subcategoryId: transaction.subcategoryId || '',
+      expenseType: transaction.expenseType || '',
+      notes: transaction.notes || '',
+      totalAmount: transaction.totalAmount.toString(),
+      purchaseDate: formatDateToInput(new Date(transaction.purchaseDate)),
+    })
+  }
+
   const voidMutation = trpc.transactions.void.useMutation({
     onSuccess: () => {
       utils.transactions.list.invalidate()
@@ -218,18 +231,7 @@ export function ExpenseList({
                               size="icon"
                               className="h-8 w-8"
                               title="Editar"
-                              onClick={() => {
-                                setEditingTransaction(transaction)
-                                setEditFormData({
-                                  description: transaction.description,
-                                  categoryId: transaction.categoryId || '',
-                                  subcategoryId: transaction.subcategoryId || '',
-                                  expenseType: transaction.expenseType || '',
-                                  notes: transaction.notes || '',
-                                  totalAmount: transaction.totalAmount.toString(),
-                                  purchaseDate: formatDateToInput(new Date(transaction.purchaseDate)),
-                                })
-                              }}
+                              onClick={() => startEditingTransaction(transaction)}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -342,18 +344,7 @@ export function ExpenseList({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              setEditingTransaction(transaction)
-                              setEditFormData({
-                                description: transaction.description,
-                                categoryId: transaction.categoryId || '',
-                                subcategoryId: transaction.subcategoryId || '',
-                                expenseType: transaction.expenseType || '',
-                                notes: transaction.notes || '',
-                                totalAmount: transaction.totalAmount.toString(),
-                                purchaseDate: formatDateToInput(new Date(transaction.purchaseDate)),
-                              })
-                            }}
+                            onClick={() => startEditingTransaction(transaction)}
                           >
                             <Pencil className="h-4 w-4 mr-1" />
                             Editar
