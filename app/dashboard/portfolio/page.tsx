@@ -54,17 +54,16 @@ export default function PortfolioPage() {
   const [fciRate, setFciRate] = useState('40')
   const fciRateDecimal = parseFloat(fciRate || '0') / 100
 
-  const { data: metrics, isLoading: metricsLoading, error: metricsError } = trpc.portfolio.getMetrics.useQuery(
+  const { data, isLoading, error } = trpc.portfolio.getFullPortfolio.useQuery(
     { fciRate: fciRateDecimal },
     { enabled: !isNaN(fciRateDecimal) }
   )
-  const { data: yieldMetrics, isLoading: yieldLoading, error: yieldError } = trpc.portfolio.getYieldMetrics.useQuery(
-    { fciRate: fciRateDecimal },
-    { enabled: !isNaN(fciRateDecimal) }
-  )
-  const { data: cashFlow } = trpc.portfolio.getCashFlowProjection.useQuery()
-  const { data: alerts } = trpc.portfolio.getConcentrationAlerts.useQuery()
-  const { data: riskBreakdown } = trpc.portfolio.getRiskBreakdown.useQuery()
+
+  const metrics = data?.metrics
+  const yieldMetrics = data?.yieldMetrics
+  const cashFlow = data?.cashFlow
+  const alerts = data?.alerts
+  const riskBreakdown = data?.riskBreakdown
 
   return (
     <div className="space-y-8">
@@ -109,14 +108,14 @@ export default function PortfolioPage() {
       </div>
 
       {/* Row 1: Yield Hero + Stat Cards */}
-      {metricsLoading || yieldLoading ? (
+      {isLoading ? (
         <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
           <Skeleton className="h-48" />
           <div className="grid gap-4 grid-cols-2">
             {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-[88px]" />)}
           </div>
         </div>
-      ) : metricsError || yieldError ? (
+      ) : error ? (
         <Card className="border-red-500/30 bg-red-500/5">
           <CardContent className="py-6">
             <div className="flex items-center gap-2 text-red-400">

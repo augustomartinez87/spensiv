@@ -169,6 +169,46 @@ export async function getMonthlyBalance(userId: string, period: string) {
 }
 
 /**
+ * Versión ligera de getMonthlyBalance: solo devuelve totales usando aggregations.
+ * Evita cargar todos los registros en memoria — ideal para evolution/sparklines.
+ */
+export async function getMonthlyTotals(userId: string, period: string) {
+    const year = parseInt(period.split('-')[0])
+    const month = parseInt(period.split('-')[1])
+    const startDate = new Date(year, month - 1, 1)
+    const endDate = new Date(year, month, 1)
+
+    const [incomeAgg, creditAgg, cashAgg] = await Promise.all([
+        prisma.income.aggregate({
+            where: { userId, date: { gte: startDate, lt: endDate } },
+            _sum: { amount: true },
+        }),
+        prisma.installment.aggregate({
+            where: {
+                billingCycle: { period, card: { userId } },
+                transaction: { isVoided: false, isForThirdParty: false },
+            },
+            _sum: { amount: true },
+        }),
+        prisma.transaction.aggregate({
+            where: {
+                userId,
+                isVoided: false,
+                isForThirdParty: false,
+                paymentMethod: { in: ['cash', 'transfer', 'debit_card'] },
+                purchaseDate: { gte: startDate, lt: endDate },
+            },
+            _sum: { totalAmount: true },
+        }),
+    ])
+
+    const totalIncome = Number(incomeAgg._sum.amount ?? 0)
+    const totalExpense = Number(creditAgg._sum.amount ?? 0) + Number(cashAgg._sum.totalAmount ?? 0)
+
+    return { period, totalIncome, totalExpense, balance: totalIncome - totalExpense }
+}
+
+/**
  * Obtener proyección de flujo de caja para los próximos N meses
  * Incluye ingresos recurrentes proyectados
  */

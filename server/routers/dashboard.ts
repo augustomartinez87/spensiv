@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { subMonths } from 'date-fns'
-import { getMonthlyBalance, getCashFlowProjection } from '@/lib/balance'
+import { getMonthlyBalance, getMonthlyTotals, getCashFlowProjection } from '@/lib/balance'
 import { formatPeriod } from '@/lib/periods'
 import { getDolarMep } from '@/lib/dolar'
 
@@ -58,13 +58,13 @@ export const dashboardRouter = router({
         periods.push(formatPeriod(subMonths(base, i)))
       }
       const results = await Promise.all(
-        periods.map((period) => getMonthlyBalance(ctx.user.id, period))
+        periods.map((period) => getMonthlyTotals(ctx.user.id, period))
       )
-      return periods.map((period, i) => ({
-        period,
-        income: results[i].totalIncome,
-        expense: results[i].totalExpense,
-        balance: results[i].balance,
+      return results.map((r) => ({
+        period: r.period,
+        income: r.totalIncome,
+        expense: r.totalExpense,
+        balance: r.balance,
       }))
     }),
 
