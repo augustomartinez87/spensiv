@@ -1263,14 +1263,14 @@ export const loansRouter = router({
 
   /**
    * Reparar préstamos a tasa 0% que quedaron con cuotas de $0.
-   * Recalcula: installmentAmount = capital / termMonths, interest = 0.
+   * Incluye tanto amortized como interest_only con tna=0.
+   * Convierte interest_only a amortized y recalcula cuotas = capital / N.
    * Respeta cuotas ya pagadas (no modifica paidAmount/paidAt).
    */
   repairZeroRateLoans: protectedProcedure.mutation(async ({ ctx }) => {
     const loans = await ctx.prisma.loan.findMany({
       where: {
         userId: ctx.user.id,
-        loanType: 'amortized',
         tna: 0,
         status: { in: ['active', 'completed'] },
       },
@@ -1284,7 +1284,11 @@ export const loansRouter = router({
 
     for (const loan of loans) {
       const capital = Number(loan.capital)
-      const termMonths = loan.termMonths!
+      const numInstallments = loan.loanInstallments.length
+      if (numInstallments === 0) continue
+
+      // Use termMonths if available, otherwise count installments
+      const termMonths = loan.termMonths ?? numInstallments
       const installmentAmount = Math.round((capital / termMonths) * 100) / 100
 
       // Check if this loan actually has broken installments
@@ -1295,8 +1299,8 @@ export const loansRouter = router({
 
       // Recalculate: each installment = capital/N, interest = 0, balance decreases
       let balance = capital
-      const updates = loan.loanInstallments.map((inst) => {
-        const isLast = inst.number === termMonths
+      const updates = loan.loanInstallments.map((inst, idx) => {
+        const isLast = idx === numInstallments - 1
         const cuota = isLast ? balance : installmentAmount
         const newBalance = isLast ? 0 : Math.round((balance - cuota) * 100) / 100
         const result = {
@@ -1311,10 +1315,12 @@ export const loansRouter = router({
       })
 
       await ctx.prisma.$transaction(async (tx) => {
-        // Update loan-level amounts
+        // Update loan-level amounts + convert to amortized if needed
         await tx.loan.update({
           where: { id: loan.id },
           data: {
+            loanType: 'amortized',
+            termMonths,
             installmentAmount,
             totalAmount: capital,
             monthlyRate: 0,
