@@ -1,5 +1,5 @@
 import { prisma } from './prisma'
-import { formatPeriod } from './periods'
+import { formatPeriod, parsePeriod } from './periods'
 import { getNonCreditPaymentMethodLabel, type NonCreditPaymentMethod } from './payment-methods'
 import { formatExpenseType } from './utils'
 
@@ -11,12 +11,7 @@ import { formatExpenseType } from './utils'
  * - EGRESOS: Todas las CUOTAS que impactan en ese mes (no las compras)
  */
 export async function getMonthlyBalance(userId: string, period: string) {
-    // period = "2025-01" (YYYY-MM)
-
-    const { year, month } = {
-        year: parseInt(period.split('-')[0]),
-        month: parseInt(period.split('-')[1])
-    }
+    const { year, month } = parsePeriod(period)
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)
 
@@ -173,8 +168,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
  * Evita cargar todos los registros en memoria — ideal para evolution/sparklines.
  */
 export async function getMonthlyTotals(userId: string, period: string) {
-    const year = parseInt(period.split('-')[0])
-    const month = parseInt(period.split('-')[1])
+    const { year, month } = parsePeriod(period)
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)
 

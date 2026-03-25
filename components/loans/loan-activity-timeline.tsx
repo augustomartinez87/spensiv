@@ -12,20 +12,21 @@ import { Textarea } from '@/components/ui/textarea'
 import { Phone, Banknote, Handshake, MessageCircle, Plus, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import type { ActivityLog } from './types'
 
-export const TAG_CONFIG: Record<string, { label: string; color: string; icon: typeof Phone }> = {
+export const TAG_CONFIG = {
     llamada: { label: 'Llamada', color: 'bg-blue-500/15 text-blue-400 border-blue-500/30', icon: Phone },
     pago: { label: 'Pago', color: 'bg-green-500/15 text-green-400 border-green-500/30', icon: Banknote },
     acuerdo: { label: 'Acuerdo', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30', icon: Handshake },
     otro: { label: 'Otro', color: 'bg-muted text-muted-foreground border-border', icon: MessageCircle },
-}
+} satisfies Record<string, { label: string; color: string; icon: typeof Phone }>
 
-import type { ActivityLog } from './types'
+type TagKey = keyof typeof TAG_CONFIG
 
 export function LoanActivityTimeline({ loanId, logs }: { loanId: string; logs: ActivityLog[] }) {
     const utils = trpc.useUtils()
     const [note, setNote] = useState('')
-    const [tag, setTag] = useState<string>('otro')
+    const [tag, setTag] = useState<TagKey>('otro')
     const [logDate, setLogDate] = useState(formatDateToInput(new Date()))
 
     const addMutation = trpc.loans.addActivityLog.useMutation({
@@ -49,7 +50,7 @@ export function LoanActivityTimeline({ loanId, logs }: { loanId: string; logs: A
             <CardContent className="space-y-4">
                 {/* Add form */}
                 <div className="flex flex-col sm:flex-row gap-2">
-                    <Select value={tag} onValueChange={setTag}>
+                    <Select value={tag} onValueChange={(v) => setTag(v as TagKey)}>
                         <SelectTrigger className="w-full sm:w-32">
                             <SelectValue />
                         </SelectTrigger>
@@ -74,7 +75,7 @@ export function LoanActivityTimeline({ loanId, logs }: { loanId: string; logs: A
                     <Button
                         size="sm"
                         disabled={!note.trim() || addMutation.isPending}
-                        onClick={() => addMutation.mutate({ loanId, note: note.trim(), tag: tag as 'llamada' | 'pago' | 'acuerdo' | 'otro', logDate })}
+                        onClick={() => addMutation.mutate({ loanId, note: note.trim(), tag, logDate })}
                     >
                         <Plus className="h-4 w-4 mr-1" />
                         Agregar
@@ -90,7 +91,7 @@ export function LoanActivityTimeline({ loanId, logs }: { loanId: string; logs: A
                         <div className="absolute left-[9px] top-2 bottom-2 w-px bg-border" />
 
                         {logs.map((log) => {
-                            const cfg = TAG_CONFIG[log.tag] || TAG_CONFIG.otro
+                            const cfg = TAG_CONFIG[log.tag as TagKey] || TAG_CONFIG.otro
                             const TagIcon = cfg.icon
                             return (
                                 <div key={log.id} className="relative group">

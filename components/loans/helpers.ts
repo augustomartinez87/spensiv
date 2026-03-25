@@ -5,7 +5,7 @@ export function amountClass(amount: number) {
     return 'text-xl font-bold'
 }
 
-export function loanRateInfo(loan: { rateIsNominal: boolean | null; tna: number | string | { toString(): string }; monthlyRate: number | string | { toString(): string } }) {
+export function loanRateInfo(loan: { rateIsNominal: boolean | null; tna: { toString(): string }; monthlyRate: { toString(): string } }) {
     const tem = Number(loan.monthlyRate)
     const tea = Math.pow(1 + tem, 12) - 1
     const tna = loan.rateIsNominal ? Number(loan.tna) : tem * 12

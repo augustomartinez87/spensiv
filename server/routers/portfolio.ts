@@ -6,7 +6,7 @@ import { calculateIRR, monthlyToAnnualRate } from '@/lib/loan-calculator'
 import { formatPeriod } from '@/lib/periods'
 import type { PrismaClient } from '@prisma/client'
 
-// ── Shared data loader (single DB roundtrip) ─────────────────────────
+// ── Shared data loader ───────────────────────────────────────────────
 
 async function loadPortfolioData(prisma: PrismaClient, userId: string) {
   const [loans, persons, mepRate] = await Promise.all([
@@ -42,30 +42,44 @@ async function loadPortfolioData(prisma: PrismaClient, userId: string) {
   return { loans, persons, mepRate }
 }
 
+type PortfolioLoans = Awaited<ReturnType<typeof loadPortfolioData>>['loans']
+type PortfolioPersons = Awaited<ReturnType<typeof loadPortfolioData>>['persons']
+
+// ── Shared helpers ───────────────────────────────────────────────────
+
+/** Pesified capital per loan, computed once and cached by loan index */
+function buildCapitalCache(loans: PortfolioLoans, mepRate: number) {
+  return loans.map((l) => pesify(Number(l.capital), l.currency, mepRate))
+}
+
+/** Group pesified capital by person */
+function buildCapitalByPerson(
+  loans: PortfolioLoans,
+  capitalCache: number[],
+) {
+  const map = new Map<string, { name: string; capital: number; personId: string | null }>()
+  for (let i = 0; i < loans.length; i++) {
+    const loan = loans[i]
+    const key = loan.personId || `unnamed_${loan.borrowerName}`
+    const name = loan.person?.name || loan.borrowerName
+    const existing = map.get(key) || { name, capital: 0, personId: loan.personId }
+    existing.capital += capitalCache[i]
+    map.set(key, existing)
+  }
+  return map
+}
+
 // ── Pure computation functions ────────────────────────────────────────
 
 function computeMetrics(
-  loans: Awaited<ReturnType<typeof loadPortfolioData>>['loans'],
-  persons: Awaited<ReturnType<typeof loadPortfolioData>>['persons'],
+  lenderLoans: PortfolioLoans,
+  capitalCache: number[],
+  persons: PortfolioPersons,
+  personScores: Map<string, ReturnType<typeof calculatePersonScore>>,
   mepRate: number,
-  fciRate: number,
 ) {
-  const lenderLoans = loans.filter((l) => l.direction === 'lender')
-
-  const totalCapital = lenderLoans.reduce(
-    (s, l) => s + pesify(Number(l.capital), l.currency, mepRate),
-    0,
-  )
-
-  // Capital by person (pesified)
-  const capitalByPerson = new Map<string, { name: string; capital: number; personId: string | null }>()
-  for (const loan of lenderLoans) {
-    const key = loan.personId || `unnamed_${loan.borrowerName}`
-    const name = loan.person?.name || loan.borrowerName
-    const existing = capitalByPerson.get(key) || { name, capital: 0, personId: loan.personId }
-    existing.capital += pesify(Number(loan.capital), loan.currency, mepRate)
-    capitalByPerson.set(key, existing)
-  }
+  const totalCapital = capitalCache.reduce((s, c) => s + c, 0)
+  const capitalByPerson = buildCapitalByPerson(lenderLoans, capitalCache)
 
   const exposures = [...capitalByPerson.values()]
     .map((e) => ({
@@ -77,20 +91,12 @@ function computeMetrics(
   const top1Percentage = exposures[0]?.percentage ?? 0
   const top3Percentage = exposures.slice(0, 3).reduce((s, e) => s + e.percentage, 0)
 
-  // High risk capital — only score persons with active loans
-  const personIds = new Set(lenderLoans.map((l) => l.personId).filter(Boolean))
-  const relevantPersons = persons.filter((p) => personIds.has(p.id))
-
-  const personScores = new Map<string, ReturnType<typeof calculatePersonScore>>()
-  for (const p of relevantPersons) {
-    personScores.set(p.id, calculatePersonScore(p))
-  }
-
   let highRiskCapital = 0
-  for (const loan of lenderLoans) {
+  for (let i = 0; i < lenderLoans.length; i++) {
+    const loan = lenderLoans[i]
     if (loan.personId) {
       const s = personScores.get(loan.personId)
-      if (s && s.score < 4) highRiskCapital += pesify(Number(loan.capital), loan.currency, mepRate)
+      if (s && s.score < 4) highRiskCapital += capitalCache[i]
     }
   }
 
@@ -106,21 +112,17 @@ function computeMetrics(
     }
   }
 
-  // Total expected value
   let totalEV = 0
-  for (const loan of lenderLoans) {
+  for (let i = 0; i < lenderLoans.length; i++) {
+    const loan = lenderLoans[i]
     const defaultProb = loan.personId
       ? (personScores.get(loan.personId)?.defaultProbability ?? 0.18)
       : 0.18
     const totalInterest = loan.loanInstallments.reduce(
-      (s, i) => s + pesify(Number(i.interest), loan.currency, mepRate),
+      (s, inst) => s + pesify(Number(inst.interest), loan.currency, mepRate),
       0,
     )
-    totalEV += calculateExpectedValue(
-      pesify(Number(loan.capital), loan.currency, mepRate),
-      totalInterest,
-      defaultProb,
-    )
+    totalEV += calculateExpectedValue(capitalCache[i], totalInterest, defaultProb)
   }
 
   return {
@@ -138,12 +140,11 @@ function computeMetrics(
 }
 
 function computeYieldMetrics(
-  loans: Awaited<ReturnType<typeof loadPortfolioData>>['loans'],
+  lenderLoans: PortfolioLoans,
+  capitalCache: number[],
   mepRate: number,
   fciRate: number,
 ) {
-  const lenderLoans = loans.filter((l) => l.direction === 'lender')
-
   if (lenderLoans.length === 0) {
     return {
       weightedYield: 0,
@@ -163,8 +164,9 @@ function computeYieldMetrics(
   let interestCollected = 0
   let interestProjected = 0
 
-  for (const loan of lenderLoans) {
-    const capital = pesify(Number(loan.capital), loan.currency, mepRate)
+  for (let i = 0; i < lenderLoans.length; i++) {
+    const loan = lenderLoans[i]
+    const capital = capitalCache[i]
     if (!Number.isFinite(capital) || capital <= 0) continue
     const installments = loan.loanInstallments
 
@@ -216,7 +218,7 @@ function computeYieldMetrics(
 }
 
 function computeCashFlowProjection(
-  loans: Awaited<ReturnType<typeof loadPortfolioData>>['loans'],
+  lenderLoans: PortfolioLoans,
   mepRate: number,
 ) {
   const byMonth = new Map<string, { principal: number; interest: number }>()
@@ -227,7 +229,7 @@ function computeCashFlowProjection(
     byMonth.set(formatPeriod(d), { principal: 0, interest: 0 })
   }
 
-  for (const loan of loans) {
+  for (const loan of lenderLoans) {
     for (const inst of loan.loanInstallments) {
       if (inst.isPaid) continue
       const due = new Date(inst.dueDate)
@@ -251,23 +253,13 @@ function computeCashFlowProjection(
 }
 
 function computeConcentrationAlerts(
-  loans: Awaited<ReturnType<typeof loadPortfolioData>>['loans'],
-  mepRate: number,
+  lenderLoans: PortfolioLoans,
+  capitalCache: number[],
 ) {
-  const totalCapital = loans.reduce(
-    (s, l) => s + pesify(Number(l.capital), l.currency, mepRate),
-    0,
-  )
+  const totalCapital = capitalCache.reduce((s, c) => s + c, 0)
   if (totalCapital === 0) return []
 
-  const capitalByPerson = new Map<string, { name: string; capital: number; personId: string | null }>()
-  for (const loan of loans) {
-    const key = loan.personId || `unnamed_${loan.borrowerName}`
-    const name = loan.person?.name || loan.borrowerName
-    const existing = capitalByPerson.get(key) || { name, capital: 0, personId: loan.personId }
-    existing.capital += pesify(Number(loan.capital), loan.currency, mepRate)
-    capitalByPerson.set(key, existing)
-  }
+  const capitalByPerson = buildCapitalByPerson(lenderLoans, capitalCache)
 
   return [...capitalByPerson.values()]
     .map((e) => {
@@ -283,7 +275,8 @@ function computeConcentrationAlerts(
 }
 
 function computeRiskBreakdown(
-  persons: Awaited<ReturnType<typeof loadPortfolioData>>['persons'],
+  persons: PortfolioPersons,
+  personScores: Map<string, ReturnType<typeof calculatePersonScore>>,
   mepRate: number,
 ) {
   const breakdown = { bajo: 0, medio: 0, alto: 0, critico: 0 }
@@ -296,7 +289,7 @@ function computeRiskBreakdown(
   }[] = []
 
   for (const person of persons) {
-    const scoreResult = calculatePersonScore(person)
+    const scoreResult = personScores.get(person.id) ?? calculatePersonScore(person)
     const capital = person.loans.reduce(
       (s, l) => s + pesify(Number(l.capital), l.currency, mepRate),
       0,
@@ -321,52 +314,72 @@ function computeRiskBreakdown(
 // ── Router ────────────────────────────────────────────────────────────
 
 export const portfolioRouter = router({
-  /**
-   * Consolidated endpoint: loads all portfolio data in a single DB roundtrip.
-   * Replaces 5 separate queries (getMetrics + getYieldMetrics + getCashFlowProjection
-   * + getConcentrationAlerts + getRiskBreakdown) with 1 loan query + 1 person query.
-   */
   getFullPortfolio: protectedProcedure
     .input(z.object({ fciRate: z.number().min(0).default(0.40) }))
     .query(async ({ ctx, input }) => {
       const { loans, persons, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
 
+      const lenderLoans = loans.filter((l) => l.direction === 'lender')
+      const capitalCache = buildCapitalCache(lenderLoans, mepRate)
+
+      // Compute person scores once for metrics + risk breakdown
+      const personIds = new Set(lenderLoans.map((l) => l.personId).filter(Boolean))
+      const personScores = new Map<string, ReturnType<typeof calculatePersonScore>>()
+      for (const p of persons) {
+        if (personIds.has(p.id)) {
+          personScores.set(p.id, calculatePersonScore(p))
+        }
+      }
+
       return {
-        metrics: computeMetrics(loans, persons, mepRate, input.fciRate),
-        yieldMetrics: computeYieldMetrics(loans, mepRate, input.fciRate),
-        cashFlow: computeCashFlowProjection(loans, mepRate),
-        alerts: computeConcentrationAlerts(loans, mepRate),
-        riskBreakdown: computeRiskBreakdown(persons, mepRate),
+        metrics: computeMetrics(lenderLoans, capitalCache, persons, personScores, mepRate),
+        yieldMetrics: computeYieldMetrics(lenderLoans, capitalCache, mepRate, input.fciRate),
+        cashFlow: computeCashFlowProjection(lenderLoans, mepRate),
+        alerts: computeConcentrationAlerts(lenderLoans, capitalCache),
+        riskBreakdown: computeRiskBreakdown(persons, personScores, mepRate),
       }
     }),
 
-  // Keep individual endpoints for backward compatibility / selective use
   getMetrics: protectedProcedure
     .input(z.object({ fciRate: z.number().min(0).default(0.40) }))
     .query(async ({ ctx, input }) => {
       const { loans, persons, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
-      return computeMetrics(loans, persons, mepRate, input.fciRate)
+      const lenderLoans = loans.filter((l) => l.direction === 'lender')
+      const capitalCache = buildCapitalCache(lenderLoans, mepRate)
+      const personIds = new Set(lenderLoans.map((l) => l.personId).filter(Boolean))
+      const personScores = new Map<string, ReturnType<typeof calculatePersonScore>>()
+      for (const p of persons) {
+        if (personIds.has(p.id)) personScores.set(p.id, calculatePersonScore(p))
+      }
+      return computeMetrics(lenderLoans, capitalCache, persons, personScores, mepRate)
     }),
 
   getYieldMetrics: protectedProcedure
     .input(z.object({ fciRate: z.number().min(0).default(0.40) }))
     .query(async ({ ctx, input }) => {
       const { loans, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
-      return computeYieldMetrics(loans, mepRate, input.fciRate)
+      const lenderLoans = loans.filter((l) => l.direction === 'lender')
+      const capitalCache = buildCapitalCache(lenderLoans, mepRate)
+      return computeYieldMetrics(lenderLoans, capitalCache, mepRate, input.fciRate)
     }),
 
   getCashFlowProjection: protectedProcedure.query(async ({ ctx }) => {
     const { loans, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
-    return computeCashFlowProjection(loans, mepRate)
+    const lenderLoans = loans.filter((l) => l.direction === 'lender')
+    return computeCashFlowProjection(lenderLoans, mepRate)
   }),
 
   getConcentrationAlerts: protectedProcedure.query(async ({ ctx }) => {
     const { loans, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
-    return computeConcentrationAlerts(loans, mepRate)
+    const lenderLoans = loans.filter((l) => l.direction === 'lender')
+    const capitalCache = buildCapitalCache(lenderLoans, mepRate)
+    return computeConcentrationAlerts(lenderLoans, capitalCache)
   }),
 
   getRiskBreakdown: protectedProcedure.query(async ({ ctx }) => {
     const { persons, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
-    return computeRiskBreakdown(persons, mepRate)
+    const personScores = new Map<string, ReturnType<typeof calculatePersonScore>>()
+    for (const p of persons) personScores.set(p.id, calculatePersonScore(p))
+    return computeRiskBreakdown(persons, personScores, mepRate)
   }),
 })
