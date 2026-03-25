@@ -99,9 +99,9 @@ function daysUntilText(date: Date) {
     return `en ${diff} día${diff !== 1 ? 's' : ''}`
 }
 
-function formatRentByCurrency(rent: Record<string, number>) {
+function formatRentByCurrency(rent: Record<string, number>, zeroLabel = '$0') {
     const entries = Object.entries(rent).filter(([, v]) => v > 0)
-    if (entries.length === 0) return '-'
+    if (entries.length === 0) return zeroLabel
     return entries.map(([currency, amount]) => formatCurrency(amount, currency)).join(' + ')
 }
 
@@ -122,6 +122,21 @@ export function LoansDashboardSummary() {
 
     return (
         <div className="flex flex-col gap-3">
+            {metrics.overdueCount > 0 && (
+                <div className={cn(
+                    'flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium',
+                    metrics.overdueCount >= 3
+                        ? 'bg-red-500/15 text-red-400 border border-red-500/20'
+                        : 'bg-yellow-500/15 text-yellow-500 border border-yellow-500/20'
+                )}>
+                    <span className="h-2 w-2 rounded-full bg-current shrink-0 animate-pulse" />
+                    <span>
+                        {metrics.overdueCount >= 3 ? 'Alerta' : 'Atención'}:{' '}
+                        {metrics.overdueCount} cuota{metrics.overdueCount !== 1 ? 's' : ''} vencida{metrics.overdueCount !== 1 ? 's' : ''} —{' '}
+                        <PrivateAmount><span className="font-bold">{formatCurrency(metrics.overdueAmount)}</span></PrivateAmount> pendiente{metrics.overdueCount !== 1 ? 's' : ''} de cobro
+                    </span>
+                </div>
+            )}
             <Card className="overflow-hidden bg-gradient-to-r from-card to-[hsl(217,30%,13%)] border-border/50">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 p-6 md:min-h-[160px]">
                     {/* Left: Pending amount + health */}
@@ -147,7 +162,7 @@ export function LoansDashboardSummary() {
                                 />
                             ) : (
                                 <div className="flex items-center justify-center w-[80px] h-[80px] rounded-full border-[7px] border-muted">
-                                    <span className="text-xs text-muted-foreground">-</span>
+                                    <span className="text-xs text-muted-foreground">N/A</span>
                                 </div>
                             )}
                             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
@@ -164,13 +179,13 @@ export function LoansDashboardSummary() {
                             value={
                                 metrics.thisWeekCount > 0
                                     ? formatCurrency(metrics.thisWeekAmount)
-                                    : '-'
+                                    : 'Sin cobros'
                             }
                             highlight={metrics.thisWeekCount > 0}
                         />
                         <MiniStat
                             label="Próximo cobro"
-                            value={nextInstallment ? daysUntilText(nextInstallment.dueDate) : '-'}
+                            value={nextInstallment ? daysUntilText(nextInstallment.dueDate) : 'Sin pendientes'}
                             highlight={false}
                             isText
                         />

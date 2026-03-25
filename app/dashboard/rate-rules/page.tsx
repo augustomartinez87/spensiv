@@ -149,9 +149,22 @@ function BorrowerTypesSection() {
             ))}
 
             {types?.length === 0 && !adding && (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                No hay tipos definidos. Agregá al menos uno para usar la sugerencia de tasas.
-              </p>
+              <div className="flex flex-col items-center gap-3 py-8 px-4">
+                <div className="rounded-full bg-blue-500/10 p-3">
+                  <Users className="h-6 w-6 text-accent-blue" />
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-medium">Configurá tus tipos de prestatario</p>
+                  <p className="text-xs text-muted-foreground max-w-sm">
+                    Definí al menos un tipo de cliente (ej: Amigo, Comerciante, Random) para activar
+                    la sugerencia automática de tasas en el formulario de préstamos.
+                  </p>
+                </div>
+                <Button size="sm" onClick={() => setAdding(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Crear primer tipo
+                </Button>
+              </div>
             )}
 
             {/* Add row */}

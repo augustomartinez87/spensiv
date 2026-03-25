@@ -77,6 +77,20 @@ export default function SimulatorPage() {
   const [resultsView, setResultsView] = useState<'analysis' | 'share'>('analysis')
   const resultsRef = useRef<HTMLDivElement>(null)
 
+  // Rate rules
+  const { data: borrowerTypes } = trpc.rateRules.listBorrowerTypes.useQuery()
+  const { data: durationAdjustments } = trpc.rateRules.listDurationAdjustments.useQuery()
+  const [selectedBorrowerTypeId, setSelectedBorrowerTypeId] = useState<string>('')
+
+  function getSuggestedTnaForTerm(term: number): number | null {
+    if (!selectedBorrowerTypeId || !borrowerTypes || !durationAdjustments) return null
+    const bt = borrowerTypes.find((b) => b.id === selectedBorrowerTypeId)
+    if (!bt) return null
+    const baseTna = Number(bt.baseTna)
+    const adj = durationAdjustments.find((a) => a.minMonths < term && a.maxMonths >= term)
+    return baseTna + (adj ? Number(adj.adjustment) : 0)
+  }
+
   // Form state
   const [capital, setCapital] = useState('1000000')
   const [currency, setCurrency] = useState<'ARS' | 'USD'>('ARS')
@@ -418,6 +432,7 @@ export default function SimulatorPage() {
               type="number"
               value={capital}
               onChange={(e) => setCapital(e.target.value)}
+              onFocus={(e) => e.target.select()}
               placeholder="Monto exacto"
               className="h-8 text-sm text-center"
             />
@@ -432,6 +447,7 @@ export default function SimulatorPage() {
                   type="number"
                   value={termMonths}
                   onChange={(e) => setTermMonths(e.target.value)}
+                  onFocus={(e) => e.target.select()}
                   placeholder="12"
                   min="1"
                   max="360"
@@ -445,10 +461,41 @@ export default function SimulatorPage() {
                 id="tnaTarget"
                 type="number"
                 value={tnaTarget}
-                onChange={(e) => setTnaTarget(e.target.value)}
+                onChange={(e) => { setTnaTarget(e.target.value); setSelectedBorrowerTypeId('') }}
+                onFocus={(e) => e.target.select()}
                 placeholder="55"
                 step="0.5"
               />
+              {borrowerTypes && borrowerTypes.length > 0 && (
+                <Select value={selectedBorrowerTypeId || '__none__'} onValueChange={(v) => {
+                  const id = v === '__none__' ? '' : v
+                  setSelectedBorrowerTypeId(id)
+                  if (id) {
+                    const bt = borrowerTypes.find((b) => b.id === id)
+                    if (bt) {
+                      // In single mode, use term-adjusted TNA; in compare mode, use base TNA
+                      if (viewMode === 'single') {
+                        const suggested = getSuggestedTnaForTerm(parseInt(termMonths) || 1)
+                        if (suggested) setTnaTarget(suggested.toString())
+                      } else {
+                        setTnaTarget(Number(bt.baseTna).toString())
+                      }
+                    }
+                  }
+                }}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Usar regla de tasas..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin regla de tasa</SelectItem>
+                    {borrowerTypes.map((bt) => (
+                      <SelectItem key={bt.id} value={bt.id}>
+                        {bt.name} — base {Number(bt.baseTna)}%
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -458,6 +505,7 @@ export default function SimulatorPage() {
                 type="number"
                 value={hurdleRate}
                 onChange={(e) => setHurdleRate(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 placeholder="40"
                 step="0.5"
               />
@@ -510,7 +558,7 @@ export default function SimulatorPage() {
                 onCheckedChange={setRoundEnabled}
               />
               <Label htmlFor="round-installments" className="text-sm cursor-pointer">
-                Redondear cuotas
+                Redondear hacia arriba
               </Label>
             </div>
             {roundEnabled && (
@@ -570,7 +618,7 @@ export default function SimulatorPage() {
             <div className="space-y-3">
               <Label>¿En cuántas cuotas?</Label>
               <div className="flex flex-wrap gap-2">
-                {[3, 6, 9, 12, 18, 24].map((term) => {
+                {Array.from(new Set([...[3, 6, 9, 12, 18, 24], ...compareTerms])).sort((a, b) => a - b).map((term) => {
                   const isSelected = compareTerms.includes(term)
                   return (
                     <button
@@ -660,8 +708,8 @@ export default function SimulatorPage() {
 
               {resultsView === 'analysis' && (
                 <>
-                  {compareResults && <CompareTermsResultCards results={compareResults} onCreateLoan={handleCreateLoan} onPreApprove={handlePreApproveLoan} />}
-                  {singleResult && <SingleResultCards result={singleResult} onCreateLoan={handleCreateLoan} onPreApprove={handlePreApproveLoan} />}
+                  {compareResults && <CompareTermsResultCards results={compareResults} onCreateLoan={handleCreateLoan} onPreApprove={handlePreApproveLoan} getSuggestedTna={selectedBorrowerTypeId ? getSuggestedTnaForTerm : undefined} />}
+                  {singleResult && <SingleResultCards result={singleResult} onCreateLoan={handleCreateLoan} onPreApprove={handlePreApproveLoan} suggestedTna={selectedBorrowerTypeId ? getSuggestedTnaForTerm(singleResult.termMonths) : undefined} />}
                 </>
               )}
 
@@ -817,7 +865,9 @@ function ConvenienceIndicator({ isConvenient, spread }: { isConvenient: boolean;
   )
 }
 
-function ResultCardContent({ result, title, onCreateLoan, onPreApprove }: { result: SimulationResult; title: string; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void }) {
+function ResultCardContent({ result, title, onCreateLoan, onPreApprove, suggestedTna }: { result: SimulationResult; title: string; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void; suggestedTna?: number | null }) {
+  const currentTna = result.tnaTarget * 100
+  const belowSuggested = suggestedTna != null && currentTna < suggestedTna
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -825,6 +875,12 @@ function ResultCardContent({ result, title, onCreateLoan, onPreApprove }: { resu
           <TrendingUp className="h-5 w-5 text-blue-500" />
           {title}
         </CardTitle>
+        {suggestedTna != null && (
+          <p className="text-xs text-muted-foreground">
+            TNA recomendada para este plazo: <span className="font-medium text-foreground">{suggestedTna}%</span>
+            {belowSuggested && <span className="text-yellow-500 ml-1">(simulando con {currentTna}%)</span>}
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="grid grid-cols-2 gap-3">
@@ -881,7 +937,7 @@ function ResultCardContent({ result, title, onCreateLoan, onPreApprove }: { resu
   )
 }
 
-function CompareTermsResultCards({ results, onCreateLoan, onPreApprove }: { results: SimulationResult[]; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void }) {
+function CompareTermsResultCards({ results, onCreateLoan, onPreApprove, getSuggestedTna }: { results: SimulationResult[]; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void; getSuggestedTna?: (term: number) => number | null }) {
   return (
     <div className={cn(
       "grid gap-6 grid-cols-1",
@@ -895,14 +951,15 @@ function CompareTermsResultCards({ results, onCreateLoan, onPreApprove }: { resu
           title={`${result.termMonths} meses`}
           onCreateLoan={onCreateLoan}
           onPreApprove={onPreApprove}
+          suggestedTna={getSuggestedTna?.(result.termMonths)}
         />
       ))}
     </div>
   )
 }
 
-function SingleResultCards({ result, onCreateLoan, onPreApprove }: { result: SimulationResult; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void }) {
-  return <ResultCardContent result={result} title="Amortizado (Cuotas)" onCreateLoan={onCreateLoan} onPreApprove={onPreApprove} />
+function SingleResultCards({ result, onCreateLoan, onPreApprove, suggestedTna }: { result: SimulationResult; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void; suggestedTna?: number | null }) {
+  return <ResultCardContent result={result} title="Amortizado (Cuotas)" onCreateLoan={onCreateLoan} onPreApprove={onPreApprove} suggestedTna={suggestedTna} />
 }
 
 // ─── Tables ──────────────────────────────────────────────────────────

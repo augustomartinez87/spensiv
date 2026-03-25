@@ -193,7 +193,6 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                         </Button>
                     ))}
                 </div>
-                <CreateLoanDialog open={createOpen} onOpenChange={setCreateOpen} direction={direction} />
             </div>
 
             {/* Pre-approved section */}

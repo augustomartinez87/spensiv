@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
-import { Plus, Zap, Shield, ShieldX, Info, Clock, AlertTriangle } from 'lucide-react'
+import { Plus, Zap, Shield, ShieldX, Info, Clock, AlertTriangle, ChevronDown } from 'lucide-react'
 import { tnaToMonthlyRate } from '@/lib/loan-calculator'
 import { getSmartFirstDueDate } from '@/lib/business-days'
 import { getNextMonths } from '@/lib/periods'
@@ -49,6 +49,7 @@ export function CreateLoanDialog({
     const [roundingMultiple, setRoundingMultiple] = useState<number>(1000)
     const [firstInstallmentMonth, setFirstInstallmentMonth] = useState<string>('')
     const [noInterest, setNoInterest] = useState(false)
+    const [showAdvanced, setShowAdvanced] = useState(false)
 
     const { data: persons } = trpc.persons.list.useQuery()
     const { data: borrowerTypes } = trpc.rateRules.listBorrowerTypes.useQuery()
@@ -263,7 +264,7 @@ export function CreateLoanDialog({
                                         <span>
                                             {isCritical
                                                 ? 'Score crítico — no se recomienda prestar'
-                                                : `Riesgo ${sp.category} · Spread mínimo: +${(sp.minTnaSpread * 100).toFixed(0)}pp`
+                                                : `Riesgo ${sp.category} · Score: ${sp.score}/12`
                                             }
                                         </span>
                                     </div>
@@ -479,84 +480,96 @@ export function CreateLoanDialog({
                         </div>
                     )}
 
-                    <div className="space-y-2">
-                        <Label htmlFor="loanStartDate">Fecha de Inicio</Label>
-                        <Input
-                            id="loanStartDate"
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            required
-                        />
-                    </div>
+                    {/* Opciones avanzadas — collapsible */}
+                    <div className="border rounded-lg">
+                        <button
+                            type="button"
+                            className="flex items-center justify-between w-full px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                        >
+                            <span>Opciones avanzadas</span>
+                            <ChevronDown className={cn('h-4 w-4 transition-transform', showAdvanced && 'rotate-180')} />
+                        </button>
+                        {showAdvanced && (
+                            <div className="px-3 pb-3 space-y-4 border-t pt-3">
+                                <div className="space-y-2">
+                                    <Label htmlFor="loanStartDate">Fecha de Inicio</Label>
+                                    <Input
+                                        id="loanStartDate"
+                                        type="date"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        required
+                                    />
+                                </div>
 
-                    {/* Smart due date toggle */}
-                    <div className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                            <Switch
-                                id="modal-smart-due-date"
-                                checked={smartDueDate}
-                                onCheckedChange={setSmartDueDate}
-                            />
-                            <Label htmlFor="modal-smart-due-date" className="text-sm cursor-pointer">
-                                Primer vencimiento inteligente
-                            </Label>
-                        </div>
-                        {smartDueDate && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 pl-0.5">
-                                <Info className="h-3 w-3 shrink-0" />
-                                Las cuotas vencen el 2° día hábil de cada mes
-                            </p>
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <Switch
+                                            id="modal-smart-due-date"
+                                            checked={smartDueDate}
+                                            onCheckedChange={setSmartDueDate}
+                                        />
+                                        <Label htmlFor="modal-smart-due-date" className="text-sm cursor-pointer">
+                                            Primer vencimiento inteligente
+                                        </Label>
+                                    </div>
+                                    {smartDueDate && (
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1 pl-0.5">
+                                            <Info className="h-3 w-3 shrink-0" />
+                                            Las cuotas vencen el 2° día hábil de cada mes
+                                        </p>
+                                    )}
+                                </div>
+
+                                {loanType === 'amortized' && (
+                                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                        <div className="flex items-center gap-2">
+                                            <Switch
+                                                id="modal-round-installments"
+                                                checked={roundEnabled}
+                                                onCheckedChange={setRoundEnabled}
+                                            />
+                                            <Label htmlFor="modal-round-installments" className="text-sm cursor-pointer">
+                                                Redondear cuotas
+                                            </Label>
+                                        </div>
+                                        {roundEnabled && (
+                                            <Select value={roundingMultiple.toString()} onValueChange={(v) => setRoundingMultiple(parseInt(v))}>
+                                                <SelectTrigger className="w-[180px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="1000">Múltiplos de $1.000</SelectItem>
+                                                    <SelectItem value="100">Múltiplos de $100</SelectItem>
+                                                    <SelectItem value="500">Múltiplos de $500</SelectItem>
+                                                    <SelectItem value="5000">Múltiplos de $5.000</SelectItem>
+                                                    <SelectItem value="10000">Múltiplos de $10.000</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    </div>
+                                )}
+
+                                {loanType === 'amortized' && (
+                                    <div className="space-y-2">
+                                        <Label>Mes de primera cuota (opcional)</Label>
+                                        <Select value={firstInstallmentMonth || '__auto__'} onValueChange={(v) => setFirstInstallmentMonth(v === '__auto__' ? '' : v)}>
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__auto__">Automático</SelectItem>
+                                                {getNextMonths(8).map((opt) => (
+                                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>
-
-                    {/* Rounding toggle — solo amortizado */}
-                    {loanType === 'amortized' && (
-                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                            <div className="flex items-center gap-2">
-                                <Switch
-                                    id="modal-round-installments"
-                                    checked={roundEnabled}
-                                    onCheckedChange={setRoundEnabled}
-                                />
-                                <Label htmlFor="modal-round-installments" className="text-sm cursor-pointer">
-                                    Redondear cuotas
-                                </Label>
-                            </div>
-                            {roundEnabled && (
-                                <Select value={roundingMultiple.toString()} onValueChange={(v) => setRoundingMultiple(parseInt(v))}>
-                                    <SelectTrigger className="w-[180px]">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="1000">Múltiplos de $1.000</SelectItem>
-                                        <SelectItem value="100">Múltiplos de $100</SelectItem>
-                                        <SelectItem value="500">Múltiplos de $500</SelectItem>
-                                        <SelectItem value="5000">Múltiplos de $5.000</SelectItem>
-                                        <SelectItem value="10000">Múltiplos de $10.000</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            )}
-                        </div>
-                    )}
-
-                    {/* First installment month selector — solo amortizado */}
-                    {loanType === 'amortized' && (
-                        <div className="space-y-2">
-                            <Label>Mes de primera cuota (opcional)</Label>
-                            <Select value={firstInstallmentMonth || '__auto__'} onValueChange={(v) => setFirstInstallmentMonth(v === '__auto__' ? '' : v)}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="__auto__">Automático</SelectItem>
-                                    {getNextMonths(8).map((opt) => (
-                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
 
                     {/* Loan preview with first due date */}
                     {loanType === 'amortized' && capital && tna && termMonths && startDate && (() => {
