@@ -8,6 +8,17 @@ import {
 } from '@/lib/installment-engine'
 import { Decimal } from '@prisma/client/runtime/library'
 
+function computeCollectionStats(installments: Array<{ isCollected: boolean; amount: Decimal | number }>, totalAmount: number) {
+  const collected = installments.filter((i) => i.isCollected)
+  const collectedAmount = collected.reduce((sum, i) => sum + Number(i.amount), 0)
+  return {
+    collectedCount: collected.length,
+    collectedAmount,
+    pendingCount: installments.length - collected.length,
+    pendingAmount: totalAmount - collectedAmount,
+  }
+}
+
 export const thirdPartyPurchasesRouter = router({
   /**
    * Crear compra de tercero
@@ -125,26 +136,16 @@ export const thirdPartyPurchasesRouter = router({
         orderBy: { createdAt: 'desc' },
       })
 
-      return purchases.map((p) => {
-        const collected = p.collectionInstallments.filter((i) => i.isCollected).length
-        const collectedAmount = p.collectionInstallments
-          .filter((i) => i.isCollected)
-          .reduce((sum, i) => sum + Number(i.amount), 0)
-
-        return {
+      return purchases.map((p) => ({
           ...p,
           totalAmount: Number(p.totalAmount),
           installmentAmount: Number(p.installmentAmount),
-          collectedCount: collected,
-          collectedAmount,
-          pendingCount: p.installments - collected,
-          pendingAmount: Number(p.totalAmount) - collectedAmount,
+          ...computeCollectionStats(p.collectionInstallments, Number(p.totalAmount)),
           collectionInstallments: p.collectionInstallments.map((i) => ({
             ...i,
             amount: Number(i.amount),
           })),
-        }
-      })
+        }))
     }),
 
   /**
@@ -166,19 +167,11 @@ export const thirdPartyPurchasesRouter = router({
 
       if (!purchase) return null
 
-      const collected = purchase.collectionInstallments.filter((i) => i.isCollected).length
-      const collectedAmount = purchase.collectionInstallments
-        .filter((i) => i.isCollected)
-        .reduce((sum, i) => sum + Number(i.amount), 0)
-
       return {
         ...purchase,
         totalAmount: Number(purchase.totalAmount),
         installmentAmount: Number(purchase.installmentAmount),
-        collectedCount: collected,
-        collectedAmount,
-        pendingCount: purchase.installments - collected,
-        pendingAmount: Number(purchase.totalAmount) - collectedAmount,
+        ...computeCollectionStats(purchase.collectionInstallments, Number(purchase.totalAmount)),
         collectionInstallments: purchase.collectionInstallments.map((i) => ({
           ...i,
           amount: Number(i.amount),

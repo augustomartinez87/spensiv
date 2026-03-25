@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from '@/lib/trpc'
-import { simulateLoan, compareLoanTypes, reverseFromInstallment, tnaToMonthlyRate, frenchInstallment, generateAmortizationTable, generateSmartAmortizationTable, strategicRoundInstallment } from '@/lib/loan-calculator'
-import type { SimulationResult, ComparisonResult } from '@/lib/loan-calculator'
+import { simulateLoan, reverseFromInstallment, tnaToMonthlyRate, frenchInstallment, generateAmortizationTable, generateSmartAmortizationTable, strategicRoundInstallment } from '@/lib/loan-calculator'
+import type { SimulationResult } from '@/lib/loan-calculator'
 import { addMonths } from 'date-fns'
 import { getDolarMep, pesify } from '@/lib/dolar'
 import { getSmartDueDates, getSmartDueDatesFromFirst, getNthBusinessDay } from '@/lib/business-days'
@@ -970,7 +970,7 @@ export const loansRouter = router({
     // Skip $0 installments (e.g. interest_only loans at 0% TNA)
     const allUnpaid = activeLoans.flatMap((loan) =>
       loan.loanInstallments
-        .filter((i) => !i.isPaid)
+        .filter((i) => !i.isPaid && Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0) > 0)
         .map((i) => {
           const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
           return {
@@ -982,7 +982,6 @@ export const loansRouter = router({
             currency: loan.currency,
           }
         })
-        .filter((i) => i.amount > 0)
     )
 
     // Overdue (past due date)

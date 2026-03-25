@@ -426,8 +426,10 @@ export async function recalculateThirdPartyInstallmentDates(userId: string): Pro
     const installments = purchase.transaction?.installmentsList ?? []
     if (!installments.length) continue
 
+    const installmentMap = new Map(installments.map((i) => [i.installmentNumber, i]))
+
     for (const collInst of purchase.collectionInstallments) {
-      const matchingInst = installments.find((i) => i.installmentNumber === collInst.number)
+      const matchingInst = installmentMap.get(collInst.number)
       if (!matchingInst) continue
 
       await prisma.thirdPartyInstallment.update({

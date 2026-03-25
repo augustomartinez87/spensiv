@@ -3,6 +3,7 @@ import { router, protectedProcedure } from '@/lib/trpc'
 import { calculatePersonScore, calculateExpectedValue } from '@/lib/loan-scoring'
 import { getDolarMep, pesify } from '@/lib/dolar'
 import { calculateIRR, monthlyToAnnualRate } from '@/lib/loan-calculator'
+import { formatPeriod } from '@/lib/periods'
 
 export const portfolioRouter = router({
   getMetrics: protectedProcedure
@@ -53,10 +54,13 @@ export const portfolioRouter = router({
       const top1Percentage = exposures.length > 0 ? exposures[0].percentage : 0
       const top3Percentage = exposures.slice(0, 3).reduce((s, e) => s + e.percentage, 0)
 
-      // High risk capital
-      const persons = await ctx.prisma.person.findMany({
-        where: { userId: ctx.user.id },
-      })
+      // High risk capital — only fetch persons referenced by active loans
+      const personIds = [...new Set(loans.map((l) => l.personId).filter(Boolean))] as string[]
+      const persons = personIds.length > 0
+        ? await ctx.prisma.person.findMany({
+            where: { id: { in: personIds } },
+          })
+        : []
 
       const personScores = new Map<string, ReturnType<typeof calculatePersonScore>>()
       for (const p of persons) {
@@ -242,7 +246,7 @@ export const portfolioRouter = router({
     const now = new Date()
     for (let i = 0; i < 12; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const key = formatPeriod(d)
       byMonth.set(key, { principal: 0, interest: 0 })
     }
 
