@@ -967,6 +967,7 @@ export const loansRouter = router({
     )
 
     // All unpaid installments flattened (keep original currency for display)
+    // Skip $0 installments (e.g. interest_only loans at 0% TNA)
     const allUnpaid = activeLoans.flatMap((loan) =>
       loan.loanInstallments
         .filter((i) => !i.isPaid)
@@ -981,6 +982,7 @@ export const loansRouter = router({
             currency: loan.currency,
           }
         })
+        .filter((i) => i.amount > 0)
     )
 
     // Overdue (past due date)
@@ -1076,6 +1078,7 @@ export const loansRouter = router({
     )
 
     const now = new Date()
+    // Skip $0 installments (e.g. interest_only loans at 0% TNA)
     const allUnpaid = activeDebts.flatMap((loan) =>
       loan.loanInstallments.map((i) => {
         const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
@@ -1087,7 +1090,7 @@ export const loansRouter = router({
           loanId: loan.id,
           currency: loan.currency,
         }
-      })
+      }).filter((i) => i.amount > 0)
     )
 
     const overdueCount = allUnpaid.filter((i) => i.dueDate < now).length
