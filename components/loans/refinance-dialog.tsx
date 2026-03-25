@@ -10,21 +10,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from '@/components/ui/switch'
 import { RefreshCw } from 'lucide-react'
 import { tnaToMonthlyRate, frenchInstallment, generateAmortizationTable } from '@/lib/loan-calculator'
+import type { LoanDetail } from './types'
 
-export function RefinanceDialog({ loan, onBack }: { loan: any; onBack: () => void }) {
+export function RefinanceDialog({ loan, onBack }: { loan: LoanDetail; onBack: () => void }) {
     const utils = trpc.useUtils()
     const [open, setOpen] = useState(false)
     const cur = loan.currency
 
     // Calculate remaining unpaid capital and interest (accounting for partial payments)
-    const unpaidInstallments = loan.loanInstallments.filter((i: any) => !i.isPaid)
-    const unpaidPrincipal = unpaidInstallments.reduce((s: number, i: any) => {
+    const unpaidInstallments = loan.loanInstallments.filter((i) => !i.isPaid)
+    const unpaidPrincipal = unpaidInstallments.reduce((s, i) => {
         const paid = Number(i.paidAmount ?? 0)
         const paidInterest = Math.min(paid, Number(i.interest))
         const paidPrincipal = Math.max(paid - paidInterest, 0)
         return s + Math.max(Number(i.principal) - paidPrincipal, 0)
     }, 0)
-    const unpaidInterest = unpaidInstallments.reduce((s: number, i: any) => {
+    const unpaidInterest = unpaidInstallments.reduce((s, i) => {
         const paid = Number(i.paidAmount ?? 0)
         const paidInterest = Math.min(paid, Number(i.interest))
         return s + Math.max(Number(i.interest) - paidInterest, 0)
@@ -155,7 +156,7 @@ export function RefinanceDialog({ loan, onBack }: { loan: any; onBack: () => voi
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {previewTable.map((row: any) => (
+                                        {previewTable.map((row) => (
                                             <tr key={row.month} className="border-b border-border/50">
                                                 <td className="py-1 px-2">{row.month}</td>
                                                 <td className="py-1 px-2 text-right">{formatCurrency(row.installment, cur)}</td>

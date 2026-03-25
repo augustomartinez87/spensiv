@@ -20,7 +20,9 @@ export const TAG_CONFIG: Record<string, { label: string; color: string; icon: ty
     otro: { label: 'Otro', color: 'bg-muted text-muted-foreground border-border', icon: MessageCircle },
 }
 
-export function LoanActivityTimeline({ loanId, logs }: { loanId: string; logs: any[] }) {
+import type { ActivityLog } from './types'
+
+export function LoanActivityTimeline({ loanId, logs }: { loanId: string; logs: ActivityLog[] }) {
     const utils = trpc.useUtils()
     const [note, setNote] = useState('')
     const [tag, setTag] = useState<string>('otro')
@@ -72,7 +74,7 @@ export function LoanActivityTimeline({ loanId, logs }: { loanId: string; logs: a
                     <Button
                         size="sm"
                         disabled={!note.trim() || addMutation.isPending}
-                        onClick={() => addMutation.mutate({ loanId, note: note.trim(), tag: tag as any, logDate })}
+                        onClick={() => addMutation.mutate({ loanId, note: note.trim(), tag: tag as 'llamada' | 'pago' | 'acuerdo' | 'otro', logDate })}
                     >
                         <Plus className="h-4 w-4 mr-1" />
                         Agregar

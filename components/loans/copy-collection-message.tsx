@@ -9,14 +9,15 @@ import { MessageCircle, Copy } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import type { LoanDetail } from './types'
 
-export function CopyCollectionMessage({ loan }: { loan: any }) {
+export function CopyCollectionMessage({ loan }: { loan: LoanDetail }) {
     const [open, setOpen] = useState(false)
     const [message, setMessage] = useState('')
     const { toast } = useToast()
     const cur = loan.currency
 
-    const nextInstallment = loan.loanInstallments.find((i: any) => !i.isPaid)
+    const nextInstallment = loan.loanInstallments.find((i) => !i.isPaid)
     if (!nextInstallment) return null
 
     const nombre = loan.borrowerName.split(' - ')[0]
@@ -24,7 +25,7 @@ export function CopyCollectionMessage({ loan }: { loan: any }) {
     const monto = formatCurrency(Math.max(Number(nextInstallment.amount) - Number(nextInstallment.paidAmount ?? 0), 0), cur)
     const total = loan.loanInstallments.length
     const saldo = formatCurrency(
-        loan.loanInstallments.filter((i: any) => !i.isPaid).reduce((s: number, i: any) =>
+        loan.loanInstallments.filter((i) => !i.isPaid).reduce((s, i) =>
             s + Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0), 0),
         cur
     )

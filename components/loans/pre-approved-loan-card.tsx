@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CheckCircle2, Trash2 } from 'lucide-react'
 import { loanRateInfo } from './helpers'
+import type { LoanListItem } from './types'
 
 export function PreApprovedLoanCard({
     loan,
@@ -17,7 +18,7 @@ export function PreApprovedLoanCard({
     isConfirming,
     isDeleting,
 }: {
-    loan: any
+    loan: LoanListItem
     onConfirm: (loanId: string, startDate: string) => void
     onDelete: (id: string) => void
     isConfirming: boolean

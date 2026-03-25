@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Banknote } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import type { LoanDetail, LoanInstallment } from './types'
 
-export function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; cur: string; loan: any }) {
+export function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; cur: string; loan: LoanDetail }) {
     const utils = trpc.useUtils()
     const [open, setOpen] = useState(false)
     const [amount, setAmount] = useState('')
@@ -33,11 +34,11 @@ export function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; c
 
     // Compute pending info from loan data
     const now = new Date()
-    const unpaidInsts = (loan?.loanInstallments ?? []).filter((i: any) => !i.isPaid)
-    const overdueInsts = unpaidInsts.filter((i: any) => new Date(i.dueDate) < now)
-    const nextDueInst = unpaidInsts.find((i: any) => new Date(i.dueDate) >= now)
+    const unpaidInsts = loan.loanInstallments.filter((i) => !i.isPaid)
+    const overdueInsts = unpaidInsts.filter((i) => new Date(i.dueDate) < now)
+    const nextDueInst = unpaidInsts.find((i) => new Date(i.dueDate) >= now)
     const pendingCount = unpaidInsts.length
-    const totalPendingAmount = unpaidInsts.reduce((s: number, i: any) => {
+    const totalPendingAmount = unpaidInsts.reduce((s, i) => {
         const paid = Number(i.paidAmount ?? 0)
         return s + Math.max(Number(i.amount) - paid, 0)
     }, 0)
@@ -65,7 +66,7 @@ export function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; c
                                 <div className="flex justify-between">
                                     <span className="text-red-400 font-medium">Vencidas ({overdueInsts.length})</span>
                                     <span className="text-red-400 font-medium">
-                                        {formatCurrency(overdueInsts.reduce((s: number, i: any) => {
+                                        {formatCurrency(overdueInsts.reduce((s, i) => {
                                             const paid = Number(i.paidAmount ?? 0)
                                             return s + Math.max(Number(i.amount) - paid, 0)
                                         }, 0), cur)}

@@ -317,7 +317,7 @@ export function CreateLoanDialog({
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>Tipo de Préstamo</Label>
-                            <Select value={loanType} onValueChange={(v) => setLoanType(v as any)}>
+                            <Select value={loanType} onValueChange={(v) => setLoanType(v as typeof loanType)}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
@@ -329,7 +329,7 @@ export function CreateLoanDialog({
                         </div>
                         <div className="space-y-2">
                             <Label>Moneda</Label>
-                            <Select value={currency} onValueChange={(v) => setCurrency(v as any)}>
+                            <Select value={currency} onValueChange={(v) => setCurrency(v as typeof currency)}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
