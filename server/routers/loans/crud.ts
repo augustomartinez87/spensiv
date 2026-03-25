@@ -36,7 +36,7 @@ export const loanCrudRouter = router({
         const monthlyInterest = input.capital * rate
         const tna = rate * 12
 
-        let installments: any[] = []
+        let installments: { number: number; dueDate: Date; amount: number; interest: number; principal: number; balance: number }[] = []
         if (rate > 0) {
           const dueDates = input.smartDueDate
             ? getSmartDueDates(startDate, 12)
@@ -316,7 +316,7 @@ export const loanCrudRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
       }
 
-      const updates: Record<string, any> = {}
+      const updates: Prisma.LoanUncheckedUpdateInput = {}
       if (input.borrowerName) updates.borrowerName = input.borrowerName
       if (input.startDate) updates.startDate = new Date(input.startDate + 'T12:00:00')
       if (input.personId !== undefined) updates.personId = input.personId

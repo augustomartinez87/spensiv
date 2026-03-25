@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js'
 import { Prisma, PrismaClient } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { calculateXirrAnnualRobust } from '../../lib/financial-engine'
 
 const CENT_TOLERANCE = new Decimal(0.01)
@@ -59,15 +60,15 @@ export function applyPaymentWaterfall(input: PaymentWaterfallInput): PaymentWate
   const principalPending = money(input.principalPending)
 
   if (paymentAmount.lte(0)) {
-    throw new Error('El pago debe ser mayor a 0')
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'El pago debe ser mayor a 0' })
   }
   if (overduePending.lt(0) || currentPending.lt(0) || principalPending.lt(0)) {
-    throw new Error('Los buckets pendientes no pueden ser negativos')
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Los buckets pendientes no pueden ser negativos' })
   }
 
   const totalPending = overduePending.plus(currentPending).plus(principalPending)
   if (paymentAmount.gt(totalPending.plus(CENT_TOLERANCE))) {
-    throw new Error('El pago excede la deuda total pendiente')
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'El pago excede la deuda total pendiente' })
   }
 
   let remaining = paymentAmount
@@ -81,7 +82,7 @@ export function applyPaymentWaterfall(input: PaymentWaterfallInput): PaymentWate
   remaining = remaining.minus(principalApplied)
 
   if (remaining.gt(CENT_TOLERANCE)) {
-    throw new Error('No se pudo aplicar la totalidad del pago con el waterfall actual')
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'No se pudo aplicar la totalidad del pago con el waterfall actual' })
   }
 
   const totalApplied = paymentAmount.minus(remaining)
@@ -106,11 +107,11 @@ export class LoanAccountingService {
         where: { id: input.loanId, userId: input.userId },
       })
       if (!loan) {
-        throw new Error('Préstamo no encontrado')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
       }
 
       if (amount.lte(0)) {
-        throw new Error('El monto debe ser mayor a 0')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'El monto debe ser mayor a 0' })
       }
 
       await this.ensureInitialDisbursementCashflowTx(tx, loan)
@@ -184,9 +185,10 @@ export class LoanAccountingService {
         : currentDues.plus(futureInstallmentsTotal)
 
       if (amount.gt(maxPayable.plus(CENT_TOLERANCE))) {
-        throw new Error(
-          `El pago excede la deuda total del préstamo (máximo: ${round2(maxPayable)})`,
-        )
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `El pago excede la deuda total del préstamo (máximo: ${round2(maxPayable)})`,
+        })
       }
 
       // Apply waterfall for current period only (capped at currentDues)
@@ -221,7 +223,7 @@ export class LoanAccountingService {
       }
 
       if (waterfall.totalApplied <= 0 && futureInstallments.length === 0 && extraPrincipalPaid.lte(0)) {
-        throw new Error('No hay deuda pendiente para aplicar el pago')
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No hay deuda pendiente para aplicar el pago' })
       }
       type AdvancePaid = { id: string; dueDate: Date; interestPaid: number; principalPaid: number; fullyPaid: boolean }
       const advancePaid: AdvancePaid[] = []
@@ -434,7 +436,7 @@ export class LoanAccountingService {
   async ensureInitialDisbursementCashflow(loanId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const loan = await tx.loan.findUnique({ where: { id: loanId } })
-      if (!loan) throw new Error('Préstamo no encontrado')
+      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
       await this.ensureInitialDisbursementCashflowTx(tx, loan)
     })
   }
@@ -467,7 +469,7 @@ export class LoanAccountingService {
     })
 
     if (!loan) {
-      throw new Error('Préstamo no encontrado')
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
     }
 
     const asOfMonth = monthStart(asOfDate)
@@ -654,7 +656,7 @@ export class LoanAccountingService {
     })
 
     if (!loan) {
-      throw new Error('Préstamo no encontrado')
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
     }
 
     await this.ensureInitialDisbursementCashflowTx(tx, loan)
@@ -719,15 +721,15 @@ export class LoanAccountingService {
         where: { id: input.installmentId, loan: { id: input.loanId, userId: input.userId } },
         include: { loan: true },
       })
-      if (!installment) throw new Error('Cuota no encontrada')
-      if (installment.isPaid) throw new Error('La cuota ya está completamente pagada')
+      if (!installment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cuota no encontrada' })
+      if (installment.isPaid) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'La cuota ya está completamente pagada' })
 
       const paidAmount = money(installment.paidAmount ?? 0)
       const totalAmount = money(installment.amount)
       const remaining = Decimal.max(totalAmount.minus(paidAmount), ZERO)
 
       if (remaining.lte(CENT_TOLERANCE)) {
-        throw new Error('No hay saldo pendiente para condonar')
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No hay saldo pendiente para condonar' })
       }
 
       const loan = installment.loan
@@ -814,7 +816,7 @@ export class LoanAccountingService {
         where: { id: input.paymentId, loan: { userId: input.userId } },
         select: { id: true, loanId: true },
       })
-      if (!payment) throw new Error('Pago no encontrado')
+      if (!payment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Pago no encontrado' })
 
       await tx.loanRealCashflow.deleteMany({ where: { paymentId: payment.id } })
       await tx.loanPayment.delete({ where: { id: payment.id } })
@@ -1106,12 +1108,12 @@ function round8(value: number | Decimal): number {
 
 function coerceDate(value: string | Date): Date {
   if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) throw new Error('Fecha de pago inválida')
+    if (Number.isNaN(value.getTime())) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Fecha de pago inválida' })
     return value
   }
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) {
-    throw new Error('Fecha de pago inválida')
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Fecha de pago inválida' })
   }
   return parsed
 }

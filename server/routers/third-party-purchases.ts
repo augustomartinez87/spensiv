@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from '@/lib/trpc'
 import {
   createTransactionWithInstallments,
@@ -198,7 +199,7 @@ export const thirdPartyPurchasesRouter = router({
       })
 
       if (!installment || installment.thirdPartyPurchase.userId !== ctx.user.id) {
-        throw new Error('Cuota no encontrada')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Cuota no encontrada' })
       }
 
       await ctx.prisma.thirdPartyInstallment.update({
@@ -241,7 +242,7 @@ export const thirdPartyPurchasesRouter = router({
       })
 
       if (!installment || installment.thirdPartyPurchase.userId !== ctx.user.id) {
-        throw new Error('Cuota no encontrada')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Cuota no encontrada' })
       }
 
       await ctx.prisma.thirdPartyInstallment.update({
@@ -275,7 +276,7 @@ export const thirdPartyPurchasesRouter = router({
       })
 
       if (!purchase) {
-        throw new Error('Compra no encontrada')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Compra no encontrada' })
       }
 
       // Void the underlying transaction
@@ -337,15 +338,15 @@ export const thirdPartyPurchasesRouter = router({
       })
 
       if (!transaction || transaction.userId !== ctx.user.id) {
-        throw new Error('Transacción no encontrada')
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Transacción no encontrada' })
       }
 
       if (!transaction.isForThirdParty) {
-        throw new Error('La transacción no está marcada como tercero')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'La transacción no está marcada como tercero' })
       }
 
       if (transaction.thirdPartyPurchase) {
-        throw new Error('La transacción ya tiene una compra de tercero asociada')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'La transacción ya tiene una compra de tercero asociada' })
       }
 
       const installmentAmount = new Decimal(transaction.totalAmount.toString()).div(transaction.installments).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { TRPCError } from '@trpc/server'
+import { Prisma } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import {
   INCOME_CATEGORY_TAXONOMY,
@@ -282,7 +283,7 @@ export const incomesRouter = router({
         .optional()
     )
     .query(async ({ ctx, input }) => {
-      const where: any = {
+      const where: Prisma.IncomeWhereInput = {
         userId: ctx.user.id,
       }
 

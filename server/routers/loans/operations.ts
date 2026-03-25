@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { tnaToMonthlyRate, frenchInstallment, reverseFromInstallment, generateAmortizationTable, strategicRoundInstallment } from '@/lib/loan-calculator'
@@ -174,7 +175,7 @@ export const loanOperationsRouter = router({
       if (Number(installment.paidAmount ?? 0) > 0) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'No se puede editar una cuota con pagos parciales' })
       if (!input.amount && !input.dueDate) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Debe indicar monto o fecha a modificar' })
 
-      const updates: Record<string, any> = {}
+      const updates: Prisma.LoanInstallmentUpdateInput = {}
 
       if (input.amount !== undefined) {
         const loan = installment.loan

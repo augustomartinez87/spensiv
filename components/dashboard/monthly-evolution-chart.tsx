@@ -20,7 +20,7 @@ interface DataPoint {
   balance: number
 }
 
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ dataKey: string; name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null
   return (
     <div
@@ -34,7 +34,7 @@ function CustomTooltip({ active, payload, label }: any) {
       <p className="font-semibold mb-2 capitalize" style={{ color: 'rgba(255,255,255,0.7)' }}>
         {label}
       </p>
-      {payload.map((entry: any) => (
+      {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center gap-2 mb-0.5">
           <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: entry.color }} />
           <span style={{ color: 'rgba(255,255,255,0.4)' }}>{entry.name}:</span>

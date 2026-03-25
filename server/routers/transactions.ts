@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { TRPCError } from '@trpc/server'
+import { Prisma } from '@prisma/client'
 import {
   createTransactionWithInstallments,
   recalculateBillingCycleTotals,
@@ -180,7 +181,7 @@ export const transactionsRouter = router({
         .optional()
     )
     .query(async ({ ctx, input }) => {
-      const where: any = {
+      const where: Prisma.TransactionWhereInput = {
         userId: ctx.user.id,
       }
 
@@ -984,7 +985,7 @@ export const transactionsRouter = router({
         .optional()
     )
     .query(async ({ ctx, input }) => {
-      const where: any = {
+      const where: Prisma.TransactionWhereInput = {
         userId: ctx.user.id,
         installments: { gt: 1 },
         isVoided: false,

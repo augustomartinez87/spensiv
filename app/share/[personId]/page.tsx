@@ -11,6 +11,26 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronDown, ChevronUp, CalendarClock, AlertCircle, Sparkles } from 'lucide-react'
 
+interface ShareInstallment {
+  id: string
+  number: number
+  dueDate: string | Date
+  amount: number
+  isPaid: boolean
+  paidAmount: number | null
+}
+
+interface ShareLoan {
+  id: string
+  borrowerName: string
+  currency: string
+  loanType: string
+  capital: number
+  installmentAmount: number | null
+  monthlyRate: number | null
+  installments: ShareInstallment[]
+}
+
 /* ─── Color Theme ──────────────────────────────────────────────────────────── */
 
 const THEME = {
@@ -157,7 +177,7 @@ export default function SharePersonPage() {
 
 /* ─── Loan Card ────────────────────────────────────────────────────────────── */
 
-function LoanCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date; colorIndex?: number }) {
+function LoanCard({ loan, now, colorIndex = 0 }: { loan: ShareLoan; now: Date; colorIndex?: number }) {
   const isInterestOnly = loan.loanType === 'interest_only'
 
   if (isInterestOnly) {
@@ -169,21 +189,21 @@ function LoanCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date; colorIn
 
 /* ─── Interest-Only Card ───────────────────────────────────────────────────── */
 
-function InterestOnlyCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date; colorIndex?: number }) {
+function InterestOnlyCard({ loan, now, colorIndex = 0 }: { loan: ShareLoan; now: Date; colorIndex?: number }) {
   const [showPaid, setShowPaid] = useState(false)
   const colors = LOAN_COLORS[colorIndex % LOAN_COLORS.length]
 
   const isZeroRate = (loan.monthlyRate ?? 0) === 0
   const monthlyInterest = loan.capital * (loan.monthlyRate ?? 0)
-  const paidInstallments = loan.installments.filter((i: any) => i.isPaid)
-  const unpaidInstallments = loan.installments.filter((i: any) => !i.isPaid)
+  const paidInstallments = loan.installments.filter((i: ShareInstallment) => i.isPaid)
+  const unpaidInstallments = loan.installments.filter((i: ShareInstallment) => !i.isPaid)
 
   const nextInst = unpaidInstallments.find(
-    (i: any) => new Date(i.dueDate) >= now,
+    (i: ShareInstallment) => new Date(i.dueDate) >= now,
   ) ?? unpaidInstallments[0]
 
   const overdueInstallments = unpaidInstallments.filter(
-    (i: any) => new Date(i.dueDate) < now,
+    (i: ShareInstallment) => new Date(i.dueDate) < now,
   )
 
   const loanLabel = loan.borrowerName
@@ -277,7 +297,7 @@ function InterestOnlyCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date;
                     ? '1 pago pendiente'
                     : `${unpaidInstallments.length} pagos pendientes`}
                 </p>
-                {unpaidInstallments.map((inst: any) => {
+                {unpaidInstallments.map((inst: ShareInstallment) => {
                   const due = new Date(inst.dueDate)
                   const isOverdue = due < now
                   const isNext = nextInst?.id === inst.id
@@ -327,7 +347,7 @@ function InterestOnlyCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date;
                 </button>
                 {showPaid && (
                   <div className="space-y-1 mt-2">
-                    {paidInstallments.map((inst: any) => (
+                    {paidInstallments.map((inst: ShareInstallment) => (
                       <div
                         key={inst.id}
                         className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm opacity-50"
@@ -363,23 +383,23 @@ function InterestOnlyCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date;
 
 /* ─── Amortized Card (original) ────────────────────────────────────────────── */
 
-function AmortizedCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date; colorIndex?: number }) {
+function AmortizedCard({ loan, now, colorIndex = 0 }: { loan: ShareLoan; now: Date; colorIndex?: number }) {
   const [showPaid, setShowPaid] = useState(false)
   const colors = LOAN_COLORS[colorIndex % LOAN_COLORS.length]
 
-  const paidInstallments = loan.installments.filter((i: any) => i.isPaid)
-  const unpaidInstallments = loan.installments.filter((i: any) => !i.isPaid)
+  const paidInstallments = loan.installments.filter((i: ShareInstallment) => i.isPaid)
+  const unpaidInstallments = loan.installments.filter((i: ShareInstallment) => !i.isPaid)
   const paidCount = paidInstallments.length
   const totalCount = loan.installments.length
 
   // Find the next upcoming installment
   const nextInst = unpaidInstallments.find(
-    (i: any) => new Date(i.dueDate) >= now,
+    (i: ShareInstallment) => new Date(i.dueDate) >= now,
   ) ?? unpaidInstallments[0]
 
   // Overdue installments (unpaid and dueDate before now)
   const overdueInstallments = unpaidInstallments.filter(
-    (i: any) => new Date(i.dueDate) < now,
+    (i: ShareInstallment) => new Date(i.dueDate) < now,
   )
 
   // Friendly loan label — strip borrower name if it matches the person name
@@ -446,7 +466,7 @@ function AmortizedCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date; co
                 ? 'Cuota restante'
                 : `${unpaidInstallments.length} cuotas restantes`}
             </p>
-            {unpaidInstallments.map((inst: any) => {
+            {unpaidInstallments.map((inst: ShareInstallment) => {
               const due = new Date(inst.dueDate)
               const isOverdue = due < now
               const isNext = nextInst?.id === inst.id
@@ -504,7 +524,7 @@ function AmortizedCard({ loan, now, colorIndex = 0 }: { loan: any; now: Date; co
             </button>
             {showPaid && (
               <div className="space-y-1 mt-2">
-                {paidInstallments.map((inst: any) => (
+                {paidInstallments.map((inst: ShareInstallment) => (
                   <div
                     key={inst.id}
                     className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm opacity-50"
