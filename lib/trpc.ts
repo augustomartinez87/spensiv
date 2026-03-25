@@ -31,6 +31,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
  * Router y procedimientos públicos
  */
 export const router = t.router
+export const mergeRouters = t.mergeRouters
 export const publicProcedure = t.procedure
 
 /**
