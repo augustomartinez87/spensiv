@@ -10,6 +10,7 @@ import { thirdPartyPurchasesRouter } from './routers/third-party-purchases'
 import { budgetRouter } from './routers/budget'
 import { adminRouter } from './routers/admin'
 import { shareRouter } from './routers/share'
+import { rateRulesRouter } from './routers/rate-rules'
 
 export const appRouter = router({
   cards: cardsRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
   budget: budgetRouter,
   admin: adminRouter,
   share: shareRouter,
+  rateRules: rateRulesRouter,
 })
 
 export type AppRouter = typeof appRouter

@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
+  Percent,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -60,6 +61,7 @@ const navigation: NavSection[] = [
       { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
       { name: 'Personas', href: '/dashboard/persons', icon: Users },
       { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
+      { name: 'Reglas de Tasas', href: '/dashboard/rate-rules', icon: Percent },
     ],
   },
   {

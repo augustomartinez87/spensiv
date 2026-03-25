@@ -33,6 +33,8 @@ model User {
   persons             Person[]
   thirdPartyPurchases ThirdPartyPurchase[]
   budgetLimits        BudgetLimit[]
+  borrowerTypes       BorrowerType[]
+  durationAdjustments DurationAdjustment[]
 
   @@map("users")
 }
@@ -647,4 +649,40 @@ model BudgetLimit {
   @@unique([userId, categoryId])
   @@index([userId])
   @@map("budget_limits")
+}
+
+// ============================================================================
+// LOAN RATE RULES
+// ============================================================================
+
+model BorrowerType {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name    String
+  baseTna Decimal @db.Decimal(5, 2) // TNA mínima base (ej: 110.00 = 110%)
+  order   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("borrower_types")
+}
+
+model DurationAdjustment {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  minMonths  Int
+  maxMonths  Int
+  adjustment Decimal @db.Decimal(5, 2) // Ajuste en pp (ej: 10.00 = +10%)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("duration_adjustments")
 }
