@@ -6,6 +6,7 @@ import { trpc } from '@/lib/trpc-client'
 import { MonthSelector } from '@/components/dashboard/month-selector'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { CompactProjection } from '@/components/dashboard/compact-projection'
+import { InsightBanner } from '@/components/dashboard/insight-banner'
 
 const MonthlyEvolutionChart = dynamic(
   () => import('@/components/dashboard/monthly-evolution-chart').then((m) => m.MonthlyEvolutionChart),
@@ -141,6 +142,15 @@ export default function DashboardPage() {
   const expenseSparkline = evolutionData?.map((d) => d.expense) ?? []
   const incomeSparkline = evolutionData?.map((d) => d.income) ?? []
 
+  const isCurrentPeriod =
+    period === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const daysInMonth = new Date(periodYear, periodMonth, 0).getDate()
+  const daysRemaining = daysInMonth - now.getDate()
+  const expenseVariation =
+    prevBalance && prevBalance.expense > 0
+      ? ((balance.totalExpense - prevBalance.expense) / prevBalance.expense) * 100
+      : null
+
   return (
     <div className="space-y-4">
       {/* ── Header ── */}
@@ -206,6 +216,15 @@ export default function DashboardPage() {
           totalExpense={convert(balance.totalExpense)}
         />
       </div>
+
+      {/* ── InsightBanner (solo mes actual) ── */}
+      {isCurrentPeriod && (
+        <InsightBanner
+          expenseVariation={expenseVariation}
+          balance={convert(balance.balance)}
+          daysRemaining={daysRemaining}
+        />
+      )}
 
       {/* ── ROW 2: Evolución + Donuts side by side ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

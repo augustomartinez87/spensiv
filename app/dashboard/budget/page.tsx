@@ -24,7 +24,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Target, Trash2, Sparkles, Pencil } from 'lucide-react'
+import { Plus, Target, Trash2, Sparkles, Pencil, MoreHorizontal } from 'lucide-react'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 type BudgetProgressItem = {
   categoryId: string
@@ -116,24 +127,31 @@ export default function BudgetPage() {
           {hasCategories && (
             <AddBudgetDialog existingCategoryIds={progressList.map((item) => item.categoryId)} />
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => seedMutation.mutate()}
-            disabled={seedMutation.isPending}
-          >
-            <Sparkles className="h-4 w-4 mr-2" />
-            {seedMutation.isPending ? 'Sincronizando...' : 'Sincronizar base'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => normalizeCategoriesMutation.mutate()}
-            disabled={normalizeCategoriesMutation.isPending || !hasCategories}
-          >
-            <Sparkles className="h-4 w-4 mr-2" />
-            {normalizeCategoriesMutation.isPending ? 'Normalizando...' : 'Normalizar categorias'}
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9" title="Mantenimiento">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-52 p-1">
+              <button
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50"
+                onClick={() => seedMutation.mutate()}
+                disabled={seedMutation.isPending}
+              >
+                <Sparkles className="h-4 w-4 shrink-0" />
+                {seedMutation.isPending ? 'Sincronizando...' : 'Sincronizar base'}
+              </button>
+              <button
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50"
+                onClick={() => normalizeCategoriesMutation.mutate()}
+                disabled={normalizeCategoriesMutation.isPending || !hasCategories}
+              >
+                <Sparkles className="h-4 w-4 shrink-0" />
+                {normalizeCategoriesMutation.isPending ? 'Normalizando...' : 'Normalizar categorias'}
+              </button>
+            </PopoverContent>
+          </Popover>
           <MonthSelector value={period} onChange={setPeriod} />
         </div>
       </div>
@@ -186,7 +204,13 @@ export default function BudgetPage() {
           existingCategoryIds={[]}
         />
       ) : (
-        <BudgetTable progress={progressList} existingCategoryIds={progressList.map((item) => item.categoryId)} />
+        <BudgetTable
+          progress={progressList}
+          existingCategoryIds={progressList.map((item) => item.categoryId)}
+          totalLimit={totalLimit}
+          totalSpent={totalSpent}
+          totalPercentage={totalPercentage}
+        />
       )}
     </div>
   )
@@ -235,9 +259,15 @@ function EmptyState({
 function BudgetTable({
   progress,
   existingCategoryIds,
+  totalLimit,
+  totalSpent,
+  totalPercentage,
 }: {
   progress: BudgetProgressItem[]
   existingCategoryIds: string[]
+  totalLimit: number
+  totalSpent: number
+  totalPercentage: number
 }) {
   const utils = trpc.useUtils()
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -363,12 +393,23 @@ function BudgetTable({
                         {Math.round(item.percentage)}%
                       </td>
                       <td className="py-3 px-4">
-                        <div className="h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className={cn('h-full rounded-full transition-all duration-500', barColor)}
-                            style={{ width: `${Math.min(item.percentage, 100)}%` }}
-                          />
-                        </div>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden cursor-default max-w-[180px]">
+                                <div
+                                  className={cn('h-full rounded-full transition-all duration-500', barColor)}
+                                  style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            {item.percentage > 100 && (
+                              <TooltipContent>
+                                Excediste por {formatCurrency(item.spent - item.monthlyLimit)} (+{Math.round(item.percentage - 100)}%)
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex justify-end gap-1">
@@ -400,6 +441,21 @@ function BudgetTable({
                   )
                 })}
               </tbody>
+              {/* Totals row */}
+              <tfoot>
+                <tr className="border-t-2 border-border bg-muted/30 font-semibold">
+                  <td className="py-3 px-4 text-sm text-muted-foreground">{sorted.length} {sorted.length === 1 ? 'categoria' : 'categorias'}</td>
+                  <td className="py-3 px-4 text-right text-sm tabular-nums">{formatCurrency(totalSpent)}</td>
+                  <td className="py-3 px-4 text-right text-sm tabular-nums">{formatCurrency(totalLimit)}</td>
+                  <td className={cn(
+                    'py-3 px-4 text-right text-sm font-bold',
+                    totalPercentage > 100 ? 'text-red-500' : totalPercentage >= 80 ? 'text-amber-500' : 'text-green-500'
+                  )}>
+                    {Math.round(totalPercentage)}%
+                  </td>
+                  <td className="py-3 px-4" colSpan={2} />
+                </tr>
+              </tfoot>
             </table>
           </div>
 
