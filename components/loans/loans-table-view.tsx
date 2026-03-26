@@ -324,7 +324,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                         <SortIcon column="status" activeColumn={sortColumn} direction={sortDirection} />
                                     </button>
                                 </TableHead>
-                                <TableHead className="w-[80px]">
+                                <TableHead className="w-[80px] hidden sm:table-cell">
                                     <span className="text-xs uppercase tracking-wider font-medium">Acciones</span>
                                 </TableHead>
                             </TableRow>
@@ -461,7 +461,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                         </TableCell>
 
                                         {/* Acciones */}
-                                        <TableCell className="py-2">
+                                        <TableCell className="py-2 hidden sm:table-cell">
                                             <div className="flex items-center gap-1">
                                                 {loan.status === 'active' && (
                                                     <Button
@@ -515,7 +515,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                     )}
                                 </TableCell>
                                 <TableCell className="py-2.5" />
-                                <TableCell className="py-2.5" />
+                                <TableCell className="py-2.5 hidden sm:table-cell" />
                             </TableRow>
                         </TableBody>
                     </Table>

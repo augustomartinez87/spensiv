@@ -122,6 +122,15 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
   const [createOpen, setCreateOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [riskFilter, setRiskFilter] = useState<string>('all')
+  const { toast } = useToast()
+
+  function copyShareLink(e: React.MouseEvent, personId: string) {
+    e.stopPropagation()
+    const url = `${window.location.origin}/share/${personId}`
+    navigator.clipboard.writeText(url).then(() => {
+      toast({ description: 'Link de estado de cuenta copiado' })
+    })
+  }
 
   if (isLoading) {
     return (
@@ -244,9 +253,18 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
                 </span>
               </div>
 
-              <div className={cn('flex items-center gap-2 text-xs px-3 py-2 rounded-lg', cat.color)}>
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span>{cat.label} · Spread ref.: {person.category === 'critico' ? 'BLOQUEADO' : `+${(person.minTnaSpread * 100).toFixed(0)}pp`}</span>
+              <div className="flex items-center justify-between gap-2">
+                <div className={cn('flex items-center gap-2 text-xs px-3 py-2 rounded-lg flex-1', cat.color)}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span>{cat.label} · Spread ref.: {person.category === 'critico' ? 'BLOQUEADO' : `+${(person.minTnaSpread * 100).toFixed(0)}pp`}</span>
+                </div>
+                <button
+                  onClick={(e) => copyShareLink(e, person.id)}
+                  className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title="Copiar link de cobro"
+                >
+                  <Link2 className="h-4 w-4" />
+                </button>
               </div>
             </CardContent>
           </Card>
@@ -265,6 +283,14 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
 
 function PersonDrawerContent({ personId, onViewFull }: { personId: string; onViewFull: () => void }) {
   const { data: person, isLoading } = trpc.persons.getById.useQuery({ id: personId })
+  const { toast } = useToast()
+
+  function copyShareLink() {
+    const url = `${window.location.origin}/share/${personId}`
+    navigator.clipboard.writeText(url).then(() => {
+      toast({ description: 'Link de estado de cuenta copiado' })
+    })
+  }
 
   if (isLoading) {
     return (
@@ -364,10 +390,16 @@ function PersonDrawerContent({ personId, onViewFull }: { personId: string; onVie
         )}
       </div>
 
-      {/* View full detail button */}
-      <Button className="w-full" variant="outline" onClick={onViewFull}>
-        Ver detalle completo
-      </Button>
+      {/* Actions */}
+      <div className="space-y-2">
+        <Button className="w-full" onClick={copyShareLink}>
+          <Link2 className="h-4 w-4 mr-2" />
+          Copiar link de cobro
+        </Button>
+        <Button className="w-full" variant="outline" onClick={onViewFull}>
+          Ver detalle completo
+        </Button>
+      </div>
     </div>
   )
 }

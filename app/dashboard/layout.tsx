@@ -81,7 +81,7 @@ const mobileNavBase = [
 
 const mobileNavAdmin = [
   { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
-  { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
+  { name: 'Personas', href: '/dashboard/persons', icon: Users },
 ]
 
 export default function DashboardLayout({
@@ -275,7 +275,7 @@ function DashboardLayoutInner({
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-32 md:pb-8">
           <div className="mx-auto max-w-7xl">
             {children}
           </div>

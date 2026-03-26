@@ -30,7 +30,10 @@ export function CopyCollectionMessage({ loan }: { loan: LoanDetail }) {
         cur
     )
 
-    const defaultMessage = `Hola ${nombre}! Te recuerdo que el ${fecha} vence tu cuota #${nextInstallment.number} por ${monto} (de un total de ${total} cuotas). Saldo pendiente: ${saldo}. Cualquier consulta avisame. 🙌`
+    const shareUrl = typeof window !== 'undefined' && loan.person?.id
+        ? `${window.location.origin}/share/${loan.person.id}`
+        : null
+    const defaultMessage = `Hola ${nombre}! Te recuerdo que el ${fecha} vence tu cuota #${nextInstallment.number} por ${monto} (de un total de ${total} cuotas). Saldo pendiente: ${saldo}.${shareUrl ? ` Podés ver tu estado de cuenta acá: ${shareUrl}` : ''} Cualquier consulta avisame. 🙌`
 
     // Initialize message if empty
     if (message === '' && defaultMessage !== '') {

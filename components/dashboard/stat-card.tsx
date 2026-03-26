@@ -86,7 +86,7 @@ export function StatCard({
 
                 {/* Fila 2: valor principal */}
                 <PrivateAmount>
-                    <div className={cn('text-2xl font-bold tracking-tight break-all mt-2 tabular-nums', valueColor)}>
+                    <div className={cn('text-xl sm:text-2xl font-bold tracking-tight break-all mt-2 tabular-nums', valueColor)}>
                         {isBalance && !isPositive && '-'}
                         ${Math.abs(value).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
