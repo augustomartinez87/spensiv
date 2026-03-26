@@ -53,6 +53,7 @@ import { useToast } from '@/hooks/use-toast'
 
 import { amountClass, loanRateInfo } from '@/components/loans/helpers'
 import { LoansDashboardSummary } from '@/components/loans/loans-dashboard-summary'
+import { LoansCompactStats } from '@/components/loans/loans-compact-stats'
 import { DebtsDashboardSummary } from '@/components/loans/debts-dashboard-summary'
 import { UpcomingInstallmentsGadget } from '@/components/loans/upcoming-installments-gadget'
 import { PreApprovedLoanCard } from '@/components/loans/pre-approved-loan-card'
@@ -70,7 +71,7 @@ import { LoanActivityTimeline } from '@/components/loans/loan-activity-timeline'
 
 export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
-  const [view, setView] = useState<'list' | 'table' | 'calendar'>('list')
+  const [view, setView] = useState<'list' | 'table' | 'calendar'>('table')
   const [tab, setTab] = useState<'lender' | 'borrower'>('lender')
 
   if (selectedLoanId) {
@@ -88,19 +89,21 @@ export default function LoansPage() {
         </TabsList>
 
         <TabsContent value="lender" className="space-y-6 mt-6">
-          <LoansDashboardSummary />
-          <div className="grid gap-6 md:grid-cols-[1fr_280px]">
-            <div>
-              {view === 'list' ? (
-                <LoanListContent onSelect={setSelectedLoanId} direction="lender" />
-              ) : view === 'table' ? (
-                <LoansTableView onSelect={setSelectedLoanId} direction="lender" />
-              ) : (
-                <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
-              )}
+          {view === 'table' ? <LoansCompactStats /> : <LoansDashboardSummary />}
+          {view === 'table' ? (
+            <LoansTableView onSelect={setSelectedLoanId} direction="lender" />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-[1fr_280px]">
+              <div>
+                {view === 'list' ? (
+                  <LoanListContent onSelect={setSelectedLoanId} direction="lender" />
+                ) : (
+                  <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
+                )}
+              </div>
+              <UpcomingInstallmentsGadget />
             </div>
-            <UpcomingInstallmentsGadget />
-          </div>
+          )}
         </TabsContent>
 
         <TabsContent value="borrower" className="space-y-6 mt-6">

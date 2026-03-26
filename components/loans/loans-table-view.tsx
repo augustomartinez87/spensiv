@@ -35,10 +35,16 @@ type SortDirection = 'asc' | 'desc'
 type StatusFilter = 'all' | 'current' | 'overdue' | 'interestOnly'
 type CurrencyFilter = 'all' | 'ARS' | 'USD' | 'EUR'
 
+/** A no-interest, no-term loan has $0 installments — never "overdue" */
+function isZeroRateOpenLoan(loan: LoanListItem) {
+    return loan.loanType === 'interest_only' && Number(loan.monthlyRate) === 0
+}
+
 function getLoanStatus(loan: LoanListItem) {
     const now = new Date()
     const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
     if (loan.status === 'completed') return 'completed' as const
+    if (isZeroRateOpenLoan(loan)) return 'open' as const
     if (nextDue && nextDue < now) return 'overdue' as const
     if (!nextDue && loan.status === 'active') return 'new' as const
     return 'current' as const
@@ -49,6 +55,7 @@ function getStatusDisplay(status: ReturnType<typeof getLoanStatus>) {
         case 'overdue': return { label: 'Vencido', color: 'bg-red-500', textColor: 'text-red-400' }
         case 'current': return { label: 'Al día', color: 'bg-green-500', textColor: 'text-green-400' }
         case 'new': return { label: 'Nuevo', color: 'bg-blue-500', textColor: 'text-blue-400' }
+        case 'open': return { label: 'Abierto', color: 'bg-blue-400', textColor: 'text-blue-400' }
         case 'completed': return { label: 'Finalizado', color: 'bg-muted-foreground', textColor: 'text-muted-foreground' }
     }
 }
@@ -171,7 +178,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                     break
                 }
                 case 'status': {
-                    const order = { overdue: 0, current: 1, new: 2, completed: 3 }
+                    const order = { overdue: 0, current: 1, open: 2, new: 3, completed: 4 }
                     cmp = order[getLoanStatus(a)] - order[getLoanStatus(b)]
                     break
                 }
@@ -421,7 +428,12 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
 
                                         {/* Prox. cuota */}
                                         <TableCell className="py-2">
-                                            {nextDue ? (
+                                            {isZeroRate && isInterestOnly ? (
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Capital pdte:</p>
+                                                    <p className="text-sm tabular-nums font-medium">{formatCurrency(Number(loan.principalOutstanding), cur)}</p>
+                                                </div>
+                                            ) : nextDue ? (
                                                 <div>
                                                     <p className={cn("text-sm", isOverdue ? "text-red-400 font-medium" : "text-foreground")}>
                                                         {format(nextDue, "d MMM", { locale: es })}

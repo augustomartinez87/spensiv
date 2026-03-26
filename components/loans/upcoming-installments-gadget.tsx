@@ -13,12 +13,17 @@ export function UpcomingInstallmentsGadget() {
 
     const now = new Date()
 
+    // Filter out $0 installments (no-interest, no-term loans)
+    const installments = metrics.upcomingInstallments.filter((inst) => inst.amount > 0)
+
+    if (installments.length === 0) return null
+
     return (
         <Card className="h-fit sticky top-20">
             <CardContent className="p-4">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Próximas cuotas</p>
                 <div className="space-y-3">
-                    {metrics.upcomingInstallments.map((inst) => {
+                    {installments.map((inst) => {
                         const dueDate = new Date(inst.dueDate)
                         const isOverdue = dueDate < now
                         return (

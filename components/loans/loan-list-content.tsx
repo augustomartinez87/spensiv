@@ -87,10 +87,12 @@ function getRingColor(loan: {
     totalCount: number
     nextDueDate: Date | string | null
     loanType: string
+    monthlyRate: { toString(): string }
 }) {
     const now = new Date()
     const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
-    const isOverdue = nextDue && nextDue < now
+    const isZeroRateOpen = loan.loanType === 'interest_only' && Number(loan.monthlyRate) === 0
+    const isOverdue = !isZeroRateOpen && nextDue && nextDue < now
 
     if (isOverdue) return '#ef4444' // red
 
@@ -229,9 +231,10 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                 {otherLoans.map((loan) => {
                     const now = new Date()
                     const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
-                    const isOverdue = nextDue && nextDue < now
                     const isInterestOnly = loan.loanType === 'interest_only'
                     const isZeroRate = Number(loan.monthlyRate) === 0
+                    const isZeroRateOpen = isInterestOnly && isZeroRate
+                    const isOverdue = !isZeroRateOpen && nextDue && nextDue < now
                     const cur = loan.currency
 
                     const ringColor = getRingColor(loan)
