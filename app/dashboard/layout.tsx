@@ -80,7 +80,8 @@ const mobileNavBase = [
 ]
 
 const mobileNavAdmin = [
-  { name: 'Préstamos', href: '/dashboard/portfolio', icon: Banknote },
+  { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
+  { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
 ]
 
 export default function DashboardLayout({
