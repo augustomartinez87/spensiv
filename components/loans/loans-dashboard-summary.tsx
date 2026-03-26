@@ -238,6 +238,28 @@ export function LoansDashboardSummary() {
     )
 }
 
+/** Standalone overdue banner for use outside the full dashboard summary (e.g. table view) */
+export function OverdueBanner() {
+    const { data: metrics } = trpc.loans.getDashboardMetrics.useQuery()
+    if (!metrics || metrics.overdueCount === 0) return null
+
+    return (
+        <div className={cn(
+            'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium',
+            metrics.overdueCount >= 3
+                ? 'bg-red-500/15 text-red-400 border border-red-500/20'
+                : 'bg-yellow-500/15 text-yellow-500 border border-yellow-500/20'
+        )}>
+            <span className="h-2 w-2 rounded-full bg-current shrink-0 animate-pulse" />
+            <span>
+                {metrics.overdueCount >= 3 ? 'Alerta' : 'Atención'}:{' '}
+                {metrics.overdueCount} cuota{metrics.overdueCount !== 1 ? 's' : ''} vencida{metrics.overdueCount !== 1 ? 's' : ''} —{' '}
+                <PrivateAmount><span className="font-bold">{formatCurrency(metrics.overdueAmount)}</span></PrivateAmount> pendiente{metrics.overdueCount !== 1 ? 's' : ''} de cobro
+            </span>
+        </div>
+    )
+}
+
 function MiniStat({
     label,
     value,

@@ -52,8 +52,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 
 import { amountClass, loanRateInfo } from '@/components/loans/helpers'
-import { LoansDashboardSummary } from '@/components/loans/loans-dashboard-summary'
-import { LoansCompactStats } from '@/components/loans/loans-compact-stats'
+import { LoansDashboardSummary, OverdueBanner } from '@/components/loans/loans-dashboard-summary'
 import { DebtsDashboardSummary } from '@/components/loans/debts-dashboard-summary'
 import { UpcomingInstallmentsGadget } from '@/components/loans/upcoming-installments-gadget'
 import { PreApprovedLoanCard } from '@/components/loans/pre-approved-loan-card'
@@ -79,20 +78,29 @@ export default function LoansPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <LoanListHeader view={view} onViewChange={setView} direction={tab} />
+    <div className="space-y-6">
+      <LoanListHeader view={view} onViewChange={setView} direction={tab} tab={tab} onTabChange={setTab} />
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-        <TabsList className="grid w-full max-w-xs grid-cols-2 bg-muted/60">
-          <TabsTrigger value="lender" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Soy prestamista</TabsTrigger>
-          <TabsTrigger value="borrower" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Soy deudor</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="lender" className="space-y-6 mt-6">
-          {view === 'table' ? <LoansCompactStats /> : <LoansDashboardSummary />}
-          {view === 'table' ? (
+      {view === 'table' ? (
+        /* ── Table view: no Tabs wrapper, no expanded KPIs, no sidebar ── */
+        <div className="space-y-4">
+          {tab === 'lender' && <OverdueBanner />}
+          {tab === 'lender' ? (
             <LoansTableView onSelect={setSelectedLoanId} direction="lender" />
           ) : (
+            <LoansTableView onSelect={setSelectedLoanId} direction="borrower" />
+          )}
+        </div>
+      ) : (
+        /* ── List / Calendar views: full Tabs with expanded KPIs + sidebar ── */
+        <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+          <TabsList className="grid w-full max-w-xs grid-cols-2 bg-muted/60">
+            <TabsTrigger value="lender" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Soy prestamista</TabsTrigger>
+            <TabsTrigger value="borrower" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Soy deudor</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="lender" className="space-y-6 mt-6">
+            <LoansDashboardSummary />
             <div className="grid gap-6 md:grid-cols-[1fr_280px]">
               <div>
                 {view === 'list' ? (
@@ -103,20 +111,18 @@ export default function LoansPage() {
               </div>
               <UpcomingInstallmentsGadget />
             </div>
-          )}
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="borrower" className="space-y-6 mt-6">
-          <DebtsDashboardSummary />
-          {view === 'list' ? (
-            <LoanListContent onSelect={setSelectedLoanId} direction="borrower" />
-          ) : view === 'table' ? (
-            <LoansTableView onSelect={setSelectedLoanId} direction="borrower" />
-          ) : (
-            <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
-          )}
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="borrower" className="space-y-6 mt-6">
+            <DebtsDashboardSummary />
+            {view === 'list' ? (
+              <LoanListContent onSelect={setSelectedLoanId} direction="borrower" />
+            ) : (
+              <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   )
 }
