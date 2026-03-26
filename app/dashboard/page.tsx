@@ -32,7 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { formatCurrency, cn, formatExpenseType } from '@/lib/utils'
+import { formatCurrency, cn } from '@/lib/utils'
 import { PrivateAmount } from '@/lib/privacy-context'
 import { useCurrency } from '@/lib/currency-context'
 import {
@@ -94,8 +94,8 @@ export default function DashboardPage() {
             <Skeleton className="h-9 w-28" />
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-28" />
           ))}
         </div>
@@ -127,17 +127,6 @@ export default function DashboardPage() {
       : new Date(periodYear, periodMonth, 0).getDate()
   const dailyExpenseAverage = daysElapsed > 0 ? balance.totalExpense / daysElapsed : 0
 
-  const allExpenseDates = [
-    ...balance.installments.map((inst: any) => new Date(inst.transaction.purchaseDate)),
-    ...(balance.cashTransactions || []).map((tx: any) => new Date(tx.purchaseDate)),
-  ]
-  const lastExpenseDate =
-    allExpenseDates.length > 0
-      ? new Date(Math.max(...allExpenseDates.map((d) => d.getTime())))
-      : null
-  const lastExpenseDaysAgo = lastExpenseDate
-    ? Math.max(0, Math.floor((now.getTime() - lastExpenseDate.getTime()) / (1000 * 60 * 60 * 24)))
-    : undefined
 
   const lastIncome = balance.incomes.length > 0 ? balance.incomes[0] : null
   const nextIncomeEstimate = lastIncome
@@ -185,8 +174,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── ROW 1: 3 hero cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* ── ROW 1: 4 hero cards (2×2 on mobile, 4 in a row on lg) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Egresos del mes"
           value={convert(balance.totalExpense)}
@@ -194,7 +183,6 @@ export default function DashboardPage() {
           type="expense"
           previousValue={prevBalance ? convert(prevBalance.expense) : undefined}
           dailyAverage={convert(dailyExpenseAverage)}
-          lastTransactionDaysAgo={lastExpenseDaysAgo}
           sparklineData={expenseSparkline}
         />
         <StatCard
@@ -205,6 +193,12 @@ export default function DashboardPage() {
           previousValue={prevBalance ? convert(prevBalance.income) : undefined}
           nextEstimatedDate={nextIncomeEstimate}
           sparklineData={incomeSparkline}
+        />
+        <StatCard
+          title="Balance neto"
+          value={convert(balance.balance)}
+          type="balance"
+          previousValue={prevBalance ? convert(prevBalance.balance) : undefined}
         />
         <CompactProjection
           balance={convert(balance.balance)}
@@ -462,7 +456,6 @@ function UnifiedRecentMovements({
                         {format(m.date, 'd MMM', { locale: es })}
                         {' · '}
                         {m.category}
-                        {m.expenseType && ` · ${formatExpenseType(m.expenseType)}`}
                       </p>
                     </div>
                   </div>

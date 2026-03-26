@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { UserButton, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -18,18 +19,19 @@ import {
   Settings,
   Users,
   PieChart,
-  Layers,
   Target,
-  Tags,
-  ShieldCheck,
   Eye,
   EyeOff,
-  Percent,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { PrivacyProvider, usePrivacy } from '@/lib/privacy-context'
 import { CurrencyProvider } from '@/lib/currency-context'
+
+const TransactionForm = dynamic(
+  () => import('@/components/transactions/transaction-form').then((m) => m.TransactionForm),
+  { ssr: false }
+)
 
 type NavItem = { name: string; href: string; icon: typeof LayoutDashboard }
 type NavSection = { label: string; items: NavItem[]; adminOnly?: boolean }
@@ -45,11 +47,8 @@ const navigation: NavSection[] = [
     label: 'Finanzas',
     items: [
       { name: 'Movimientos', href: '/dashboard/transactions', icon: ListOrdered },
-      { name: 'Categorias', href: '/dashboard/categories', icon: Tags },
       { name: 'Presupuesto', href: '/dashboard/budget', icon: Target },
-      { name: 'Tarjetas', href: '/dashboard/cards', icon: CardsIcon },
-      { name: 'Cuotas', href: '/dashboard/installments', icon: Layers },
-      { name: 'Compras Terceros', href: '/dashboard/third-party', icon: Users },
+      { name: 'Tarjetas & Cuotas', href: '/dashboard/cards', icon: CardsIcon },
       { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
     ],
   },
@@ -58,17 +57,8 @@ const navigation: NavSection[] = [
     adminOnly: true,
     items: [
       { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
-      { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
       { name: 'Personas', href: '/dashboard/persons', icon: Users },
       { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
-      { name: 'Reglas de Tasas', href: '/dashboard/rate-rules', icon: Percent },
-    ],
-  },
-  {
-    label: 'Administración',
-    adminOnly: true,
-    items: [
-      { name: 'Usuarios', href: '/dashboard/admin', icon: ShieldCheck },
     ],
   },
 ]
@@ -79,8 +69,7 @@ const mobileNavBase = [
 ]
 
 const mobileNavAdmin = [
-  { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
-  { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
+  { name: 'Préstamos', href: '/dashboard/portfolio', icon: Banknote },
 ]
 
 export default function DashboardLayout({
@@ -146,10 +135,7 @@ function DashboardLayoutInner({
               </svg>
             </div>
             {!sidebarCollapsed && (
-              <div>
-                <span className="font-bold text-lg text-white tracking-tight">Spensiv</span>
-                <p className="text-[10px] text-[hsl(var(--sidebar-foreground))] leading-none mt-0.5">Personal Premium</p>
-              </div>
+              <span className="font-bold text-lg text-white tracking-tight">Spensiv</span>
             )}
           </Link>
         </div>
@@ -282,6 +268,15 @@ function DashboardLayoutInner({
             {children}
           </div>
         </main>
+      </div>
+
+      {/* Mobile FAB — Nuevo Gasto */}
+      <div className="md:hidden fixed bottom-20 right-4 z-50">
+        <TransactionForm
+          size="icon"
+          triggerText=""
+          className="h-14 w-14 rounded-full shadow-xl bg-rose-500 hover:bg-rose-600 text-white border-0 [&>svg]:mr-0"
+        />
       </div>
 
       {/* Mobile Bottom Tab Bar */}

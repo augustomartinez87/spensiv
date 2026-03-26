@@ -14,7 +14,6 @@ interface StatCardProps {
     previousValue?: number
     currency?: string
     dailyAverage?: number
-    lastTransactionDaysAgo?: number
     nextEstimatedDate?: string
     sparklineData?: number[]
 }
@@ -32,7 +31,6 @@ export function StatCard({
     type,
     previousValue,
     dailyAverage,
-    lastTransactionDaysAgo,
     nextEstimatedDate,
     sparklineData,
 }: StatCardProps) {
@@ -57,15 +55,6 @@ export function StatCard({
     const sparkColor = type === 'expense' ? '#e54352' : '#22c55e'
     const sparkPoints = (sparklineData ?? []).map((v, i) => ({ v, i }))
 
-    const lastStr =
-        lastTransactionDaysAgo === 0
-            ? 'hoy'
-            : lastTransactionDaysAgo === 1
-                ? 'ayer'
-                : lastTransactionDaysAgo !== undefined
-                    ? `hace ${lastTransactionDaysAgo}d`
-                    : null
-
     return (
         <Card className="hover:shadow-md h-full min-h-[160px]">
             <CardContent className="p-5 flex flex-col h-full">
@@ -74,12 +63,18 @@ export function StatCard({
                     <p className="text-xs font-medium text-muted-foreground leading-snug">{title}</p>
                     {hasPreviousData ? (
                         <span className={cn(
-                            'text-xs font-semibold px-2 py-0.5 rounded-full shrink-0',
-                            variation !== null && variation >= 0
-                                ? 'bg-[hsl(var(--accent-positive))]/15 text-accent-positive'
-                                : 'bg-[hsl(var(--accent-danger))]/15 text-accent-danger'
+                            'text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-0.5',
+                            // For expenses: higher spend = bad (red), lower = good (green)
+                            // For income/balance: higher = good (green), lower = bad (red)
+                            type === 'expense'
+                                ? variation !== null && variation > 0
+                                    ? 'bg-[hsl(var(--accent-danger))]/15 text-accent-danger'
+                                    : 'bg-[hsl(var(--accent-positive))]/15 text-accent-positive'
+                                : variation !== null && variation >= 0
+                                    ? 'bg-[hsl(var(--accent-positive))]/15 text-accent-positive'
+                                    : 'bg-[hsl(var(--accent-danger))]/15 text-accent-danger'
                         )}>
-                            {variation !== null && variation >= 0 ? '+' : ''}{variation?.toFixed(1) ?? 0}%
+                            {variation !== null && variation > 0 ? '↑' : variation !== null && variation < 0 ? '↓' : ''}{Math.abs(variation ?? 0).toFixed(1)}%
                         </span>
                     ) : (
                         <span className="text-[10px] font-medium text-muted-foreground/70 bg-muted/50 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
@@ -127,10 +122,6 @@ export function StatCard({
                             {dailyAverage !== undefined && (
                                 <span>Prom: {fmtAvg(dailyAverage)}/día</span>
                             )}
-                            {dailyAverage !== undefined && lastStr && (
-                                <span className="opacity-40"> · </span>
-                            )}
-                            {lastStr && <span>Último: {lastStr}</span>}
                             {count !== undefined && (
                                 <>
                                     <span className="opacity-40"> · </span>
