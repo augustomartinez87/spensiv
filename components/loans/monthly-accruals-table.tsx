@@ -44,7 +44,7 @@ export function MonthlyAccrualsTable({ loanId, cur }: { loanId: string; cur: str
                                     })())}>
                                         {(() => {
                                             const isFuture = new Date(a.year, a.month - 1) > new Date()
-                                            if (isFuture) return <span className="text-muted-foreground/50">-</span>
+                                            if (isFuture) return <span className="text-muted-foreground/40 italic">N/A</span>
                                             return formatCurrency(Number(a.deviationAmount), cur)
                                         })()}
                                     </td>

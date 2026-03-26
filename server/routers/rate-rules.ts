@@ -4,9 +4,10 @@ import { TRPCError } from '@trpc/server'
 
 const DEFAULT_DURATION_BRACKETS = [
   { minMonths: 0, maxMonths: 3, adjustment: 0 },
-  { minMonths: 3, maxMonths: 6, adjustment: 10 },
-  { minMonths: 6, maxMonths: 9, adjustment: 20 },
-  { minMonths: 9, maxMonths: 12, adjustment: 30 },
+  { minMonths: 3, maxMonths: 6, adjustment: 5 },
+  { minMonths: 6, maxMonths: 9, adjustment: 10 },
+  { minMonths: 9, maxMonths: 12, adjustment: 15 },
+  { minMonths: 12, maxMonths: 360, adjustment: 50 },
 ]
 
 export const rateRulesRouter = router({

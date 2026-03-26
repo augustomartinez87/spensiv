@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Banknote, CalendarDays } from 'lucide-react'
+import { Banknote, CalendarDays, LayoutList } from 'lucide-react'
 import { CreateLoanDialog } from './create-loan-dialog'
 
-export function LoanListHeader({ view, onViewChange, direction }: { view: 'list' | 'calendar'; onViewChange: (v: 'list' | 'calendar') => void; direction: 'lender' | 'borrower' }) {
+export function LoanListHeader({ view, onViewChange, direction }: { view: 'list' | 'table' | 'calendar'; onViewChange: (v: 'list' | 'table' | 'calendar') => void; direction: 'lender' | 'borrower' }) {
     const [createOpen, setCreateOpen] = useState(false)
 
     return (
@@ -28,6 +28,15 @@ export function LoanListHeader({ view, onViewChange, direction }: { view: 'list'
                     >
                         <Banknote className="h-4 w-4 mr-1.5" />
                         Lista
+                    </Button>
+                    <Button
+                        variant={view === 'table' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="h-8"
+                        onClick={() => onViewChange('table')}
+                    >
+                        <LayoutList className="h-4 w-4 mr-1.5" />
+                        Tabla
                     </Button>
                     <Button
                         variant={view === 'calendar' ? 'default' : 'ghost'}

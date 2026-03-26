@@ -242,13 +242,20 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                     if (loan.person) {
                         cardTitle = loan.person.name || loan.person.alias || loan.borrowerName
                         // Remove person name from borrowerName to get subtitle
-                        const parts = loan.borrowerName.split(' - ')
-                        if (parts.length > 1) {
-                            const personName = loan.person.name || loan.person.alias || ''
-                            cardSubtitle = parts.filter(p => p.trim() !== personName.trim()).join(' - ') || null
+                        const personName = loan.person.name || loan.person.alias || ''
+                        const remaining = loan.borrowerName
+                            .split(' - ')
+                            .filter(p => p.trim() !== personName.trim())
+                            .join(' - ')
+                            .trim()
+                        cardSubtitle = remaining || null
+                        // If borrowerName is entirely different from person name, show it as subtitle
+                        if (!cardSubtitle && loan.borrowerName.trim() !== personName.trim()) {
+                            cardSubtitle = loan.borrowerName
                         }
                     } else {
-                        const parts = loan.borrowerName.split(' - ')
+                        // Split on " - " or " / " for consistency
+                        const parts = loan.borrowerName.split(/\s[-\/]\s/)
                         cardTitle = parts[0]
                         cardSubtitle = parts.length > 1 ? parts.slice(1).join(' - ') : null
                     }

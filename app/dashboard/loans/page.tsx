@@ -59,6 +59,7 @@ import { PreApprovedLoanCard } from '@/components/loans/pre-approved-loan-card'
 
 import { LoanListHeader } from '@/components/loans/loan-list-header'
 import { LoanListContent } from '@/components/loans/loan-list-content'
+import { LoansTableView } from '@/components/loans/loans-table-view'
 import { InstallmentCalendar } from '@/components/loans/installment-calendar'
 import { RegisterPaymentDialog } from '@/components/loans/register-payment-dialog'
 import { PaymentHistorySection } from '@/components/loans/payment-history-section'
@@ -69,7 +70,7 @@ import { LoanActivityTimeline } from '@/components/loans/loan-activity-timeline'
 
 export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
-  const [view, setView] = useState<'list' | 'calendar'>('list')
+  const [view, setView] = useState<'list' | 'table' | 'calendar'>('list')
   const [tab, setTab] = useState<'lender' | 'borrower'>('lender')
 
   if (selectedLoanId) {
@@ -81,9 +82,9 @@ export default function LoansPage() {
       <LoanListHeader view={view} onViewChange={setView} direction={tab} />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-        <TabsList className="grid w-full max-w-xs grid-cols-2">
-          <TabsTrigger value="lender">Soy prestamista</TabsTrigger>
-          <TabsTrigger value="borrower">Soy deudor</TabsTrigger>
+        <TabsList className="grid w-full max-w-xs grid-cols-2 bg-muted/60">
+          <TabsTrigger value="lender" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Soy prestamista</TabsTrigger>
+          <TabsTrigger value="borrower" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Soy deudor</TabsTrigger>
         </TabsList>
 
         <TabsContent value="lender" className="space-y-6 mt-6">
@@ -92,6 +93,8 @@ export default function LoansPage() {
             <div>
               {view === 'list' ? (
                 <LoanListContent onSelect={setSelectedLoanId} direction="lender" />
+              ) : view === 'table' ? (
+                <LoansTableView onSelect={setSelectedLoanId} direction="lender" />
               ) : (
                 <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
               )}
@@ -102,7 +105,13 @@ export default function LoansPage() {
 
         <TabsContent value="borrower" className="space-y-6 mt-6">
           <DebtsDashboardSummary />
-          <LoanListContent onSelect={setSelectedLoanId} direction="borrower" />
+          {view === 'list' ? (
+            <LoanListContent onSelect={setSelectedLoanId} direction="borrower" />
+          ) : view === 'table' ? (
+            <LoansTableView onSelect={setSelectedLoanId} direction="borrower" />
+          ) : (
+            <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
+          )}
         </TabsContent>
       </Tabs>
     </div>

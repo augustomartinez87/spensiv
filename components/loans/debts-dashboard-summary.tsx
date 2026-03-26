@@ -49,7 +49,7 @@ export function DebtsDashboardSummary() {
                             </p>
                         </>
                     ) : (
-                        <p className="text-xl font-bold text-muted-foreground mt-1">-</p>
+                        <p className="text-sm font-medium text-muted-foreground mt-2">Sin cuotas pendientes</p>
                     )}
                 </CardContent>
             </Card>

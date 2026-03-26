@@ -196,30 +196,33 @@ export function CreateLoanDialog({
                     <DialogTitle>{direction === 'lender' ? 'Crear Préstamo' : 'Registrar Deuda'}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="borrowerName">
-                            {direction === 'lender' ? 'Nombre del Deudor' : 'Descripción'}
-                        </Label>
-                        <Input
-                            id="borrowerName"
-                            value={borrowerName}
-                            onChange={(e) => setBorrowerName(e.target.value)}
-                            placeholder={direction === 'lender' ? 'Ej: Juan Perez' : 'Ej: Tarjeta Visa - Cuotas celular'}
-                            required
-                        />
-                    </div>
-
-                    {direction === 'borrower' && (
+                    {/* ── Datos del préstamo ── */}
+                    <fieldset className="space-y-3">
+                        <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Datos del préstamo</legend>
                         <div className="space-y-2">
-                            <Label htmlFor="creditorName">Acreedor</Label>
+                            <Label htmlFor="borrowerName">
+                                {direction === 'lender' ? 'Nombre del Deudor' : 'Descripción'}
+                            </Label>
                             <Input
-                                id="creditorName"
-                                value={creditorName}
-                                onChange={(e) => setCreditorName(e.target.value)}
-                                placeholder="Ej: Banco Galicia, Mercado Crédito"
+                                id="borrowerName"
+                                value={borrowerName}
+                                onChange={(e) => setBorrowerName(e.target.value)}
+                                placeholder={direction === 'lender' ? 'Ej: Juan Perez' : 'Ej: Tarjeta Visa - Cuotas celular'}
+                                required
                             />
                         </div>
-                    )}
+
+                        {direction === 'borrower' && (
+                            <div className="space-y-2">
+                                <Label htmlFor="creditorName">Acreedor</Label>
+                                <Input
+                                    id="creditorName"
+                                    value={creditorName}
+                                    onChange={(e) => setCreditorName(e.target.value)}
+                                    placeholder="Ej: Banco Galicia, Mercado Crédito"
+                                />
+                            </div>
+                        )}
 
                     {/* Person selector */}
                     {persons && persons.length > 0 && (
@@ -353,6 +356,11 @@ export function CreateLoanDialog({
                             </Select>
                         </div>
                     </div>
+                    </fieldset>
+
+                    {/* ── Condiciones financieras ── */}
+                    <fieldset className="space-y-3">
+                        <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Condiciones financieras</legend>
 
                     <div className="flex items-center gap-2 py-1">
                         <Switch id="no-interest" checked={noInterest} onCheckedChange={setNoInterest} />
@@ -479,6 +487,7 @@ export function CreateLoanDialog({
                             Cuota mensual de interés: <strong>{formatCurrency(interestPreview, currency)}</strong>
                         </div>
                     )}
+                    </fieldset>
 
                     {/* Opciones avanzadas — collapsible */}
                     <div className="border rounded-lg">

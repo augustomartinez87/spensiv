@@ -135,7 +135,7 @@ export function IncomeList({
                         </span>
                       </td>
                       <td className="py-2.5 px-4 text-muted-foreground">
-                        {income.subcategory || '-'}
+                        {income.subcategory || <span className="text-muted-foreground/50 italic">Sin subcategoría</span>}
                       </td>
                       <td className="py-2.5 px-4 text-center">
                         {income.isRecurring ? (
@@ -143,7 +143,7 @@ export function IncomeList({
                             Sí
                           </span>
                         ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
+                          <span className="text-xs text-muted-foreground">No</span>
                         )}
                       </td>
                       <td className="py-2.5 px-4 text-right font-bold text-green-400 whitespace-nowrap tabular-nums">
