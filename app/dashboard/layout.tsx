@@ -22,6 +22,8 @@ import {
   Target,
   Eye,
   EyeOff,
+  Percent,
+  ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -57,8 +59,17 @@ const navigation: NavSection[] = [
     adminOnly: true,
     items: [
       { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
+      { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
       { name: 'Personas', href: '/dashboard/persons', icon: Users },
       { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
+      { name: 'Reglas de Tasas', href: '/dashboard/rate-rules', icon: Percent },
+    ],
+  },
+  {
+    label: 'Administración',
+    adminOnly: true,
+    items: [
+      { name: 'Usuarios', href: '/dashboard/admin', icon: ShieldCheck },
     ],
   },
 ]
