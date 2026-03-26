@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Trash2, Pencil, Check, X, Users, Clock } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, Users, Clock, ArrowUp, ArrowDown } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 // ── Borrower Types Section ────────────────────────────────────────────
@@ -49,6 +49,16 @@ function BorrowerTypesSection() {
   function saveEdit(id: string) {
     if (!editName.trim() || !editTna) return
     upsert.mutate({ id, name: editName.trim(), baseTna: parseFloat(editTna) })
+  }
+
+  async function swapOrder(index: number, direction: 'up' | 'down') {
+    if (!types) return
+    const otherIndex = direction === 'up' ? index - 1 : index + 1
+    if (otherIndex < 0 || otherIndex >= types.length) return
+    const a = types[index]
+    const b = types[otherIndex]
+    await upsert.mutateAsync({ id: a.id, name: a.name, baseTna: Number(a.baseTna), order: b.order })
+    await upsert.mutateAsync({ id: b.id, name: b.name, baseTna: Number(b.baseTna), order: a.order })
   }
 
   function saveNew() {
@@ -125,7 +135,27 @@ function BorrowerTypesSection() {
                   <>
                     <span className="text-sm font-medium">{t.name}</span>
                     <span className="text-sm">{Number(t.baseTna)}%</span>
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5">
+                      <div className="flex flex-col">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-5 w-5"
+                          disabled={!types || types.indexOf(t) === 0}
+                          onClick={() => types && swapOrder(types.indexOf(t), 'up')}
+                        >
+                          <ArrowUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-5 w-5"
+                          disabled={!types || types.indexOf(t) === types.length - 1}
+                          onClick={() => types && swapOrder(types.indexOf(t), 'down')}
+                        >
+                          <ArrowDown className="h-3 w-3" />
+                        </Button>
+                      </div>
                       <Button
                         size="icon"
                         variant="ghost"

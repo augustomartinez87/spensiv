@@ -50,6 +50,7 @@ import {
   TrendingUp,
   TrendingDown,
   Link2,
+  Search,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -119,6 +120,8 @@ function PersonsHeader() {
 function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
   const { data: persons, isLoading } = trpc.persons.list.useQuery()
   const [createOpen, setCreateOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [riskFilter, setRiskFilter] = useState<string>('all')
 
   if (isLoading) {
     return (
@@ -144,9 +147,49 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
     )
   }
 
+  const filtered = persons.filter((p) => {
+    const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.alias && p.alias.toLowerCase().includes(search.toLowerCase()))
+    const matchesRisk = riskFilter === 'all' || p.category === riskFilter
+    return matchesSearch && matchesRisk
+  })
+
   return (
-    <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-      {persons.map((person) => {
+    <div className="space-y-4">
+      {/* Search & filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex bg-muted rounded-lg p-0.5 w-fit">
+          {[
+            { value: 'all', label: 'Todos' },
+            { value: 'bajo', label: 'Bajo' },
+            { value: 'medio', label: 'Medio' },
+            { value: 'alto', label: 'Alto' },
+            { value: 'critico', label: 'Crítico' },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                riskFilter === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => setRiskFilter(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+      {filtered.map((person) => {
         const cat = CATEGORY_CONFIG[person.category]
         const Icon = cat.icon
 
@@ -209,6 +252,11 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
           </Card>
         )
       })}
+      </div>
+
+      {filtered.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-8">No se encontraron personas con esos filtros.</p>
+      )}
     </div>
   )
 }

@@ -571,7 +571,7 @@ export function CreateLoanDialog({
                         )}
                     </div>
 
-                    {/* Loan preview with first due date */}
+                    {/* Loan preview with first due date + mini schedule */}
                     {loanType === 'amortized' && capital && tna && termMonths && startDate && (() => {
                         const cap = parseFloat(capital)
                         const term = parseInt(termMonths)
@@ -587,13 +587,58 @@ export function CreateLoanDialog({
                             ? getSmartFirstDueDate(start)
                             : new Date(y, m, d)
                         const dueDateStr = dueDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+
+                        // Mini amortization schedule (first 3 + last)
+                        const previewRows: { n: number; interest: number; principal: number; balance: number }[] = []
+                        let balance = cap
+                        const showCount = Math.min(3, term)
+                        for (let i = 1; i <= term; i++) {
+                            const interest = balance * rate
+                            const principal = installment - interest
+                            balance = Math.max(0, balance - principal)
+                            if (i <= showCount || i === term) {
+                                previewRows.push({ n: i, interest, principal, balance })
+                            }
+                        }
+
                         return (
-                            <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-lg px-3 py-2">
-                                <Clock className="h-3.5 w-3.5 shrink-0" />
-                                <span>
-                                    {term} cuotas de ~{formatCurrency(installment, currency)} — 1er vencimiento:{' '}
-                                    <span className="font-semibold">{dueDateStr}</span>
-                                </span>
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-lg px-3 py-2">
+                                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                                    <span>
+                                        {term} cuotas de ~{formatCurrency(installment, currency)} — 1er vencimiento:{' '}
+                                        <span className="font-semibold">{dueDateStr}</span>
+                                    </span>
+                                </div>
+                                <div className="text-xs border rounded-lg overflow-hidden">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="bg-muted/50 text-muted-foreground">
+                                                <th className="py-1.5 px-2 text-left font-medium">#</th>
+                                                <th className="py-1.5 px-2 text-right font-medium">Interés</th>
+                                                <th className="py-1.5 px-2 text-right font-medium">Capital</th>
+                                                <th className="py-1.5 px-2 text-right font-medium">Saldo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {previewRows.map((row, idx) => (
+                                                <>
+                                                    {idx === previewRows.length - 1 && term > showCount && (
+                                                        <tr key="ellipsis">
+                                                            <td colSpan={4} className="py-1 text-center text-muted-foreground">···</td>
+                                                        </tr>
+                                                    )}
+                                                    <tr key={row.n} className="border-t border-border/30">
+                                                        <td className="py-1.5 px-2 tabular-nums">{row.n}</td>
+                                                        <td className="py-1.5 px-2 text-right tabular-nums">{formatCurrency(row.interest, currency)}</td>
+                                                        <td className="py-1.5 px-2 text-right tabular-nums">{formatCurrency(row.principal, currency)}</td>
+                                                        <td className="py-1.5 px-2 text-right tabular-nums">{formatCurrency(row.balance, currency)}</td>
+                                                    </tr>
+                                                </>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         )
                     })()}

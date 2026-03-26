@@ -43,6 +43,7 @@ import {
   CheckCircle,
   Clock,
 } from 'lucide-react'
+import { Shield } from 'lucide-react'
 import type { SimulationResult } from '@/lib/loan-calculator'
 import { getSmartFirstDueDate } from '@/lib/business-days'
 import { getNextMonths } from '@/lib/periods'
@@ -77,10 +78,12 @@ export default function SimulatorPage() {
   const [resultsView, setResultsView] = useState<'analysis' | 'share'>('analysis')
   const resultsRef = useRef<HTMLDivElement>(null)
 
-  // Rate rules
+  // Rate rules & persons
   const { data: borrowerTypes } = trpc.rateRules.listBorrowerTypes.useQuery()
   const { data: durationAdjustments } = trpc.rateRules.listDurationAdjustments.useQuery()
+  const { data: persons } = trpc.persons.list.useQuery()
   const [selectedBorrowerTypeId, setSelectedBorrowerTypeId] = useState<string>('')
+  const [selectedPersonId, setSelectedPersonId] = useState<string>('')
 
   function getSuggestedTnaForTerm(term: number): number | null {
     if (!selectedBorrowerTypeId || !borrowerTypes || !durationAdjustments) return null
@@ -549,6 +552,42 @@ export default function SimulatorPage() {
             )}
           </div>
 
+          {/* Person selector (informational) */}
+          {persons && persons.length > 0 && (
+            <div className="space-y-2">
+              <Label>Persona (opcional)</Label>
+              <Select value={selectedPersonId || '__none__'} onValueChange={(v) => setSelectedPersonId(v === '__none__' ? '' : v)}>
+                <SelectTrigger className="max-w-xs">
+                  <SelectValue placeholder="Sin persona" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin persona</SelectItem>
+                  {persons.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.alias ? `(${p.alias})` : ''} · Score: {p.score}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedPersonId && (() => {
+                const p = persons.find((p) => p.id === selectedPersonId)
+                if (!p) return null
+                const catColors: Record<string, string> = {
+                  bajo: 'bg-green-500/10 text-green-400',
+                  medio: 'bg-yellow-500/10 text-yellow-400',
+                  alto: 'bg-orange-500/10 text-orange-400',
+                  critico: 'bg-red-500/10 text-red-400',
+                }
+                return (
+                  <div className={cn('text-xs px-3 py-2 rounded-lg flex items-center gap-2', catColors[p.category] || '')}>
+                    <Shield className="h-3.5 w-3.5" />
+                    <span>Riesgo {p.category} · Score: {p.score}/12 · Prob. default: {(p.defaultProbability * 100).toFixed(0)}%</span>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+
           {/* Rounding toggle */}
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             <div className="flex items-center gap-2">
@@ -845,18 +884,28 @@ function MetricCard({
 }
 
 function ConvenienceIndicator({ isConvenient, spread }: { isConvenient: boolean; spread: number }) {
+  const spreadPp = spread * 100
+  let colorClass: string
+  let label: string
+  if (!isConvenient) {
+    colorClass = "bg-red-500/10 border-red-500/20 text-red-400"
+    label = 'NO CONVIENE'
+  } else if (spreadPp > 30) {
+    colorClass = "bg-green-600/15 border-green-500/25 text-green-400"
+    label = 'MUY CONVENIENTE'
+  } else if (spreadPp > 10) {
+    colorClass = "bg-green-500/10 border-green-500/20 text-green-400"
+    label = 'CONVIENE'
+  } else {
+    colorClass = "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
+    label = 'CONVIENE (MARGINAL)'
+  }
+
   return (
-    <div className={cn(
-      "flex items-center gap-2 px-4 py-3 rounded-xl border",
-      isConvenient
-        ? "bg-green-500/10 border-green-500/20 text-green-400"
-        : "bg-red-500/10 border-red-500/20 text-red-400"
-    )}>
+    <div className={cn("flex items-center gap-2 px-4 py-3 rounded-xl border", colorClass)}>
       {isConvenient ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
       <div>
-        <p className="font-bold text-sm">
-          {isConvenient ? 'CONVIENE' : 'NO CONVIENE'}
-        </p>
+        <p className="font-bold text-sm">{label}</p>
         <p className="text-xs opacity-80">
           Spread: {spread > 0 ? '+' : ''}{spread.toFixed(2)} pp vs hurdle rate
         </p>

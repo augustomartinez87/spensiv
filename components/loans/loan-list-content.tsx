@@ -34,35 +34,38 @@ function ProgressRing({
     const offset = circumference * (1 - progress)
 
     return (
-        <div className="relative shrink-0" style={{ width: size, height: size }}>
-            <svg width={size} height={size} className="-rotate-90">
-                <circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    fill="none"
-                    className="stroke-muted"
-                    strokeWidth={strokeWidth}
-                />
-                <circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    fill="none"
-                    stroke={color}
-                    strokeWidth={strokeWidth}
-                    strokeDasharray={circumference}
-                    strokeDashoffset={offset}
-                    strokeLinecap="round"
-                    className="transition-all duration-500"
-                />
-            </svg>
-            <span
-                className="absolute inset-0 flex items-center justify-center font-semibold text-foreground select-none"
-                style={{ fontSize: 10 }}
-            >
-                {paid}/{total}
-            </span>
+        <div className="flex flex-col items-center gap-0.5 shrink-0">
+            <div className="relative" style={{ width: size, height: size }}>
+                <svg width={size} height={size} className="-rotate-90">
+                    <circle
+                        cx={size / 2}
+                        cy={size / 2}
+                        r={radius}
+                        fill="none"
+                        className="stroke-muted"
+                        strokeWidth={strokeWidth}
+                    />
+                    <circle
+                        cx={size / 2}
+                        cy={size / 2}
+                        r={radius}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={circumference}
+                        strokeDashoffset={offset}
+                        strokeLinecap="round"
+                        className="transition-all duration-500"
+                    />
+                </svg>
+                <span
+                    className="absolute inset-0 flex items-center justify-center font-semibold text-foreground select-none"
+                    style={{ fontSize: 10 }}
+                >
+                    {paid}/{total}
+                </span>
+            </div>
+            <span className="text-[9px] text-muted-foreground">cobradas</span>
         </div>
     )
 }

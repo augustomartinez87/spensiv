@@ -78,10 +78,17 @@ export default function PortfolioPage() {
         <TooltipProvider>
           <div className="flex items-center gap-3">
             {metrics?.mepRate && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-sm">
-                <span className="text-muted-foreground">💱 MEP</span>
-                <span className="font-semibold text-foreground">{formatCurrency(metrics.mepRate)}</span>
-              </div>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-sm cursor-help">
+                    <span className="text-muted-foreground">💱 MEP</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(metrics.mepRate)}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[220px]">
+                  <p className="text-xs">Cotización del dólar MEP. Se usa para convertir préstamos en USD/EUR a pesos en las métricas de cartera.</p>
+                </TooltipContent>
+              </UITooltip>
             )}
             <div className="flex items-center gap-1 shrink-0">
               <Label htmlFor="fciRate" className="text-sm text-muted-foreground">Tasa libre de riesgo (%)</Label>
@@ -164,7 +171,7 @@ export default function PortfolioPage() {
               {/* Interest progress */}
               <div className="mt-5 space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Interés cobrado / proyectado</span>
+                  <span className="text-muted-foreground">Interés cobrado / proyectado (acumulado)</span>
                   <span className="font-medium text-foreground">{(yieldMetrics.interestRatio * 100).toFixed(0)}%</span>
                 </div>
                 <Progress value={yieldMetrics.interestRatio * 100} className="h-2" />
