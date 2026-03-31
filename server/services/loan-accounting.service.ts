@@ -2,6 +2,7 @@ import Decimal from 'decimal.js'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { calculateXirrAnnualRobust } from '../../lib/financial-engine'
+import { addMonths } from 'date-fns'
 
 const CENT_TOLERANCE = new Decimal(0.01)
 const ZERO = new Decimal(0)
@@ -406,6 +407,33 @@ export class LoanAccountingService {
         })
         if (remaining === 0) {
           await tx.loan.update({ where: { id: loan.id }, data: { status: 'completed' } })
+        }
+      }
+
+      // Auto-generate more installments for interest_only loans with few unpaid remaining
+      if (loan.loanType === 'interest_only' && Number(loan.monthlyRate) > 0) {
+        const unpaidRemaining = await tx.loanInstallment.count({
+          where: { loanId: loan.id, isPaid: false },
+        })
+        if (unpaidRemaining <= 3) {
+          const lastInst = await tx.loanInstallment.findFirst({
+            where: { loanId: loan.id },
+            orderBy: { number: 'desc' },
+          })
+          if (lastInst) {
+            const monthlyInterest = Number(loan.installmentAmount)
+            await tx.loanInstallment.createMany({
+              data: Array.from({ length: 12 }, (_, i) => ({
+                loanId: loan.id,
+                number: lastInst.number + i + 1,
+                dueDate: addMonths(new Date(lastInst.dueDate), i + 1),
+                amount: monthlyInterest,
+                interest: monthlyInterest,
+                principal: 0,
+                balance: Number(loan.principalOutstanding ?? loan.capital),
+              })),
+            })
+          }
         }
       }
 
