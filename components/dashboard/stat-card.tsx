@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { PrivateAmount } from '@/lib/privacy-context'
+import { PrivateAmount } from '@/lib/contexts/privacy-context'
 import { ResponsiveContainer, AreaChart, Area } from 'recharts'
 
 interface StatCardProps {

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { ThemeProvider } from 'next-themes'
-import { TRPCProvider } from '@/lib/trpc-client'
+import { TRPCProvider } from '@/lib/contexts/trpc-client'
 import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 

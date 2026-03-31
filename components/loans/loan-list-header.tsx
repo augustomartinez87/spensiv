@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Banknote, CalendarDays, LayoutList } from 'lucide-react'

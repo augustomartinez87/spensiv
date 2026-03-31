@@ -4,8 +4,8 @@ import {
   isValidPeriod,
   getPeriodDateRange,
   calculateBudgetPercentage,
-} from '../lib/budget-utils'
-import { getNonCreditPaymentMethodLabel } from '../lib/payment-methods'
+} from '../lib/budget-analytics'
+import { getNonCreditPaymentMethodLabel } from '../lib/transaction-utils'
 
 test('isValidPeriod valida formato y rango de mes', () => {
   assert.equal(isValidPeriod('2026-01'), true)

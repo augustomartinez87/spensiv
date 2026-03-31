@@ -1,9 +1,28 @@
-import { getIncomeCategoryMappingByName, normalizeIncomeCategoryText } from '@/lib/income-categories'
+import { getIncomeCategoryMappingByName, normalizeIncomeCategoryText } from './categories/income-categories'
+
+// ── Payment method types & labels ───────────────────────────────────
+
+export type NonCreditPaymentMethod = 'cash' | 'transfer' | 'debit_card'
+
+export function getNonCreditPaymentMethodLabel(method: NonCreditPaymentMethod): string {
+  switch (method) {
+    case 'cash':
+      return 'Efectivo'
+    case 'transfer':
+      return 'Transferencia'
+    case 'debit_card':
+      return 'Tarjeta de débito'
+    default:
+      return 'Otro'
+  }
+}
+
+// ── Expense classification ──────────────────────────────────────────
 
 export const PENDING_CLASSIFICATION_FILTER = '__pending_classification__'
 export const PENDING_CLASSIFICATION_LABEL = 'Pendiente de clasificar'
 
-export function getExpenseTypeLabel(type: string | null) {
+export function getExpenseTypeLabel(type: string | null | undefined): string {
   switch (type) {
     case 'structural':
       return 'Estructural'
@@ -11,7 +30,20 @@ export function getExpenseTypeLabel(type: string | null) {
       return 'Emocional Recurrente'
     case 'emotional_impulsive':
       return 'Emocional Impulsivo'
+    case 'fixed_essential':
+      return 'Fijo · Esencial'
+    case 'variable_essential':
+      return 'Variable · Esencial'
+    case 'fixed_non_essential':
+      return 'Fijo · No esencial'
+    case 'variable_non_essential':
+      return 'Variable · No esencial'
+    case 'planned_purchase':
+      return 'Compra planeada'
+    case 'income':
+      return 'Ingreso'
     default:
+      if (type) return type.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
       return 'Sin clasificar'
   }
 }

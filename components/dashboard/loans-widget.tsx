@@ -1,8 +1,8 @@
 'use client'
 
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { Card } from '@/components/ui/card'
-import { PrivateAmount } from '@/lib/privacy-context'
+import { PrivateAmount } from '@/lib/contexts/privacy-context'
 import { formatCurrency } from '@/lib/utils'
 import { Banknote, Calculator, Briefcase } from 'lucide-react'
 import Link from 'next/link'

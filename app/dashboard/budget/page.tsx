@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { MonthSelector } from '@/components/dashboard/month-selector'
 import { Card, CardContent } from '@/components/ui/card'

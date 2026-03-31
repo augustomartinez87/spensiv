@@ -1,9 +1,9 @@
 'use client'
 
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PrivateAmount } from '@/lib/privacy-context'
+import { PrivateAmount } from '@/lib/contexts/privacy-context'
 import { daysUntilText } from '@/lib/date-utils'
 import { MOROSITY_WARNING_PCT, MOROSITY_DANGER_PCT } from '@/lib/constants/thresholds'
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { PrivateAmount } from '@/lib/privacy-context'
+import { PrivateAmount } from '@/lib/contexts/privacy-context'
 
 interface DonutItem {
   name: string

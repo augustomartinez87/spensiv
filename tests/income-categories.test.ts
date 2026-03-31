@@ -6,7 +6,7 @@ import {
   getIncomeCategoryMappingByName,
   sortIncomeCategoriesByTaxonomy,
   sortIncomeSubcategoriesByTaxonomy,
-} from '../lib/income-categories'
+} from '../lib/categories/income-categories'
 
 test('getIncomeCategoryMappingByName mapea categorias legacy', () => {
   assert.deepEqual(getIncomeCategoryMappingByName('active_income'), {

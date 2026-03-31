@@ -7,8 +7,8 @@ import {
   isMasterExpenseCategory,
   isMasterExpenseSubcategory,
   normalizeExpenseCategoryText,
-} from '@/lib/expense-categories'
-import { ensureExpenseTaxonomyForUser } from '@/lib/expense-category-seeding'
+} from '@/lib/categories/expense-categories'
+import { ensureExpenseTaxonomyForUser } from '@/lib/categories/expense-category-seeding'
 
 function sameNormalizedValue(a: string, b: string): boolean {
   return normalizeExpenseCategoryText(a) === normalizeExpenseCategoryText(b)

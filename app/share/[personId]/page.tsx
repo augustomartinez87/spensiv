@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { TransactionForm } from '@/components/transactions/transaction-form'
 import { IncomeForm } from '@/components/transactions/income-form'
 import { ExpenseList } from '@/components/transactions/expense-list'

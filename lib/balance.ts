@@ -1,7 +1,7 @@
 import { prisma } from './prisma'
 import { formatPeriod, parsePeriod } from './periods'
-import { getNonCreditPaymentMethodLabel, type NonCreditPaymentMethod } from './payment-methods'
-import { formatExpenseType } from './utils'
+import { getNonCreditPaymentMethodLabel, type NonCreditPaymentMethod } from './transaction-utils'
+import { getExpenseTypeLabel } from './transaction-utils'
 
 /**
  * Obtener balance mensual (Ingresos - Egresos)
@@ -107,7 +107,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
     // Gastos por tipo (con traducción a español)
     const expensesByType = installments.reduce(
         (acc: Record<string, number>, inst) => {
-            const type = formatExpenseType(inst.transaction.expenseType)
+            const type = getExpenseTypeLabel(inst.transaction.expenseType)
             acc[type] = (acc[type] || 0) + Number(inst.amount)
             return acc
         },
@@ -115,7 +115,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
     )
     // Sumar transacciones no-crédito a tipos
     for (const tx of cashTransactions) {
-        const type = formatExpenseType(tx.expenseType)
+        const type = getExpenseTypeLabel(tx.expenseType)
         expensesByType[type] = (expensesByType[type] || 0) + Number(tx.totalAmount)
     }
 

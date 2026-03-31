@@ -27,8 +27,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { PrivacyProvider, usePrivacy } from '@/lib/privacy-context'
-import { CurrencyProvider } from '@/lib/currency-context'
+import { PrivacyProvider, usePrivacy } from '@/lib/contexts/privacy-context'
+import { CurrencyProvider } from '@/lib/contexts/currency-context'
 
 const TransactionForm = dynamic(
   () => import('@/components/transactions/transaction-form').then((m) => m.TransactionForm),

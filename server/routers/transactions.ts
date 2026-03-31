@@ -8,14 +8,14 @@ import {
   voidTransaction,
   unvoidTransaction,
 } from '@/lib/installment-engine'
-import { ensureExpenseTaxonomyForUser } from '@/lib/expense-category-seeding'
+import { ensureExpenseTaxonomyForUser } from '@/lib/categories/expense-category-seeding'
 import {
   getCanonicalExpenseCategoryName,
   getCanonicalExpenseSubcategoryName,
   normalizeExpenseCategoryText,
   sortCategoriesByExpenseTaxonomy,
   sortSubcategoriesByExpenseTaxonomy,
-} from '@/lib/expense-categories'
+} from '@/lib/categories/expense-categories'
 import {
   normalizeExpenseCategories,
   transferBudgetLimits,

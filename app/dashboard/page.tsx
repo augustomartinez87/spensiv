@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { MonthSelector } from '@/components/dashboard/month-selector'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { CompactProjection } from '@/components/dashboard/compact-projection'
@@ -34,13 +34,13 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatCurrency, cn } from '@/lib/utils'
-import { PrivateAmount } from '@/lib/privacy-context'
-import { useCurrency } from '@/lib/currency-context'
+import { PrivateAmount } from '@/lib/contexts/privacy-context'
+import { useCurrency } from '@/lib/contexts/currency-context'
 import {
   AlertCircle,
   ArrowRight,
 } from 'lucide-react'
-import { getCategoryIconInfo } from '@/lib/category-icons'
+import { getCategoryIconInfo } from '@/lib/categories/category-icons'
 import Link from 'next/link'
 
 // ── Helpers ──────────────────────────────────────────────────────────

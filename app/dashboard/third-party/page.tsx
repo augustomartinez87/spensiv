@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { ThirdPartyForm } from '@/components/third-party/third-party-form'
 import { ThirdPartyDetail } from '@/components/third-party/third-party-detail'
 import { Card, CardContent } from '@/components/ui/card'

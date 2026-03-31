@@ -1,6 +1,6 @@
 'use client'
 
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { format } from 'date-fns'

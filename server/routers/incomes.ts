@@ -11,7 +11,7 @@ import {
   normalizeIncomeCategoryText,
   sortIncomeCategoriesByTaxonomy,
   sortIncomeSubcategoriesByTaxonomy,
-} from '@/lib/income-categories'
+} from '@/lib/categories/income-categories'
 
 const incomeCategoryInputSchema = z.string().min(1).max(80)
 const incomeSubcategoryInputSchema = z.string().min(1).max(80)

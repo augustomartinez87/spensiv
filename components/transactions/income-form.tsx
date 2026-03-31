@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -22,7 +22,7 @@ import {
   normalizeIncomeCategoryText,
   sortIncomeCategoriesByTaxonomy,
   sortIncomeSubcategoriesByTaxonomy,
-} from '@/lib/income-categories'
+} from '@/lib/categories/income-categories'
 
 type IncomeCategoryOption = {
   name: string

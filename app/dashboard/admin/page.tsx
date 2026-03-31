@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { ShieldCheck, ShieldOff, Users } from 'lucide-react'
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

@@ -1,10 +1,10 @@
 'use client'
 
-import { trpc } from '@/lib/trpc-client'
+import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PrivateAmount } from '@/lib/privacy-context'
+import { PrivateAmount } from '@/lib/contexts/privacy-context'
 
 function HealthChip({ overdueCount }: { overdueCount: number }) {
     if (overdueCount === 0) {

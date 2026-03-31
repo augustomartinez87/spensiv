@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { formatCurrency, cn } from '@/lib/utils'
-import { PrivateAmount } from '@/lib/privacy-context'
+import { PrivateAmount } from '@/lib/contexts/privacy-context'
 import { CheckCircle2, AlertTriangle } from 'lucide-react'
 import { getBudgetStatus } from '@/lib/budget-analytics'
 import { daysRemainingInMonth } from '@/lib/date-utils'

@@ -5,9 +5,9 @@ import {
   calculateBudgetPercentage,
   getPeriodDateRange,
   isValidPeriod,
-} from '@/lib/budget-utils'
-import { ensureExpenseTaxonomyForUser } from '@/lib/expense-category-seeding'
-import { sortCategoriesByExpenseTaxonomy } from '@/lib/expense-categories'
+} from '@/lib/budget-analytics'
+import { ensureExpenseTaxonomyForUser } from '@/lib/categories/expense-category-seeding'
+import { sortCategoriesByExpenseTaxonomy } from '@/lib/categories/expense-categories'
 
 const periodInputSchema = z
   .string()
