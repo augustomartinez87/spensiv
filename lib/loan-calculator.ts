@@ -431,7 +431,7 @@ export function compareLoanTypes(input: Omit<LoanInput, 'loanType'>): Comparison
   const tirDifference = round2((amortized.tirTNA - bullet.tirTNA) * 100)
 
   let recommendation: 'amortized' | 'bullet' | 'neither'
-  if (!amortized.isConvenient && !bullet.isConvenient) {
+  if (amortized.tirTNA <= 0 && bullet.tirTNA <= 0) {
     recommendation = 'neither'
   } else if (amortized.tirTNA >= bullet.tirTNA) {
     recommendation = 'amortized'
