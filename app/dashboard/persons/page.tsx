@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -66,6 +67,13 @@ const INCOME_TYPE_LABELS: Record<string, string> = {
   informal: 'Informal',
 }
 
+function copyPersonShareLink(personId: string, toast: (opts: { description: string }) => void) {
+  const url = `${window.location.origin}/share/${personId}`
+  navigator.clipboard.writeText(url).then(() => {
+    toast({ description: 'Link de estado de cuenta copiado' })
+  })
+}
+
 const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: typeof ShieldCheck }> = {
   bajo: { label: 'Riesgo Bajo', color: 'text-green-400 bg-green-500/10', icon: ShieldCheck },
   medio: { label: 'Riesgo Medio', color: 'text-yellow-400 bg-yellow-500/10', icon: Shield },
@@ -76,6 +84,13 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: type
 export default function PersonsPage() {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [sheetPersonId, setSheetPersonId] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+
+  // Open person sheet when navigated from another page (e.g., loan detail)
+  useEffect(() => {
+    const personId = searchParams.get('person')
+    if (personId) setSheetPersonId(personId)
+  }, [searchParams])
 
   // Full-page detail for deep drill-down
   if (selectedPersonId) {
@@ -124,13 +139,6 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
   const [riskFilter, setRiskFilter] = useState<string>('all')
   const { toast } = useToast()
 
-  function copyShareLink(e: React.MouseEvent, personId: string) {
-    e.stopPropagation()
-    const url = `${window.location.origin}/share/${personId}`
-    navigator.clipboard.writeText(url).then(() => {
-      toast({ description: 'Link de estado de cuenta copiado' })
-    })
-  }
 
   if (isLoading) {
     return (
@@ -259,7 +267,7 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
                   <span>{cat.label} · Spread ref.: {person.category === 'critico' ? 'BLOQUEADO' : `+${(person.minTnaSpread * 100).toFixed(0)}pp`}</span>
                 </div>
                 <button
-                  onClick={(e) => copyShareLink(e, person.id)}
+                  onClick={(e) => { e.stopPropagation(); copyPersonShareLink(person.id, toast) }}
                   className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   title="Copiar link de cobro"
                 >
@@ -284,13 +292,6 @@ function PersonsList({ onSelect }: { onSelect: (id: string) => void }) {
 function PersonDrawerContent({ personId, onViewFull }: { personId: string; onViewFull: () => void }) {
   const { data: person, isLoading } = trpc.persons.getById.useQuery({ id: personId })
   const { toast } = useToast()
-
-  function copyShareLink() {
-    const url = `${window.location.origin}/share/${personId}`
-    navigator.clipboard.writeText(url).then(() => {
-      toast({ description: 'Link de estado de cuenta copiado' })
-    })
-  }
 
   if (isLoading) {
     return (
@@ -392,7 +393,7 @@ function PersonDrawerContent({ personId, onViewFull }: { personId: string; onVie
 
       {/* Actions */}
       <div className="space-y-2">
-        <Button className="w-full" onClick={copyShareLink}>
+        <Button className="w-full" onClick={() => copyPersonShareLink(personId, toast)}>
           <Link2 className="h-4 w-4 mr-2" />
           Copiar link de cobro
         </Button>
@@ -463,11 +464,7 @@ function PersonDetail({ personId, onBack }: { personId: string; onBack: () => vo
             variant="ghost"
             size="icon"
             className="text-muted-foreground hover:text-foreground"
-            onClick={() => {
-              const url = `${window.location.origin}/share/${personId}`
-              navigator.clipboard.writeText(url)
-              toast({ description: 'Link copiado al portapapeles' })
-            }}
+            onClick={() => copyPersonShareLink(personId, toast)}
           >
             <Link2 className="h-4 w-4" />
           </Button>

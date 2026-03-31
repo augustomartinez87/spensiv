@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,7 +43,14 @@ import {
   Link2,
   MinusCircle,
   Ban,
+  MoreHorizontal,
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Tooltip as UITooltip,
   TooltipContent,
@@ -131,12 +139,14 @@ export default function LoansPage() {
 
 function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) {
   const utils = trpc.useUtils()
+  const router = useRouter()
   const { data: loan, isLoading } = trpc.loans.getById.useQuery({ id: loanId })
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmComplete, setConfirmComplete] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editStartDate, setEditStartDate] = useState('')
+  const [editTna, setEditTna] = useState('')
   const [assignPersonOpen, setAssignPersonOpen] = useState(false)
   const [assignPersonId, setAssignPersonId] = useState('')
   const { data: allPersons } = trpc.persons.list.useQuery()
@@ -155,6 +165,19 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
       utils.loans.getById.invalidate({ id: loanId })
       utils.loans.list.invalidate()
       utils.loans.getDashboardMetrics.invalidate()
+      setEditing(false)
+    },
+  })
+
+  const updateRateMutation = trpc.loans.updateRate.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.getMonthlyAccruals.invalidate({ loanId })
+      utils.loans.getLoanPayments.invalidate({ loanId })
+      utils.loans.list.invalidate()
+      utils.loans.getDashboardMetrics.invalidate()
+      utils.loans.getDashboardMetricsDebtor?.invalidate?.()
+      toast({ title: 'Tasa actualizada y cuotas recalculadas' })
       setEditing(false)
     },
   })
@@ -179,16 +202,30 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
     if (!loan) return
     setEditName(loan.borrowerName)
     setEditStartDate(formatDateToInput(new Date(loan.startDate)))
+    setEditTna(String((Number(loan.tna) * 100).toFixed(2)))
     setEditing(true)
   }
 
   function saveEdit() {
     if (!loan) return
+
+    const originalTnaPct = (Number(loan.tna) * 100).toFixed(2)
+    const newTnaPct = parseFloat(editTna)
+    const tnaChanged = !isNaN(newTnaPct) && newTnaPct.toFixed(2) !== originalTnaPct && loan.status === 'active'
+
     const changes: { id: string; borrowerName?: string; startDate?: string } = { id: loanId }
     if (editName !== loan.borrowerName) changes.borrowerName = editName
     const currentStart = formatDateToInput(new Date(loan.startDate))
     if (editStartDate !== currentStart) changes.startDate = editStartDate
-    updateMutation.mutate(changes)
+
+    if (Object.keys(changes).length > 1) updateMutation.mutate(changes)
+
+    if (tnaChanged) {
+      updateRateMutation.mutate({ loanId, tna: newTnaPct / 100 })
+    } else if (Object.keys(changes).length === 1) {
+      // Nothing changed
+      setEditing(false)
+    }
   }
 
   const recalculateMutation = trpc.loans.recalculate.useMutation({
@@ -257,7 +294,12 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
 
   const now = new Date()
   const isInterestOnly = loan.loanType === 'interest_only'
+  const isZeroRate = Number(loan.monthlyRate) === 0
+  const isZeroRateAmortized = !isInterestOnly && isZeroRate
   const cur = loan.currency
+  const loanSubtitle = loan.person
+    ? loan.borrowerName.replace(loan.person.name || loan.person.alias || '', '').replace(/^\s*[-–]\s*/, '').trim()
+    : ''
   const paid = loan.loanInstallments.filter((i) => i.isPaid).length
   const total = loan.loanInstallments.length
   const totalCollected = (loan.loanPayments ?? []).reduce((sum, p) => sum + Number(p.amount), 0)
@@ -281,7 +323,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                 className="text-lg font-bold h-9"
                 autoFocus
               />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Label className="text-xs text-muted-foreground shrink-0">Fecha inicio:</Label>
                 <Input
                   type="date"
@@ -289,27 +331,55 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                   onChange={(e) => setEditStartDate(e.target.value)}
                   className="h-8 text-sm w-auto"
                 />
+                {loan?.status === 'active' && (
+                  <>
+                    <Label className="text-xs text-muted-foreground shrink-0">TNA (%):</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editTna}
+                      onChange={(e) => setEditTna(e.target.value)}
+                      className="h-8 text-sm w-24"
+                    />
+                    {(() => {
+                      const newTna = parseFloat(editTna)
+                      const origTna = Number(loan?.tna) * 100
+                      return !isNaN(newTna) && Math.abs(newTna - origTna) > 0.01 ? (
+                        <span className="text-xs text-amber-400">⚠ Recalcula cuotas y rendimiento</span>
+                      ) : null
+                    })()}
+                  </>
+                )}
               </div>
             </div>
           ) : (
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-foreground">{loan.borrowerName}</h1>
-                {isInterestOnly && (
+                <h1 className="text-2xl font-bold text-foreground">
+                  {loan.person
+                    ? (loan.person.name || loan.person.alias || loan.borrowerName)
+                    : loan.borrowerName
+                  }
+                </h1>
+                {(isInterestOnly || isZeroRateAmortized) && (
                   <Badge variant="outline" className="text-xs">
-                    {Number(loan.monthlyRate) === 0 ? 'Sin intereses' : 'Solo interés'}
+                    {isZeroRate ? 'Sin intereses' : 'Solo interés'}
                   </Badge>
                 )}
                 {cur !== 'ARS' && (
                   <Badge variant="outline" className="text-xs">{cur}</Badge>
                 )}
               </div>
+              {loanSubtitle && (
+                <p className="text-sm text-muted-foreground font-medium">{loanSubtitle}</p>
+              )}
               <p className="text-sm text-muted-foreground">
-                {isInterestOnly
-                  ? Number(loan.monthlyRate) === 0
-                    ? `${formatCurrency(Number(loan.capital), cur)} · Sin intereses`
-                    : `${formatCurrency(Number(loan.capital), cur)} · Interés mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
-                  : `${formatCurrency(Number(loan.capital), cur)} - ${loan.termMonths} cuotas de ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                {isZeroRate
+                  ? `${formatCurrency(Number(loan.capital), cur)} · Sin intereses`
+                  : isInterestOnly
+                    ? `${formatCurrency(Number(loan.capital), cur)} · Interés mensual: ${formatCurrency(Number(loan.installmentAmount), cur)}`
+                    : `${formatCurrency(Number(loan.capital), cur)} - ${loan.termMonths} cuotas de ${formatCurrency(Number(loan.installmentAmount), cur)}`
                 }
                 {' · '}Inicio: {format(new Date(loan.startDate), "d MMM yyyy", { locale: es })}
               </p>
@@ -392,14 +462,22 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         )
       )}
       {loan.person && (
-        <div className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-muted">
-          <UserCircle className="h-4 w-4 text-muted-foreground" />
-          <span>Persona: <strong>{loan.person.name}</strong>{loan.person.alias ? ` (${loan.person.alias})` : ''}</span>
-        </div>
+        <button
+          className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-muted hover:bg-muted/70 transition-colors w-full text-left"
+          onClick={() => router.push(`/dashboard/persons?person=${loan.person!.id}`)}
+        >
+          <UserCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-muted-foreground">Persona:</span>
+          <strong className="text-foreground">{loan.person.name || loan.person.alias}</strong>
+          {loan.person.alias && loan.person.name && (
+            <span className="text-muted-foreground">({loan.person.alias})</span>
+          )}
+          <Link2 className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />
+        </button>
       )}
 
       {/* Summary cards */}
-      <div className={cn("grid gap-4", isInterestOnly ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-4")}>
+      <div className={cn("grid gap-4", (isInterestOnly || isZeroRateAmortized) ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-4")}>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Capital</p>
@@ -412,11 +490,18 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
             <p className="text-xl font-bold text-accent-positive mt-1">{formatCurrency(totalCollected, cur)}</p>
           </CardContent>
         </Card>
-        {isInterestOnly ? (
+        {isInterestOnly && !isZeroRate ? (
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wider">Interés mensual</p>
               <p className="text-xl font-bold text-accent-blue mt-1">{formatCurrency(Number(loan.installmentAmount), cur)}</p>
+            </CardContent>
+          </Card>
+        ) : isZeroRateAmortized || (isInterestOnly && isZeroRate) ? (
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Capital pendiente</p>
+              <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(Number(loan.principalOutstanding ?? loan.capital), cur)}</p>
             </CardContent>
           </Card>
         ) : (
@@ -525,8 +610,8 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         </div>
       )}
 
-      {/* Action buttons */}
-      {loan.status === 'active' && unpaidCount > 0 && (
+      {/* Action buttons — amortized with installments */}
+      {loan.status === 'active' && unpaidCount > 0 && !isZeroRateAmortized && (
         <div className="flex flex-wrap gap-2">
           <CopyCollectionMessage loan={loan} />
           <RegisterPaymentDialog loanId={loanId} cur={cur} loan={loan} />
@@ -544,10 +629,10 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         </div>
       )}
 
-      {/* Interest-only action buttons */}
-      {isInterestOnly && loan.status === 'active' && (
+      {/* Interest-only and zero-rate action buttons */}
+      {(isInterestOnly || isZeroRateAmortized) && loan.status === 'active' && (
         <div className="flex flex-wrap gap-2">
-          {unpaidCount <= 3 && (
+          {isInterestOnly && !isZeroRate && unpaidCount <= 3 && (
             <Button
               variant="outline"
               onClick={() => generateMoreMutation.mutate({ loanId })}
@@ -557,6 +642,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
               {generateMoreMutation.isPending ? 'Generando...' : 'Generar más cuotas'}
             </Button>
           )}
+          {isZeroRate && <RegisterPaymentDialog loanId={loanId} cur={cur} loan={loan} />}
           {confirmComplete ? (
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Devolvió el capital?</span>
@@ -585,12 +671,21 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         <TabsList>
           <TabsTrigger value="installments">Cuotas</TabsTrigger>
           <TabsTrigger value="accounting">Contabilidad</TabsTrigger>
+          <TabsTrigger value="activity">Actividad</TabsTrigger>
         </TabsList>
         <TabsContent value="installments" className="mt-4">
           <Card>
             <CardContent className="pt-6">
+              {/* Zero-rate amortized: no installment schedule */}
+              {isZeroRateAmortized && (
+                <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
+                  <Banknote className="h-8 w-8" />
+                  <p className="text-sm">Este préstamo no tiene cuotas programadas.</p>
+                  <p className="text-xs">El capital se devuelve sin intereses ni calendario fijo.</p>
+                </div>
+              )}
               {/* Desktop table */}
-              <div className="hidden md:block overflow-x-auto">
+              {!isZeroRateAmortized && <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-xs text-muted-foreground uppercase tracking-wider">
@@ -667,21 +762,6 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                           <td className="py-2.5 px-3 text-center">
                             {!inst.isPaid && (
                               <div className="flex items-center justify-center gap-0.5">
-                                {paidAmount === 0 && (
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                    title="Editar cuota"
-                                    onClick={() => {
-                                      setEditInstId(inst.id)
-                                      setEditInstAmount(String(Number(inst.amount)))
-                                      setEditInstDate(formatDateToInput(dueDate))
-                                    }}
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
                                 <Button
                                   size="icon"
                                   variant="ghost"
@@ -694,15 +774,32 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                                 >
                                   <Banknote className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 text-muted-foreground hover:text-red-400"
-                                  title="Condonar saldo restante"
-                                  onClick={() => setWaiveInstId(inst.id)}
-                                >
-                                  <Ban className="h-3.5 w-3.5" />
-                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground">
+                                      <MoreHorizontal className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {paidAmount === 0 && (
+                                      <DropdownMenuItem onClick={() => {
+                                        setEditInstId(inst.id)
+                                        setEditInstAmount(String(Number(inst.amount)))
+                                        setEditInstDate(formatDateToInput(dueDate))
+                                      }}>
+                                        <Pencil className="h-3.5 w-3.5 mr-2" />
+                                        Editar cuota
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                      className="text-red-400 focus:text-red-400"
+                                      onClick={() => setWaiveInstId(inst.id)}
+                                    >
+                                      <Ban className="h-3.5 w-3.5 mr-2" />
+                                      Condonar saldo
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             )}
                           </td>
@@ -711,10 +808,10 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                     })}
                   </tbody>
                 </table>
-              </div>
+              </div>}
 
               {/* Mobile list */}
-              <div className="md:hidden divide-y divide-border">
+              {!isZeroRateAmortized && <div className="md:hidden divide-y divide-border">
                 {loan.loanInstallments.map((inst) => {
                   const dueDate = new Date(inst.dueDate)
                   const paidAmount = Number(inst.paidAmount ?? 0)
@@ -758,21 +855,6 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                       </div>
                       {!inst.isPaid && (
                         <div className="flex items-center gap-0.5 shrink-0">
-                          {paidAmount === 0 && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                              title="Editar cuota"
-                              onClick={() => {
-                                setEditInstId(inst.id)
-                                setEditInstAmount(String(Number(inst.amount)))
-                                setEditInstDate(formatDateToInput(dueDate))
-                              }}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
                           <Button
                             size="icon"
                             variant="ghost"
@@ -785,26 +867,46 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                           >
                             <Banknote className="h-4 w-4" />
                           </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-muted-foreground hover:text-red-400"
-                            title="Condonar saldo restante"
-                            onClick={() => setWaiveInstId(inst.id)}
-                          >
-                            <Ban className="h-3.5 w-3.5" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground">
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {paidAmount === 0 && (
+                                <DropdownMenuItem onClick={() => {
+                                  setEditInstId(inst.id)
+                                  setEditInstAmount(String(Number(inst.amount)))
+                                  setEditInstDate(formatDateToInput(dueDate))
+                                }}>
+                                  <Pencil className="h-3.5 w-3.5 mr-2" />
+                                  Editar cuota
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                className="text-red-400 focus:text-red-400"
+                                onClick={() => setWaiveInstId(inst.id)}
+                              >
+                                <Ban className="h-3.5 w-3.5 mr-2" />
+                                Condonar saldo
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       )}
                     </div>
                   )
                 })}
-              </div>
+              </div>}
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="accounting" className="mt-4">
           <MonthlyAccrualsTable loanId={loanId} cur={cur} />
+        </TabsContent>
+        <TabsContent value="activity" className="mt-4">
+          <LoanActivityTimeline loanId={loanId} logs={loan.activityLogs || []} />
         </TabsContent>
       </Tabs>
 
@@ -951,9 +1053,6 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
 
       {/* Payment History */}
       <PaymentHistorySection loanId={loanId} cur={cur} />
-
-      {/* Activity Timeline */}
-      <LoanActivityTimeline loanId={loanId} logs={loan.activityLogs || []} />
     </div>
   )
 }

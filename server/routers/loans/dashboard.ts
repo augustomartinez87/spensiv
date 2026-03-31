@@ -39,9 +39,13 @@ export const loanDashboardRouter = router({
       0
     )
 
+    // Helper: zero-rate amortized loans have no installment schedule
+    const getEffectiveInstallments = (loan: { loanType: string; monthlyRate: unknown; loanInstallments: unknown[] }) =>
+      (loan.loanType === 'amortized' && Number(loan.monthlyRate) === 0) ? [] : loan.loanInstallments as typeof activeLoans[0]['loanInstallments']
+
     const totalPending = activeLoans.reduce(
       (sum, loan) =>
-        sum + loan.loanInstallments
+        sum + getEffectiveInstallments(loan)
           .filter((i) => !i.isPaid)
           .reduce(
             (s, i) => s + pesify(Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0), loan.currency, mepRate),
@@ -50,9 +54,9 @@ export const loanDashboardRouter = router({
       0
     )
 
-    // Skip $0 installments (e.g. interest_only loans at 0% TNA)
+    // Skip $0 installments (e.g. interest_only loans at 0% TNA) and zero-rate amortized
     const allUnpaid = activeLoans.flatMap((loan) =>
-      loan.loanInstallments
+      getEffectiveInstallments(loan)
         .filter((i) => !i.isPaid && Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0) > 0)
         .map((i) => {
           const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
@@ -146,16 +150,20 @@ export const loanDashboardRouter = router({
     const totalDebt = activeDebts.reduce(
       (sum, loan) => sum + pesify(Number(loan.capital), loan.currency, mepRate), 0
     )
+    // Zero-rate amortized loans have no installment schedule
+    const getEffectiveInstallments = (loan: typeof activeDebts[0]) =>
+      (loan.loanType === 'amortized' && Number(loan.monthlyRate) === 0) ? [] : loan.loanInstallments
+
     const totalPending = activeDebts.reduce(
-      (sum, loan) => sum + loan.loanInstallments.reduce(
+      (sum, loan) => sum + getEffectiveInstallments(loan).reduce(
         (s, i) => s + pesify(Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0), loan.currency, mepRate), 0
       ), 0
     )
 
     const now = new Date()
-    // Skip $0 installments (e.g. interest_only loans at 0% TNA)
+    // Skip $0 installments (e.g. interest_only loans at 0% TNA) and zero-rate amortized
     const allUnpaid = activeDebts.flatMap((loan) =>
-      loan.loanInstallments.map((i) => {
+      getEffectiveInstallments(loan).map((i) => {
         const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
         return {
           ...i,

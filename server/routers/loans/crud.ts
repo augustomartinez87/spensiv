@@ -3,7 +3,8 @@ import { Prisma } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { tnaToMonthlyRate, frenchInstallment, reverseFromInstallment, generateAmortizationTable, generateSmartAmortizationTable, strategicRoundInstallment } from '@/lib/loan-calculator'
-import { addMonths } from 'date-fns'
+import { addMonths, format as formatDate } from 'date-fns'
+import { LoanAccountingService } from '../../services/loan-accounting.service'
 import { getSmartDueDates } from '@/lib/business-days'
 
 const createLoanInput = z.object({
@@ -121,16 +122,19 @@ export const loanCrudRouter = router({
             personId: input.personId ?? null,
             direction: input.direction,
             creditorName: input.creditorName ?? null,
-            loanInstallments: {
-              create: smart.rows.map((row) => ({
-                number: row.month,
-                dueDate: new Date(row.date + 'T12:00:00'),
-                amount: row.installment,
-                interest: row.interest,
-                principal: row.principal,
-                balance: row.balance,
-              })),
-            },
+            // Zero-rate loans have no installment schedule
+            ...(input.tna > 0 ? {
+              loanInstallments: {
+                create: smart.rows.map((row) => ({
+                  number: row.month,
+                  dueDate: new Date(row.date + 'T12:00:00'),
+                  amount: row.installment,
+                  interest: row.interest,
+                  principal: row.principal,
+                  balance: row.balance,
+                })),
+              },
+            } : {}),
           },
           include: { loanInstallments: { orderBy: { number: 'asc' } } },
         })
@@ -183,16 +187,19 @@ export const loanCrudRouter = router({
           personId: input.personId ?? null,
           direction: input.direction,
           creditorName: input.creditorName ?? null,
-          loanInstallments: {
-            create: table.map((row) => ({
-              number: row.month,
-              dueDate: new Date(row.date + 'T12:00:00'),
-              amount: row.installment,
-              interest: row.interest,
-              principal: row.principal,
-              balance: row.balance,
-            })),
-          },
+          // Zero-rate loans have no installment schedule
+          ...(input.tna > 0 ? {
+            loanInstallments: {
+              create: table.map((row) => ({
+                number: row.month,
+                dueDate: new Date(row.date + 'T12:00:00'),
+                amount: row.installment,
+                interest: row.interest,
+                principal: row.principal,
+                balance: row.balance,
+              })),
+            },
+          } : {}),
         },
         include: { loanInstallments: { orderBy: { number: 'asc' } } },
       })
@@ -253,12 +260,17 @@ export const loanCrudRouter = router({
       })
 
       return loans.map((loan) => {
-        const paid = loan.loanInstallments.filter((i) => i.isPaid).length
-        const total = loan.loanInstallments.length
-        const nextInstallment = loan.loanInstallments.find((i) => !i.isPaid)
+        // Zero-rate amortized loans have no installment schedule — hide any legacy installments
+        const effectiveInstallments = (loan.loanType === 'amortized' && Number(loan.monthlyRate) === 0)
+          ? []
+          : loan.loanInstallments
+        const paid = effectiveInstallments.filter((i) => i.isPaid).length
+        const total = effectiveInstallments.length
+        const nextInstallment = effectiveInstallments.find((i) => !i.isPaid)
 
         return {
           ...loan,
+          loanInstallments: effectiveInstallments,
           person: loan.person
             ? {
                 ...loan.person,
@@ -294,6 +306,11 @@ export const loanCrudRouter = router({
 
       if (!loan) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
+      }
+
+      // Zero-rate amortized loans have no installment schedule — hide any legacy installments
+      if (loan.loanType === 'amortized' && Number(loan.monthlyRate) === 0) {
+        return { ...loan, loanInstallments: [] }
       }
 
       return loan
@@ -340,6 +357,112 @@ export const loanCrudRouter = router({
       }
 
       return updated
+    }),
+
+  updateRate: protectedProcedure
+    .input(z.object({
+      loanId: z.string(),
+      tna: z.number().min(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.loanId, userId: ctx.user.id, status: 'active' },
+        include: { loanInstallments: { orderBy: { number: 'asc' } } },
+      })
+      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
+
+      const newMonthlyRate = tnaToMonthlyRate(input.tna)
+      const paidInstallments = loan.loanInstallments.filter((i) => i.isPaid)
+      const paidCount = paidInstallments.length
+
+      // Delete all unpaid installments — they'll be regenerated with new rate
+      await ctx.prisma.loanInstallment.deleteMany({
+        where: { loanId: loan.id, isPaid: false },
+      })
+
+      const principalRemaining = Number(loan.principalOutstanding)
+
+      if (loan.loanType === 'amortized') {
+        const remainingMonths = (loan.termMonths ?? 0) - paidCount
+
+        if (remainingMonths > 0 && newMonthlyRate > 0 && principalRemaining > 0) {
+          const newInstallment = frenchInstallment(principalRemaining, newMonthlyRate, remainingMonths)
+
+          // Virtual start date: last paid installment's dueDate (so month 1 of new schedule = next due date)
+          // If nothing is paid yet, use original loan start date
+          const virtualStartDate = paidCount > 0
+            ? formatDate(new Date(paidInstallments[paidCount - 1].dueDate), 'yyyy-MM-dd')
+            : formatDate(new Date(loan.startDate), 'yyyy-MM-dd')
+
+          const table = generateAmortizationTable(principalRemaining, newMonthlyRate, remainingMonths, newInstallment, virtualStartDate)
+
+          await ctx.prisma.loanInstallment.createMany({
+            data: table.map((row) => ({
+              loanId: loan.id,
+              number: paidCount + row.month,
+              dueDate: new Date(row.date + 'T12:00:00'),
+              amount: row.installment,
+              interest: row.interest,
+              principal: row.principal,
+              balance: row.balance,
+            })),
+          })
+
+          await ctx.prisma.loan.update({
+            where: { id: loan.id },
+            data: {
+              tna: input.tna,
+              monthlyRate: newMonthlyRate,
+              installmentAmount: newInstallment,
+              totalAmount: newInstallment * remainingMonths + paidInstallments.reduce((s, i) => s + Number(i.amount), 0),
+            },
+          })
+        } else {
+          // 0% or nothing remaining — just update rate fields
+          const newInstallment = newMonthlyRate > 0 && remainingMonths > 0
+            ? frenchInstallment(principalRemaining, newMonthlyRate, remainingMonths)
+            : (loan.termMonths ? principalRemaining / (loan.termMonths - paidCount || 1) : principalRemaining)
+          await ctx.prisma.loan.update({
+            where: { id: loan.id },
+            data: { tna: input.tna, monthlyRate: newMonthlyRate, installmentAmount: newInstallment },
+          })
+        }
+      } else if (loan.loanType === 'interest_only') {
+        const newMonthlyInterest = principalRemaining * newMonthlyRate
+
+        if (newMonthlyRate > 0 && principalRemaining > 0) {
+          // Regenerate 12 interest installments from today
+          const virtualStartDate = paidCount > 0
+            ? formatDate(new Date(paidInstallments[paidCount - 1].dueDate), 'yyyy-MM-dd')
+            : formatDate(new Date(loan.startDate), 'yyyy-MM-dd')
+
+          const installments = Array.from({ length: 12 }, (_, i) => ({
+            loanId: loan.id,
+            number: paidCount + i + 1,
+            dueDate: addMonths(new Date(virtualStartDate + 'T12:00:00'), i + 1),
+            amount: newMonthlyInterest,
+            interest: newMonthlyInterest,
+            principal: 0,
+            balance: principalRemaining,
+          }))
+
+          await ctx.prisma.loanInstallment.createMany({ data: installments })
+        }
+
+        await ctx.prisma.loan.update({
+          where: { id: loan.id },
+          data: { tna: input.tna, monthlyRate: newMonthlyRate, installmentAmount: newMonthlyInterest },
+        })
+      }
+
+      // Rebuild accruals and IRR with new rate (independent — run in parallel)
+      const service = new LoanAccountingService(ctx.prisma)
+      await Promise.all([
+        service.rebuildMonthlyAccruals(loan.id),
+        service.recalculateIrrCache(loan.id),
+      ])
+
+      return { success: true }
     }),
 
   delete: protectedProcedure
@@ -473,28 +596,31 @@ export const loanCrudRouter = router({
         }
       } else {
         const monthlyRate = Number(loan.monthlyRate)
-        const termMonths = loan.termMonths!
-        const installmentAmount = Number(loan.installmentAmount)
+        // Zero-rate loans have no installment schedule
+        if (monthlyRate > 0) {
+          const termMonths = loan.termMonths!
+          const installmentAmount = Number(loan.installmentAmount)
 
-        const table = generateAmortizationTable(
-          Number(loan.capital),
-          monthlyRate,
-          termMonths,
-          installmentAmount,
-          input.startDate,
-        )
+          const table = generateAmortizationTable(
+            Number(loan.capital),
+            monthlyRate,
+            termMonths,
+            installmentAmount,
+            input.startDate,
+          )
 
-        await ctx.prisma.loanInstallment.createMany({
-          data: table.map((row) => ({
-            loanId: loan.id,
-            number: row.month,
-            dueDate: addMonths(startDate, row.month),
-            amount: row.installment,
-            interest: row.interest,
-            principal: row.principal,
-            balance: row.balance,
-          })),
-        })
+          await ctx.prisma.loanInstallment.createMany({
+            data: table.map((row) => ({
+              loanId: loan.id,
+              number: row.month,
+              dueDate: addMonths(startDate, row.month),
+              amount: row.installment,
+              interest: row.interest,
+              principal: row.principal,
+              balance: row.balance,
+            })),
+          })
+        }
       }
 
       const updated = await ctx.prisma.loan.update({

@@ -24,6 +24,7 @@ import {
     Infinity,
     Search,
 } from 'lucide-react'
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { calculatePersonScore } from '@/lib/loan-scoring'
@@ -35,9 +36,9 @@ type SortDirection = 'asc' | 'desc'
 type StatusFilter = 'all' | 'current' | 'overdue' | 'interestOnly'
 type CurrencyFilter = 'all' | 'ARS' | 'USD' | 'EUR'
 
-/** A no-interest, no-term loan has $0 installments — never "overdue" */
+/** A zero-rate loan has no installment schedule — never "overdue" */
 function isZeroRateOpenLoan(loan: LoanListItem) {
-    return loan.loanType === 'interest_only' && Number(loan.monthlyRate) === 0
+    return Number(loan.monthlyRate) === 0
 }
 
 function getLoanStatus(loan: LoanListItem) {
@@ -381,9 +382,11 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                         {/* Tipo */}
                                         <TableCell className="py-2 hidden md:table-cell">
                                             <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                                {isInterestOnly
-                                                    ? isZeroRate ? 'Sin intereses' : 'Solo interés'
-                                                    : 'Amortizado'
+                                                {isZeroRate
+                                                    ? 'Sin intereses'
+                                                    : isInterestOnly
+                                                        ? 'Solo interés'
+                                                        : 'Amortizado'
                                                 }
                                             </Badge>
                                         </TableCell>
@@ -394,7 +397,16 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                                 {isZeroRate ? '0%' : `${(ri.tna * 100).toFixed(1)}%`}
                                             </span>
                                             {Number(loan.tna) > 1.5 && (
-                                                <Badge variant="destructive" className="ml-1 text-[8px] px-1 py-0">!</Badge>
+                                                <TooltipProvider>
+                                                    <UITooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Badge variant="destructive" className="ml-1 text-[8px] px-1 py-0 cursor-default">!</Badge>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>TNA supera el 150% — revisá las condiciones del préstamo</p>
+                                                        </TooltipContent>
+                                                    </UITooltip>
+                                                </TooltipProvider>
                                             )}
                                         </TableCell>
 
@@ -407,7 +419,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
 
                                         {/* Progreso */}
                                         <TableCell className="py-2">
-                                            {isInterestOnly ? (
+                                            {(isInterestOnly || isZeroRate) ? (
                                                 <div className="flex items-center gap-1 text-muted-foreground">
                                                     <Infinity className="h-3.5 w-3.5" />
                                                 </div>
@@ -428,7 +440,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
 
                                         {/* Prox. cuota */}
                                         <TableCell className="py-2">
-                                            {isZeroRate && isInterestOnly ? (
+                                            {isZeroRate ? (
                                                 <div>
                                                     <p className="text-xs text-muted-foreground">Capital pdte:</p>
                                                     <p className="text-sm tabular-nums font-medium">{formatCurrency(Number(loan.principalOutstanding), cur)}</p>

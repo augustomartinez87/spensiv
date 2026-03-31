@@ -116,8 +116,12 @@ export class LoanAccountingService {
 
       await this.ensureInitialDisbursementCashflowTx(tx, loan)
 
+      // Zero-rate loans (0% TNA) use principal-only payment — no installment schedule
+      const isZeroRateLoan = Number(loan.monthlyRate) === 0
+
       // Fetch all unpaid installments for max-payable validation and advance logic
-      const unpaidInstallments = await tx.loanInstallment.findMany({
+      // Skip for zero-rate loans — they have no installment schedule
+      const unpaidInstallments = isZeroRateLoan ? [] : await tx.loanInstallment.findMany({
         where: { loanId: loan.id, isPaid: false },
         orderBy: { number: 'asc' },
         select: { id: true, number: true, dueDate: true, amount: true, interest: true, principal: true, paidAmount: true },
@@ -145,6 +149,8 @@ export class LoanAccountingService {
 
       // Interest-only loans: principal never decreases via regular payments
       const isInterestOnly = loan.loanType === 'interest_only'
+      // Zero-rate loans also pay principal directly (no installment waterfall)
+      const isPrincipalDirectLoan = isInterestOnly || isZeroRateLoan
 
       // Current dues: use installment amounts as authoritative source.
       // The accrual engine may disagree due to rounding drift in interest/principal
@@ -166,7 +172,7 @@ export class LoanAccountingService {
       // but principal absorbs the remainder so the total matches installment amounts.
       // This prevents rounding drift from spilling cents into future installments.
       let currentPeriodPrincipal: Decimal
-      if (isInterestOnly) {
+      if (isPrincipalDirectLoan) {
         currentPeriodPrincipal = ZERO
       } else {
         currentPeriodPrincipal = Decimal.max(
@@ -180,7 +186,7 @@ export class LoanAccountingService {
         const remaining = Decimal.max(money(i.amount).minus(money(i.paidAmount ?? 0)), ZERO)
         return s.plus(remaining)
       }, ZERO)
-      const maxPayable = isInterestOnly 
+      const maxPayable = isPrincipalDirectLoan
         ? currentDues.plus(futureInstallmentsTotal).plus(money(preState.principalOutstanding))
         : currentDues.plus(futureInstallmentsTotal)
 
@@ -210,8 +216,8 @@ export class LoanAccountingService {
       let excessRemaining = amount.minus(money(waterfall.totalApplied))
       let extraPrincipalPaid = ZERO
 
-      // If interest-only, pay principal with excess natively!
-      if (isInterestOnly && excessRemaining.gt(CENT_TOLERANCE)) {
+      // For interest-only and zero-rate loans, pay principal with excess natively
+      if (isPrincipalDirectLoan && excessRemaining.gt(CENT_TOLERANCE)) {
           const principalPending = money(preState.principalOutstanding)
           const principalToPay = Decimal.min(excessRemaining, principalPending)
           if (principalToPay.gt(0)) {

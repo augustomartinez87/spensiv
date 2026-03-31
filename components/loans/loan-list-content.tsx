@@ -91,7 +91,7 @@ function getRingColor(loan: {
 }) {
     const now = new Date()
     const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
-    const isZeroRateOpen = loan.loanType === 'interest_only' && Number(loan.monthlyRate) === 0
+    const isZeroRateOpen = Number(loan.monthlyRate) === 0
     const isOverdue = !isZeroRateOpen && nextDue && nextDue < now
 
     if (isOverdue) return '#ef4444' // red
@@ -233,7 +233,7 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                     const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
                     const isInterestOnly = loan.loanType === 'interest_only'
                     const isZeroRate = Number(loan.monthlyRate) === 0
-                    const isZeroRateOpen = isInterestOnly && isZeroRate
+                    const isZeroRateOpen = isZeroRate
                     const isOverdue = !isZeroRateOpen && nextDue && nextDue < now
                     const cur = loan.currency
 
@@ -265,7 +265,7 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
 
                     // Collect chips
                     const chips: { label: string; variant?: 'destructive' | 'outline' }[] = []
-                    if (isInterestOnly) {
+                    if (isInterestOnly || isZeroRate) {
                         chips.push({ label: isZeroRate ? 'Sin intereses' : 'Solo interés', variant: 'outline' })
                     }
                     if (cur !== 'ARS') {
@@ -309,7 +309,7 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                                         )}
                                     </div>
                                     {/* Progress ring or status dot */}
-                                    {isInterestOnly ? (
+                                    {(isInterestOnly || isZeroRate) ? (
                                         <StatusDot color={ringColor} />
                                     ) : (
                                         <ProgressRing
@@ -325,9 +325,11 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                                     <p className="text-sm text-muted-foreground">
                                         {formatCurrency(Number(loan.capital), cur)}
                                         {' · '}
-                                        {isInterestOnly
-                                            ? isZeroRate ? 'Sin plazo fijo' : 'Solo interés'
-                                            : `${loan.termMonths} meses`
+                                        {isZeroRate
+                                            ? 'Sin intereses'
+                                            : isInterestOnly
+                                                ? 'Solo interés'
+                                                : `${loan.termMonths} meses`
                                         }
                                     </p>
                                     {chips.length > 0 && (
@@ -358,8 +360,8 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                                     </div>
                                 )}
 
-                                {/* Interest-only info */}
-                                {isInterestOnly && loan.status === 'active' && (
+                                {/* Interest-only / zero-rate info */}
+                                {(isInterestOnly || isZeroRate) && loan.status === 'active' && (
                                     <div className={cn(
                                         "flex items-center gap-2 text-sm px-3 py-2 rounded-lg",
                                         isZeroRate
@@ -382,7 +384,7 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                                     return (
                                         <div className="grid grid-cols-2 text-xs text-muted-foreground border-t border-border/50 pt-2 mt-auto">
                                             <span>
-                                                {isInterestOnly
+                                                {(isInterestOnly || isZeroRate)
                                                     ? isZeroRate ? 'Sin intereses' : `${(ri.tem * 100).toFixed(2)}% TEM`
                                                     : `Cuota: ${formatCurrency(Number(loan.installmentAmount), cur)}`
                                                 }

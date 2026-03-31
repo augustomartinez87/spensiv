@@ -44,7 +44,8 @@ export function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; c
     }, 0)
     
     const principalPending = loan?.principalOutstanding ? Number(loan.principalOutstanding) : 0
-    const allowPayment = pendingCount > 0 || (loan?.loanType === 'interest_only' && principalPending > 0)
+    const isZeroRateLoan = Number(loan?.monthlyRate ?? 0) === 0
+    const allowPayment = pendingCount > 0 || ((loan?.loanType === 'interest_only' || (loan?.loanType === 'amortized' && isZeroRateLoan)) && principalPending > 0)
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -90,7 +91,7 @@ export function RegisterPaymentDialog({ loanId, cur, loan }: { loanId: string; c
                                     <span className="font-medium">{formatCurrency(totalPendingAmount, cur)}</span>
                                 </div>
                             )}
-                            {loan?.loanType === 'interest_only' && principalPending > 0 && (
+                            {(loan?.loanType === 'interest_only' || (loan?.loanType === 'amortized' && isZeroRateLoan)) && principalPending > 0 && (
                                 <div className="flex justify-between border-t border-border/50 pt-1.5 text-muted-foreground">
                                     <span>Capital vivo prestado</span>
                                     <span className="text-foreground">{formatCurrency(principalPending, cur)}</span>
