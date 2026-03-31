@@ -39,9 +39,9 @@ export const loanDashboardRouter = router({
       0
     )
 
-    // Helper: zero-rate amortized loans have no installment schedule
+    // Helper: zero-rate loans (any type) have no installment schedule
     const getEffectiveInstallments = (loan: { loanType: string; monthlyRate: unknown; loanInstallments: unknown[] }) =>
-      (loan.loanType === 'amortized' && Number(loan.monthlyRate) === 0) ? [] : loan.loanInstallments as typeof activeLoans[0]['loanInstallments']
+      Number(loan.monthlyRate) === 0 ? [] : loan.loanInstallments as typeof activeLoans[0]['loanInstallments']
 
     const totalPending = activeLoans.reduce(
       (sum, loan) =>
@@ -150,9 +150,9 @@ export const loanDashboardRouter = router({
     const totalDebt = activeDebts.reduce(
       (sum, loan) => sum + pesify(Number(loan.capital), loan.currency, mepRate), 0
     )
-    // Zero-rate amortized loans have no installment schedule
+    // Zero-rate loans (any type) have no installment schedule
     const getEffectiveInstallments = (loan: typeof activeDebts[0]) =>
-      (loan.loanType === 'amortized' && Number(loan.monthlyRate) === 0) ? [] : loan.loanInstallments
+      Number(loan.monthlyRate) === 0 ? [] : loan.loanInstallments
 
     const totalPending = activeDebts.reduce(
       (sum, loan) => sum + getEffectiveInstallments(loan).reduce(

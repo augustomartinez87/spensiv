@@ -260,8 +260,8 @@ export const loanCrudRouter = router({
       })
 
       return loans.map((loan) => {
-        // Zero-rate amortized loans have no installment schedule — hide any legacy installments
-        const effectiveInstallments = (loan.loanType === 'amortized' && Number(loan.monthlyRate) === 0)
+        // Zero-rate loans (any type) have no installment schedule — hide any legacy installments
+        const effectiveInstallments = Number(loan.monthlyRate) === 0
           ? []
           : loan.loanInstallments
         const paid = effectiveInstallments.filter((i) => i.isPaid).length
@@ -308,8 +308,8 @@ export const loanCrudRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
       }
 
-      // Zero-rate amortized loans have no installment schedule — hide any legacy installments
-      if (loan.loanType === 'amortized' && Number(loan.monthlyRate) === 0) {
+      // Zero-rate loans (any type) have no installment schedule — hide any legacy installments
+      if (Number(loan.monthlyRate) === 0) {
         return { ...loan, loanInstallments: [] }
       }
 
