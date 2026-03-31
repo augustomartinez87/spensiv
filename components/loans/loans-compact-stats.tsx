@@ -4,15 +4,8 @@ import { trpc } from '@/lib/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PrivateAmount } from '@/lib/privacy-context'
-
-function daysUntilText(date: Date) {
-    const now = new Date()
-    const diff = Math.ceil((new Date(date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    if (diff === 0) return 'hoy'
-    if (diff === 1) return 'mañana'
-    if (diff < 0) return `hace ${Math.abs(diff)}d`
-    return `en ${diff}d`
-}
+import { daysUntilText } from '@/lib/date-utils'
+import { MOROSITY_WARNING_PCT, MOROSITY_DANGER_PCT } from '@/lib/constants/thresholds'
 
 function formatRentCompact(rent: Record<string, number>) {
     const entries = Object.entries(rent).filter(([, v]) => v > 0)
@@ -34,12 +27,12 @@ export function LoansCompactStats() {
     )
 
     const morosityColor =
-        metrics.morosityPct < 5 ? 'text-green-400' :
-        metrics.morosityPct < 15 ? 'text-yellow-500' :
+        metrics.morosityPct < MOROSITY_WARNING_PCT ? 'text-green-400' :
+        metrics.morosityPct < MOROSITY_DANGER_PCT ? 'text-yellow-500' :
         'text-red-400'
     const morosityDotColor =
-        metrics.morosityPct < 5 ? 'bg-green-400' :
-        metrics.morosityPct < 15 ? 'bg-yellow-500' :
+        metrics.morosityPct < MOROSITY_WARNING_PCT ? 'bg-green-400' :
+        metrics.morosityPct < MOROSITY_DANGER_PCT ? 'bg-yellow-500' :
         'bg-red-400'
 
     const hasInterestOnlyRent = Object.values(metrics.interestOnlyRent).some(v => v > 0)

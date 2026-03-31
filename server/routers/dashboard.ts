@@ -4,6 +4,7 @@ import { subMonths } from 'date-fns'
 import { getMonthlyBalance, getMonthlyTotals, getCashFlowProjection } from '@/lib/balance'
 import { formatPeriod } from '@/lib/periods'
 import { getDolarMep } from '@/lib/dolar'
+import { computeCardBalances } from '@/lib/card-analytics'
 
 export const dashboardRouter = router({
   getMepRate: protectedProcedure.query(async () => {
@@ -107,45 +108,7 @@ export const dashboardRouter = router({
         },
       })
 
-      const cardBalances = cards.map((card) => {
-        const cyclePendingAmount = (cycle: (typeof card.billingCycles)[number]) =>
-          cycle.installments.reduce((sum, installment) => sum + Number(installment.amount), 0)
-
-        const totalBalance = card.billingCycles.reduce(
-          (sum, cycle) => sum + cyclePendingAmount(cycle),
-          0
-        )
-
-        const currentPeriodBalance = card.billingCycles
-          .filter((cycle) => cycle.period === currentPeriod)
-          .reduce((sum, cycle) => sum + cyclePendingAmount(cycle), 0)
-
-        const nextDueCycle = card.billingCycles
-          .filter(
-            (cycle) =>
-              (cycle.status === 'open' || cycle.status === 'closed') &&
-              cyclePendingAmount(cycle) > 0
-          )
-          .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0]
-
-        return {
-          id: card.id,
-          name: card.name,
-          bank: card.bank,
-          brand: card.brand,
-          last4: card.last4,
-          creditLimit: card.creditLimit ? Number(card.creditLimit) : null,
-          closingDay: card.closingDay,
-          dueDay: card.dueDay,
-          totalBalance,
-          currentPeriodBalance,
-          nextDueDate: nextDueCycle?.dueDate || null,
-          nextDueAmount: nextDueCycle ? cyclePendingAmount(nextDueCycle) : 0,
-          cycleCount: card.billingCycles.length,
-        }
-      })
-
-      const totalDebt = cardBalances.reduce((sum, card) => sum + card.totalBalance, 0)
+      const { cards: cardBalances, totalDebt } = computeCardBalances(cards, currentPeriod)
 
       const thirdPartyByCard = await ctx.prisma.thirdPartyPurchase.groupBy({
         by: ['cardId'],

@@ -5,6 +5,8 @@ import { Progress } from '@/components/ui/progress'
 import { formatCurrency, cn } from '@/lib/utils'
 import { PrivateAmount } from '@/lib/privacy-context'
 import { CheckCircle2, AlertTriangle } from 'lucide-react'
+import { getBudgetStatus } from '@/lib/budget-analytics'
+import { daysRemainingInMonth } from '@/lib/date-utils'
 
 interface CompactProjectionProps {
   balance: number
@@ -12,66 +14,50 @@ interface CompactProjectionProps {
   totalExpense: number
 }
 
+const statusStyles = {
+  deficit: {
+    icon: AlertTriangle,
+    color: 'text-red-200',
+    bgColor: 'from-red-950 to-red-800/50',
+    borderColor: 'border-red-700/30',
+  },
+  warning: {
+    icon: AlertTriangle,
+    color: 'text-yellow-200',
+    bgColor: 'from-yellow-950 to-yellow-800/50',
+    borderColor: 'border-yellow-700/30',
+  },
+  healthy: {
+    icon: CheckCircle2,
+    color: 'text-emerald-200',
+    bgColor: 'from-emerald-950 to-emerald-800/50',
+    borderColor: 'border-emerald-700/30',
+  },
+} as const
+
 export function CompactProjection({
   balance,
   totalIncome,
   totalExpense,
 }: CompactProjectionProps) {
-  const expensePercentage = totalIncome > 0
-    ? (totalExpense / totalIncome) * 100
-    : 0
+  const budgetStatus = getBudgetStatus(balance, totalIncome, totalExpense, formatCurrency)
+  const style = statusStyles[budgetStatus.level]
+  const Icon = style.icon
 
-  const savingsPotential = totalIncome - totalExpense * 1.1
-
-  const getStatus = () => {
-    if (balance < 0) {
-      return {
-        message: 'Estás en déficit',
-        icon: AlertTriangle,
-        color: 'text-red-200',
-        bgColor: 'from-red-950 to-red-800/50',
-        borderColor: 'border-red-700/30',
-      }
-    }
-    if (expensePercentage > 80) {
-      return {
-        message: 'Cuidado con los gastos',
-        icon: AlertTriangle,
-        color: 'text-yellow-200',
-        bgColor: 'from-yellow-950 to-yellow-800/50',
-        borderColor: 'border-yellow-700/30',
-      }
-    }
-    return {
-      message: savingsPotential > 0
-        ? `Podrías ahorrar ${formatCurrency(savingsPotential)}`
-        : 'Vas por buen camino',
-      icon: CheckCircle2,
-      color: 'text-emerald-200',
-      bgColor: 'from-emerald-950 to-emerald-800/50',
-      borderColor: 'border-emerald-700/30',
-    }
-  }
-
-  const status = getStatus()
-  const Icon = status.icon
-
-  const today = new Date()
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-  const daysRemaining = daysInMonth - today.getDate()
+  const daysRemaining = daysRemainingInMonth()
 
   return (
     <Card className={cn(
       "overflow-hidden bg-gradient-to-br border h-full min-h-[140px]",
-      status.bgColor,
-      status.borderColor
+      style.bgColor,
+      style.borderColor
     )}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
-          <p className={cn("text-xs font-medium uppercase tracking-wider", status.color)}>
+          <p className={cn("text-xs font-medium uppercase tracking-wider", style.color)}>
             Proyección Mensual
           </p>
-          <Icon className={cn("h-5 w-5", status.color)} />
+          <Icon className={cn("h-5 w-5", style.color)} />
         </div>
 
         <PrivateAmount>
@@ -86,16 +72,16 @@ export function CompactProjection({
         <div className="mt-3">
           <div className="flex justify-between text-[10px] text-white/70 mb-1">
             <span>Gastos</span>
-            <span>{expensePercentage.toFixed(0)}% de ingresos</span>
+            <span>{budgetStatus.expensePercentage.toFixed(0)}% de ingresos</span>
           </div>
           <Progress
-            value={Math.min(expensePercentage, 100)}
+            value={Math.min(budgetStatus.expensePercentage, 100)}
             className="h-1.5 bg-white/20"
           />
         </div>
 
-        <p className={cn("text-xs font-medium mt-2", status.color)}>
-          {status.message}
+        <p className={cn("text-xs font-medium mt-2", style.color)}>
+          {budgetStatus.message}
         </p>
       </CardContent>
     </Card>

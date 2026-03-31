@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from '@/lib/trpc'
-import { tnaToMonthlyRate, frenchInstallment, reverseFromInstallment, generateAmortizationTable, strategicRoundInstallment } from '@/lib/loan-calculator'
+import { tnaToMonthlyRate, frenchInstallment, reverseFromInstallment, generateAmortizationTable, strategicRoundInstallment, calculateInstallmentComponents, calculateRemainingCapital } from '@/lib/loan-calculator'
 import { addMonths } from 'date-fns'
 import { getSmartDueDatesFromFirst, getNthBusinessDay } from '@/lib/business-days'
 import { LoanAccountingService } from '../../services/loan-accounting.service'
@@ -190,15 +190,12 @@ export const loanOperationsRouter = router({
             },
           })
           const prevBalance = prevInstallment ? Number(prevInstallment.balance) : Number(loan.capital)
-          const monthlyRate = Number(loan.monthlyRate)
-          const interest = prevBalance * monthlyRate
-          const principal = Math.max(input.amount - interest, 0)
-          const balance = Math.max(prevBalance - principal, 0)
+          const components = calculateInstallmentComponents(prevBalance, Number(loan.monthlyRate), input.amount)
 
           updates.amount = input.amount
-          updates.interest = interest
-          updates.principal = principal
-          updates.balance = balance
+          updates.interest = components.interest
+          updates.principal = components.principal
+          updates.balance = components.balance
         }
       }
 
@@ -383,19 +380,14 @@ export const loanOperationsRouter = router({
         })
         if (!loan) throw new TRPCError({ code: 'CONFLICT', message: 'El préstamo ya no está activo' })
 
-        let newCapital = loan.loanInstallments.reduce((sum, i) => {
-          const paid = Number(i.paidAmount ?? 0)
-          const paidInterest = Math.min(paid, Number(i.interest))
-          const paidPrincipal = Math.max(paid - paidInterest, 0)
-          return sum + Math.max(Number(i.principal) - paidPrincipal, 0)
-        }, 0)
-        if (input.capitalizeInterest) {
-          newCapital += loan.loanInstallments.reduce((sum, i) => {
-            const paid = Number(i.paidAmount ?? 0)
-            const paidInterest = Math.min(paid, Number(i.interest))
-            return sum + Math.max(Number(i.interest) - paidInterest, 0)
-          }, 0)
-        }
+        const newCapital = calculateRemainingCapital(
+          loan.loanInstallments.map(i => ({
+            interest: Number(i.interest),
+            principal: Number(i.principal),
+            paidAmount: Number(i.paidAmount ?? 0),
+          })),
+          input.capitalizeInterest,
+        )
 
         let monthlyRate = tnaToMonthlyRate(input.tna)
         const exactInstallment = frenchInstallment(newCapital, monthlyRate, input.termMonths)

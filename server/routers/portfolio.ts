@@ -4,6 +4,7 @@ import { calculatePersonScore, calculateExpectedValue } from '@/lib/loan-scoring
 import { getDolarMep, pesify } from '@/lib/dolar'
 import { calculateIRR, monthlyToAnnualRate } from '@/lib/loan-calculator'
 import { formatPeriod } from '@/lib/periods'
+import { OVERDUE_DETECTION_DAYS } from '@/lib/constants/thresholds'
 import type { PrismaClient } from '@prisma/client'
 
 // ── Shared data loader ───────────────────────────────────────────────
@@ -100,13 +101,12 @@ function computeMetrics(
     }
   }
 
-  // Overdue capital (>15 days)
   const now = new Date()
-  const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000)
+  const overdueThreshold = new Date(now.getTime() - OVERDUE_DETECTION_DAYS * 24 * 60 * 60 * 1000)
   let overdueCapital = 0
   for (const loan of lenderLoans) {
     for (const inst of loan.loanInstallments) {
-      if (!inst.isPaid && new Date(inst.dueDate) < fifteenDaysAgo) {
+      if (!inst.isPaid && new Date(inst.dueDate) < overdueThreshold) {
         overdueCapital += pesify(Number(inst.amount), loan.currency, mepRate)
       }
     }

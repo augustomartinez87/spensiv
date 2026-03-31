@@ -66,6 +66,43 @@ export interface SimulationResult {
   accruedCurve: Array<{ month: number; value: number }>
 }
 
+/**
+ * Computes remaining capital from unpaid installments, applying partial payment waterfall
+ * (paid amount covers interest first, then principal).
+ * Used for refinancing calculations.
+ */
+export function calculateRemainingCapital(
+  unpaidInstallments: Array<{ interest: number; principal: number; paidAmount: number }>,
+  capitalizeInterest: boolean,
+): number {
+  let capital = 0
+  for (const inst of unpaidInstallments) {
+    const paid = inst.paidAmount
+    const paidInterest = Math.min(paid, inst.interest)
+    const paidPrincipal = Math.max(paid - inst.interest, 0)
+    capital += Math.max(inst.principal - paidPrincipal, 0)
+    if (capitalizeInterest) {
+      capital += Math.max(inst.interest - paidInterest, 0)
+    }
+  }
+  return capital
+}
+
+/**
+ * Calculates interest, principal and remaining balance for a single installment.
+ * Used when editing installment amounts to keep the amortization math consistent.
+ */
+export function calculateInstallmentComponents(
+  prevBalance: number,
+  monthlyRate: number,
+  installmentAmount: number,
+): { interest: number; principal: number; balance: number } {
+  const interest = prevBalance * monthlyRate
+  const principal = Math.max(installmentAmount - interest, 0)
+  const balance = Math.max(prevBalance - principal, 0)
+  return { interest, principal, balance }
+}
+
 export function tnaToMonthlyRate(tna: number): number {
   return tnaNominalToMonthlyRate(tna)
 }
