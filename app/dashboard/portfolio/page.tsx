@@ -113,15 +113,33 @@ export default function PortfolioPage() {
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Rendimiento Efectivo</p>
               </div>
 
-              <div>
-                <p className="text-3xl font-bold text-accent-positive">
-                  {(yieldMetrics.weightedYield * 100).toFixed(1)}%
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">TIR anual ponderada</p>
+              {/* TEM ponderada — métrica principal */}
+              <div className="space-y-3">
+                <div>
+                  <p className="text-3xl font-bold text-accent-positive">
+                    {(yieldMetrics.weightedTEM * 100).toFixed(2)}% <span className="text-lg font-medium text-muted-foreground">TEM</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Tasa efectiva mensual ponderada · todos los préstamos</p>
+                </div>
+
+                <div className="flex items-baseline gap-4">
+                  <div>
+                    <p className="text-xl font-bold text-foreground">{formatCurrency(yieldMetrics.monthlyIncomeExpected)}</p>
+                    <p className="text-xs text-muted-foreground">Ingreso mensual esperado</p>
+                  </div>
+                  {yieldMetrics.amortizedLoansCount > 0 && (
+                    <div className="border-l border-border pl-4">
+                      <p className="text-base font-semibold text-accent-blue">
+                        {(yieldMetrics.weightedIRR * 100).toFixed(1)}% <span className="text-xs font-normal text-muted-foreground">TEA</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">TIR · {yieldMetrics.amortizedLoansCount} amortizados</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Interest progress */}
-              <div className="mt-5 space-y-1.5">
+              {/* Interés cobrado / proyectado */}
+              <div className="mt-2 space-y-1.5">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Interés cobrado / proyectado (acumulado)</span>
                   <span className="font-medium text-foreground">{(yieldMetrics.interestRatio * 100).toFixed(0)}%</span>

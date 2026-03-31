@@ -146,7 +146,10 @@ function computeYieldMetrics(
 ) {
   if (lenderLoans.length === 0) {
     return {
-      weightedYield: 0,
+      weightedTEM: 0,
+      monthlyIncomeExpected: 0,
+      weightedIRR: 0,
+      amortizedLoansCount: 0,
       interestCollected: 0,
       interestProjected: 0,
       interestRatio: 0,
@@ -155,10 +158,17 @@ function computeYieldMetrics(
     }
   }
 
+  // TEM ponderada: Σ(capital × monthlyRate) / Σ(capital) — todos los préstamos con tasa
+  let totalWeightedTEM = 0
+  let totalCapitalForTEM = 0
+
+  // TIR ponderada: solo préstamos amortizados con flujos definidos
   let totalWeightedIRR = 0
   let totalWeightForIRR = 0
+  let amortizedLoansCount = 0
   let totalWeightedDuration = 0
   let totalWeightForDuration = 0
+
   let interestCollected = 0
   let interestProjected = 0
 
@@ -166,8 +176,17 @@ function computeYieldMetrics(
     const loan = lenderLoans[i]
     const capital = capitalCache[i]
     if (!Number.isFinite(capital) || capital <= 0) continue
+
+    const monthlyRate = Number(loan.monthlyRate)
     const installments = loan.loanInstallments
 
+    // TEM ponderada — todos los préstamos con tasa > 0
+    if (monthlyRate > 0) {
+      totalWeightedTEM += monthlyRate * capital
+      totalCapitalForTEM += capital
+    }
+
+    // Interés cobrado/proyectado desde cuotas
     for (const inst of installments) {
       const intArs = pesify(Number(inst.interest), loan.currency, mepRate)
       if (!Number.isFinite(intArs)) continue
@@ -175,37 +194,45 @@ function computeYieldMetrics(
       if (inst.isPaid) interestCollected += intArs
     }
 
-    const cashFlows = [-capital]
-    for (const inst of installments) {
-      const payment = pesify(Number(inst.amount), loan.currency, mepRate)
-      if (Number.isFinite(payment)) cashFlows.push(payment)
-    }
+    // TIR solo para préstamos amortizados con cuotas definidas
+    if (loan.loanType === 'amortized' && installments.length > 0) {
+      const cashFlows = [-capital]
+      for (const inst of installments) {
+        const payment = pesify(Number(inst.amount), loan.currency, mepRate)
+        if (Number.isFinite(payment)) cashFlows.push(payment)
+      }
 
-    if (cashFlows.length > 1) {
-      const hasPositive = cashFlows.some((value) => value > 0)
-      const hasNegative = cashFlows.some((value) => value < 0)
-      if (hasPositive && hasNegative) {
-        try {
-          const monthlyIRR = calculateIRR(cashFlows)
-          if (isFinite(monthlyIRR) && monthlyIRR > -1) {
-            const annualIRR = monthlyToAnnualRate(monthlyIRR)
-            totalWeightedIRR += annualIRR * capital
-            totalWeightForIRR += capital
+      if (cashFlows.length > 1) {
+        const hasPositive = cashFlows.some((v) => v > 0)
+        const hasNegative = cashFlows.some((v) => v < 0)
+        if (hasPositive && hasNegative) {
+          try {
+            const monthlyIRR = calculateIRR(cashFlows)
+            if (isFinite(monthlyIRR) && monthlyIRR > -1) {
+              const annualIRR = monthlyToAnnualRate(monthlyIRR)
+              totalWeightedIRR += annualIRR * capital
+              totalWeightForIRR += capital
+              amortizedLoansCount++
+            }
+          } catch {
+            // Skip loans with non-solvable IRR
           }
-        } catch {
-          // Skip loans with non-solvable IRR
         }
       }
-    }
 
-    const termMonths = installments.length
-    totalWeightedDuration += termMonths * capital
-    totalWeightForDuration += capital
+      totalWeightedDuration += installments.length * capital
+      totalWeightForDuration += capital
+    }
   }
 
-  const weightedYield = totalWeightForIRR > 0 ? totalWeightedIRR / totalWeightForIRR : 0
   return {
-    weightedYield,
+    // TEM ponderada por capital (todos los préstamos)
+    weightedTEM: totalCapitalForTEM > 0 ? totalWeightedTEM / totalCapitalForTEM : 0,
+    // Ingreso mensual esperado = Σ(capital × TEM) — en ARS
+    monthlyIncomeExpected: totalWeightedTEM,
+    // TIR ponderada (solo amortizados con cuotas)
+    weightedIRR: totalWeightForIRR > 0 ? totalWeightedIRR / totalWeightForIRR : 0,
+    amortizedLoansCount,
     interestCollected,
     interestProjected,
     interestRatio: interestProjected > 0 ? interestCollected / interestProjected : 0,
