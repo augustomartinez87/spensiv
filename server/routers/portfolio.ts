@@ -143,12 +143,10 @@ function computeYieldMetrics(
   lenderLoans: PortfolioLoans,
   capitalCache: number[],
   mepRate: number,
-  fciRate: number,
 ) {
   if (lenderLoans.length === 0) {
     return {
       weightedYield: 0,
-      spread: 0,
       interestCollected: 0,
       interestProjected: 0,
       interestRatio: 0,
@@ -208,7 +206,6 @@ function computeYieldMetrics(
   const weightedYield = totalWeightForIRR > 0 ? totalWeightedIRR / totalWeightForIRR : 0
   return {
     weightedYield,
-    spread: weightedYield - fciRate,
     interestCollected,
     interestProjected,
     interestRatio: interestProjected > 0 ? interestCollected / interestProjected : 0,
@@ -315,14 +312,12 @@ function computeRiskBreakdown(
 
 export const portfolioRouter = router({
   getFullPortfolio: protectedProcedure
-    .input(z.object({ fciRate: z.number().min(0).default(0.40) }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx }) => {
       const { loans, persons, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
 
       const lenderLoans = loans.filter((l) => l.direction === 'lender')
       const capitalCache = buildCapitalCache(lenderLoans, mepRate)
 
-      // Compute person scores once for metrics + risk breakdown
       const personIds = new Set(lenderLoans.map((l) => l.personId).filter(Boolean))
       const personScores = new Map<string, ReturnType<typeof calculatePersonScore>>()
       for (const p of persons) {
@@ -333,7 +328,7 @@ export const portfolioRouter = router({
 
       return {
         metrics: computeMetrics(lenderLoans, capitalCache, persons, personScores, mepRate),
-        yieldMetrics: computeYieldMetrics(lenderLoans, capitalCache, mepRate, input.fciRate),
+        yieldMetrics: computeYieldMetrics(lenderLoans, capitalCache, mepRate),
         cashFlow: computeCashFlowProjection(lenderLoans, mepRate),
         alerts: computeConcentrationAlerts(lenderLoans, capitalCache),
         riskBreakdown: computeRiskBreakdown(persons, personScores, mepRate),
@@ -341,8 +336,7 @@ export const portfolioRouter = router({
     }),
 
   getMetrics: protectedProcedure
-    .input(z.object({ fciRate: z.number().min(0).default(0.40) }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx }) => {
       const { loans, persons, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
       const lenderLoans = loans.filter((l) => l.direction === 'lender')
       const capitalCache = buildCapitalCache(lenderLoans, mepRate)
@@ -355,12 +349,11 @@ export const portfolioRouter = router({
     }),
 
   getYieldMetrics: protectedProcedure
-    .input(z.object({ fciRate: z.number().min(0).default(0.40) }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx }) => {
       const { loans, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
       const lenderLoans = loans.filter((l) => l.direction === 'lender')
       const capitalCache = buildCapitalCache(lenderLoans, mepRate)
-      return computeYieldMetrics(lenderLoans, capitalCache, mepRate, input.fciRate)
+      return computeYieldMetrics(lenderLoans, capitalCache, mepRate)
     }),
 
   getCashFlowProjection: protectedProcedure.query(async ({ ctx }) => {

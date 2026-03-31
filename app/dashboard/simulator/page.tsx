@@ -28,8 +28,6 @@ import {
   Calculator,
   TrendingUp,
   ArrowRightLeft,
-  CheckCircle2,
-  XCircle,
   Info,
   Zap,
   Banknote,
@@ -99,7 +97,6 @@ export default function SimulatorPage() {
   const [currency, setCurrency] = useState<'ARS' | 'USD'>('ARS')
   const [termMonths, setTermMonths] = useState('12')
   const [tnaTarget, setTnaTarget] = useState('55')
-  const [hurdleRate, setHurdleRate] = useState('40')
   const [customInstallment, setCustomInstallment] = useState('')
   const [impliedTna, setImpliedTna] = useState<number | null>(null)
   const [startDate, setStartDate] = useState(formatDateToInput(new Date()))
@@ -130,7 +127,6 @@ export default function SimulatorPage() {
       if (saved.capital) setCapital(saved.capital)
       if (saved.currency) setCurrency(saved.currency)
       if (saved.tnaTarget) setTnaTarget(saved.tnaTarget)
-      if (saved.hurdleRate) setHurdleRate(saved.hurdleRate)
       if (saved.startDate) setStartDate(saved.startDate)
       if (saved.roundEnabled !== undefined) setRoundEnabled(saved.roundEnabled)
       if (saved.roundingMultiple) setRoundingMultiple(saved.roundingMultiple)
@@ -185,7 +181,6 @@ export default function SimulatorPage() {
           capital,
           currency,
           tnaTarget,
-          hurdleRate,
           startDate,
           roundEnabled,
           roundingMultiple,
@@ -199,7 +194,7 @@ export default function SimulatorPage() {
       } catch {}
     }, 300)
     return () => clearTimeout(saveTimerRef.current)
-  }, [capital, currency, tnaTarget, hurdleRate, startDate, roundEnabled, roundingMultiple, smartDueDate, firstInstallmentMonth, compareTerms, viewMode, termMonths, customInstallment])
+  }, [capital, currency, tnaTarget, startDate, roundEnabled, roundingMultiple, smartDueDate, firstInstallmentMonth, compareTerms, viewMode, termMonths, customInstallment])
 
   function handleInstallmentChange(value: string) {
     setCustomInstallment(value)
@@ -320,14 +315,12 @@ export default function SimulatorPage() {
     autoSimTimerRef.current = setTimeout(() => {
       const cap = parseFloat(capital)
       const tna = parseFloat(tnaTarget)
-      const hurdle = parseFloat(hurdleRate)
-      if (!cap || cap <= 0 || !tna || tna <= 0 || !hurdle) return
+      if (!cap || cap <= 0 || !tna || tna <= 0) return
 
       if (viewMode === 'compare' && compareTerms.length > 0) {
         compareTermsMutation.mutate({
           capital: cap,
           tnaTarget: tna / 100,
-          hurdleRate: hurdle / 100,
           accrualType: 'exponential',
           startDate,
           roundingMultiple: roundEnabled ? roundingMultiple : 0,
@@ -342,7 +335,6 @@ export default function SimulatorPage() {
         simulateMutation.mutate({
           capital: cap,
           tnaTarget: tna / 100,
-          hurdleRate: hurdle / 100,
           accrualType: 'exponential',
           startDate,
           roundingMultiple: roundEnabled ? roundingMultiple : 0,
@@ -358,7 +350,7 @@ export default function SimulatorPage() {
     }, 600)
     return () => clearTimeout(autoSimTimerRef.current)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capital, currency, tnaTarget, hurdleRate, startDate, roundEnabled, roundingMultiple, smartDueDate, firstInstallmentMonth, compareTerms, viewMode, termMonths, customInstallment])
+  }, [capital, currency, tnaTarget, startDate, roundEnabled, roundingMultiple, smartDueDate, firstInstallmentMonth, compareTerms, viewMode, termMonths, customInstallment])
 
   const hasResults = singleResult || compareResults
 
@@ -499,19 +491,6 @@ export default function SimulatorPage() {
                   </SelectContent>
                 </Select>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="hurdleRate">Tasa Libre de Riesgo / Hurdle Rate (%)</Label>
-              <Input
-                id="hurdleRate"
-                type="number"
-                value={hurdleRate}
-                onChange={(e) => setHurdleRate(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                placeholder="40"
-                step="0.5"
-              />
             </div>
 
             <div className="space-y-2">
@@ -883,36 +862,6 @@ function MetricCard({
   )
 }
 
-function ConvenienceIndicator({ isConvenient, spread }: { isConvenient: boolean; spread: number }) {
-  const spreadPp = spread * 100
-  let colorClass: string
-  let label: string
-  if (!isConvenient) {
-    colorClass = "bg-red-500/10 border-red-500/20 text-red-400"
-    label = 'NO CONVIENE'
-  } else if (spreadPp > 30) {
-    colorClass = "bg-green-600/15 border-green-500/25 text-green-400"
-    label = 'MUY CONVENIENTE'
-  } else if (spreadPp > 10) {
-    colorClass = "bg-green-500/10 border-green-500/20 text-green-400"
-    label = 'CONVIENE'
-  } else {
-    colorClass = "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
-    label = 'CONVIENE (MARGINAL)'
-  }
-
-  return (
-    <div className={cn("flex items-center gap-2 px-4 py-3 rounded-xl border", colorClass)}>
-      {isConvenient ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
-      <div>
-        <p className="font-bold text-sm">{label}</p>
-        <p className="text-xs opacity-80">
-          Spread: {spread > 0 ? '+' : ''}{spread.toFixed(2)} pp vs hurdle rate
-        </p>
-      </div>
-    </div>
-  )
-}
 
 function ResultCardContent({ result, title, onCreateLoan, onPreApprove, suggestedTna }: { result: SimulationResult; title: string; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void; suggestedTna?: number | null }) {
   const currentTna = result.tnaTarget * 100
@@ -940,7 +889,6 @@ function ResultCardContent({ result, title, onCreateLoan, onPreApprove, suggeste
           <MetricCard
             label="TIR (TNA equiv.)"
             value={`${(result.tirTNA * 100).toFixed(2)}%`}
-            variant={result.isConvenient ? 'success' : 'danger'}
           />
           <MetricCard
             label="Cuota Mensual"
@@ -958,7 +906,6 @@ function ResultCardContent({ result, title, onCreateLoan, onPreApprove, suggeste
             <span>1er vencimiento: <span className="font-medium text-foreground">{formatFirstDueDate(result.amortizationTable[0].date)}</span></span>
           </div>
         )}
-        <ConvenienceIndicator isConvenient={result.isConvenient} spread={result.spread} />
         {onCreateLoan && (
           <div className="flex gap-2">
             <Button

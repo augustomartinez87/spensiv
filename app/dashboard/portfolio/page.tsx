@@ -1,11 +1,8 @@
 'use client'
 
-import { useState } from 'react'
 import { trpc } from '@/lib/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
 import {
@@ -32,7 +29,6 @@ import {
   TrendingUp,
   AlertTriangle,
   ShieldX,
-  HelpCircle,
   Target,
   Clock,
   Percent,
@@ -51,13 +47,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string; dotColor: 
 }
 
 export default function PortfolioPage() {
-  const [fciRate, setFciRate] = useState('40')
-  const fciRateDecimal = parseFloat(fciRate || '0') / 100
-
-  const { data, isLoading, error } = trpc.portfolio.getFullPortfolio.useQuery(
-    { fciRate: fciRateDecimal },
-    { enabled: !isNaN(fciRateDecimal) }
-  )
+  const { data, isLoading, error } = trpc.portfolio.getFullPortfolio.useQuery()
 
   const metrics = data?.metrics
   const yieldMetrics = data?.yieldMetrics
@@ -90,26 +80,6 @@ export default function PortfolioPage() {
                 </TooltipContent>
               </UITooltip>
             )}
-            <div className="flex items-center gap-1 shrink-0">
-              <Label htmlFor="fciRate" className="text-sm text-muted-foreground">Tasa libre de riesgo (%)</Label>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-[240px]">
-                  <p className="text-xs">Rendimiento de referencia sin riesgo (ej: FCI money market o plazo fijo). Se usa para calcular el spread de la cartera.</p>
-                </TooltipContent>
-              </UITooltip>
-            </div>
-            <Input
-              id="fciRate"
-              type="number"
-              value={fciRate}
-              onChange={(e) => setFciRate(e.target.value)}
-              className="w-20 h-9"
-              step="1"
-              min="0"
-            />
           </div>
         </TooltipProvider>
       </div>
@@ -143,29 +113,11 @@ export default function PortfolioPage() {
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Rendimiento Efectivo</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                {/* Yield */}
-                <div>
-                  <p className="text-3xl font-bold text-accent-positive">
-                    {(yieldMetrics.weightedYield * 100).toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">TIR anual ponderada</p>
-                </div>
-
-                {/* Spread */}
-                <div>
-                  <p className={cn(
-                    'text-3xl font-bold',
-                    yieldMetrics.spread > 0.05
-                      ? 'text-accent-positive'
-                      : yieldMetrics.spread > 0.02
-                        ? 'text-accent-warning'
-                        : 'text-accent-danger'
-                  )}>
-                    {yieldMetrics.spread > 0 ? '+' : ''}{(yieldMetrics.spread * 100).toFixed(1)}pp
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Spread vs tasa libre</p>
-                </div>
+              <div>
+                <p className="text-3xl font-bold text-accent-positive">
+                  {(yieldMetrics.weightedYield * 100).toFixed(1)}%
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">TIR anual ponderada</p>
               </div>
 
               {/* Interest progress */}

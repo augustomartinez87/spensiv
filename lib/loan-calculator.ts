@@ -20,7 +20,6 @@ export interface LoanInput {
   capital: number
   termMonths: number
   tnaTarget: number
-  hurdleRate: number
   loanType: LoanType
   accrualType: AccrualType
   customInstallment?: number
@@ -53,10 +52,8 @@ export interface SimulationResult {
   capital: number
   termMonths: number
   tnaTarget: number
-  hurdleRate: number
   monthlyRate: number
   dailyRate: number
-  hurdleMonthlyRate: number
   installmentAmount?: number
   roundedInstallmentAmount?: number
   amortizationTable?: AmortizationRow[]
@@ -66,9 +63,6 @@ export interface SimulationResult {
   bulletMonthlySummary?: BulletMonthlySummary[]
   tirEffective: number
   tirTNA: number
-  hurdleTirTNA: number
-  spread: number
-  isConvenient: boolean
   accruedCurve: Array<{ month: number; value: number }>
 }
 
@@ -282,16 +276,13 @@ export function strategicRoundInstallment(
 export function simulateLoan(input: LoanInput): SimulationResult {
   const monthlyRate = tnaNominalToMonthlyRate(input.tnaTarget)
   const dailyRate = tnaNominalToDailyRate(input.tnaTarget, { dayCount: 'ACT_365' })
-  const hurdleMonthlyRate = tnaNominalToMonthlyRate(input.hurdleRate)
   const base = {
     loanType: input.loanType,
     capital: input.capital,
     termMonths: input.termMonths,
     tnaTarget: input.tnaTarget,
-    hurdleRate: input.hurdleRate,
     monthlyRate,
     dailyRate,
-    hurdleMonthlyRate,
   }
 
   if (input.loanType === 'amortized') {
@@ -302,7 +293,7 @@ export function simulateLoan(input: LoanInput): SimulationResult {
 
 function simulateAmortized(
   input: LoanInput,
-  base: Omit<SimulationResult, 'tirEffective' | 'tirTNA' | 'hurdleTirTNA' | 'spread' | 'isConvenient' | 'accruedCurve'>,
+  base: Omit<SimulationResult, 'tirEffective' | 'tirTNA' | 'accruedCurve'>,
 ): SimulationResult {
   if (input.smartDueDate || input.firstInstallmentMonth) {
     return simulateAmortizedSmart(input, base)
@@ -335,7 +326,6 @@ function simulateAmortized(
   const tirMonthly = built.irrMonthly
   const tirTNA = monthlyRateToTnaNominal(tirMonthly)
   const tirEffective = monthlyRateToTea(tirMonthly)
-  const spread = round2((tirTNA - input.hurdleRate) * 100)
 
   return {
     ...base,
@@ -345,16 +335,13 @@ function simulateAmortized(
     totalPaid: round2(built.schedule.totalPaid),
     tirEffective,
     tirTNA,
-    hurdleTirTNA: input.hurdleRate,
-    spread,
-    isConvenient: tirTNA + 1e-8 >= input.hurdleRate,
     accruedCurve: [{ month: 0, value: 0 }, ...table.map((row) => ({ month: row.month, value: row.accruedReturn }))],
   }
 }
 
 function simulateAmortizedSmart(
   input: LoanInput,
-  base: Omit<SimulationResult, 'tirEffective' | 'tirTNA' | 'hurdleTirTNA' | 'spread' | 'isConvenient' | 'accruedCurve'>,
+  base: Omit<SimulationResult, 'tirEffective' | 'tirTNA' | 'accruedCurve'>,
 ): SimulationResult {
   const startDate = parseIsoDate(input.startDate)
   const dueDates = resolveDueDates(startDate, input.termMonths, input.firstInstallmentMonth)
@@ -389,7 +376,6 @@ function simulateAmortizedSmart(
   const xirrMonthly = Math.pow(1 + xirr, 1 / 12) - 1
   const tirTNA = monthlyRateToTnaNominal(xirrMonthly)
   const tirEffective = xirr
-  const spread = round2((tirTNA - input.hurdleRate) * 100)
 
   return {
     ...base,
@@ -399,16 +385,13 @@ function simulateAmortizedSmart(
     totalPaid: round2(smart.totalPaid),
     tirEffective,
     tirTNA,
-    hurdleTirTNA: input.hurdleRate,
-    spread,
-    isConvenient: tirTNA + 1e-8 >= input.hurdleRate,
     accruedCurve: [{ month: 0, value: 0 }, ...table.map((r) => ({ month: r.month, value: r.accruedReturn }))],
   }
 }
 
 function simulateBullet(
   input: LoanInput,
-  base: Omit<SimulationResult, 'tirEffective' | 'tirTNA' | 'hurdleTirTNA' | 'spread' | 'isConvenient' | 'accruedCurve'>,
+  base: Omit<SimulationResult, 'tirEffective' | 'tirTNA' | 'accruedCurve'>,
 ): SimulationResult {
   const nominalValue = round2(bulletNominalValue(input.capital, input.tnaTarget, input.termMonths))
   const monthlySummary = generateBulletMonthlySummary(
@@ -423,7 +406,6 @@ function simulateBullet(
   const tirMonthly = calculateIRRRobust(cashFlows)
   const tirTNA = monthlyRateToTnaNominal(tirMonthly)
   const tirEffective = monthlyRateToTea(tirMonthly)
-  const spread = round2((tirTNA - input.hurdleRate) * 100)
 
   return {
     ...base,
@@ -432,9 +414,6 @@ function simulateBullet(
     bulletMonthlySummary: monthlySummary,
     tirEffective,
     tirTNA,
-    hurdleTirTNA: input.hurdleRate,
-    spread,
-    isConvenient: tirTNA + 1e-8 >= input.hurdleRate,
     accruedCurve: [{ month: 0, value: 0 }, ...monthlySummary.map((row) => ({ month: row.month, value: row.accruedReturn }))],
   }
 }
