@@ -24,7 +24,6 @@ import {
     Infinity,
     Search,
 } from 'lucide-react'
-import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { calculatePersonScore } from '@/lib/loan-scoring'
@@ -393,21 +392,9 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
 
                                         {/* TNA */}
                                         <TableCell className="py-2 hidden md:table-cell">
-                                            <span className="text-sm tabular-nums">
+                                            <span className={cn("text-sm tabular-nums font-medium", Number(loan.tna) > 1.5 && "text-red-400")}>
                                                 {isZeroRate ? '0%' : `${(ri.tna * 100).toFixed(1)}%`}
                                             </span>
-                                            {Number(loan.tna) > 1.5 && (
-                                                <TooltipProvider>
-                                                    <UITooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Badge variant="destructive" className="ml-1 text-[8px] px-1 py-0 cursor-default">!</Badge>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>TNA supera el 150% — revisá las condiciones del préstamo</p>
-                                                        </TooltipContent>
-                                                    </UITooltip>
-                                                </TooltipProvider>
-                                            )}
                                         </TableCell>
 
                                         {/* Plazo */}
