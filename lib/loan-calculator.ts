@@ -360,7 +360,13 @@ function simulateAmortized(
     })
   }
 
-  const tirMonthly = built.irrMonthly
+  // When rounding is applied, recalculate IRR using uniform installments
+  // (the rounded amount for all periods) to reflect the effective rate
+  // the borrower actually pays, instead of the adjusted last-period rate.
+  const hasRounding = (input.roundingMultiple ?? 0) > 0 && built.roundedInstallment !== built.theoreticalInstallment
+  const tirMonthly = hasRounding
+    ? calculateIRRRobust([-input.capital, ...Array(input.termMonths).fill(built.roundedInstallment)])
+    : built.irrMonthly
   const tirTNA = monthlyRateToTnaNominal(tirMonthly)
   const tirEffective = monthlyRateToTea(tirMonthly)
 
