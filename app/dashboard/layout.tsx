@@ -24,6 +24,8 @@ import {
   EyeOff,
   Percent,
   ShieldCheck,
+  HandCoins,
+  Layers,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -51,6 +53,8 @@ const navigation: NavSection[] = [
       { name: 'Movimientos', href: '/dashboard/transactions', icon: ListOrdered },
       { name: 'Presupuesto', href: '/dashboard/budget', icon: Target },
       { name: 'Tarjetas & Cuotas', href: '/dashboard/cards', icon: CardsIcon },
+      { name: 'Cuotas', href: '/dashboard/installments', icon: Layers },
+      { name: 'Cuotas de Terceros', href: '/dashboard/third-party', icon: HandCoins },
       { name: 'Proyecciones', href: '/dashboard/projections', icon: TrendingUp },
     ],
   },
