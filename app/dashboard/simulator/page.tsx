@@ -140,6 +140,20 @@ export default function SimulatorPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Auto-apply suggested rate when borrower type, term, or view mode changes
+  useEffect(() => {
+    if (!selectedBorrowerTypeId || !borrowerTypes || !durationAdjustments) return
+    const bt = borrowerTypes.find((b) => b.id === selectedBorrowerTypeId)
+    if (!bt) return
+    if (viewMode === 'single') {
+      const suggested = getSuggestedTnaForTerm(parseInt(termMonths) || 1)
+      if (suggested != null) setTnaTarget(suggested.toString())
+    } else {
+      setTnaTarget(Number(bt.baseTna).toString())
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBorrowerTypeId, termMonths, viewMode, borrowerTypes, durationAdjustments])
+
   // Results
   const [singleResult, setSingleResult] = useState<SimulationResult | null>(null)
   const [compareResults, setCompareResults] = useState<SimulationResult[] | null>(null)
@@ -463,20 +477,7 @@ export default function SimulatorPage() {
               />
               {borrowerTypes && borrowerTypes.length > 0 && (
                 <Select value={selectedBorrowerTypeId || '__none__'} onValueChange={(v) => {
-                  const id = v === '__none__' ? '' : v
-                  setSelectedBorrowerTypeId(id)
-                  if (id) {
-                    const bt = borrowerTypes.find((b) => b.id === id)
-                    if (bt) {
-                      // In single mode, use term-adjusted TNA; in compare mode, use base TNA
-                      if (viewMode === 'single') {
-                        const suggested = getSuggestedTnaForTerm(parseInt(termMonths) || 1)
-                        if (suggested) setTnaTarget(suggested.toString())
-                      } else {
-                        setTnaTarget(Number(bt.baseTna).toString())
-                      }
-                    }
-                  }
+                  setSelectedBorrowerTypeId(v === '__none__' ? '' : v)
                 }}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue placeholder="Usar regla de tasas..." />
