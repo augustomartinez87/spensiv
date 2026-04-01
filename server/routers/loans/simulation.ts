@@ -23,6 +23,7 @@ const compareTermsInput = z.object({
   accrualType: z.enum(['linear', 'exponential']).default('exponential'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   terms: z.array(z.number().int().min(1).max(360)).min(1).max(4),
+  tnaPerTerm: z.record(z.string(), z.number().min(0.001)).optional(),
   roundingMultiple: z.number().int().min(0).optional(),
   firstInstallmentMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
 })
@@ -41,7 +42,7 @@ export const loanSimulationRouter = router({
         simulateLoan({
           capital: input.capital,
           termMonths: term,
-          tnaTarget: input.tnaTarget,
+          tnaTarget: input.tnaPerTerm?.[term.toString()] ?? input.tnaTarget,
           loanType: 'amortized',
           accrualType: input.accrualType,
           startDate: input.startDate,

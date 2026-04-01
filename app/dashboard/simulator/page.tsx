@@ -317,6 +317,13 @@ export default function SimulatorPage() {
     if (!cap || cap <= 0 || !tna || tna <= 0) return
 
     if (viewMode === 'compare' && compareTerms.length > 0) {
+      const tnaPerTerm: Record<string, number> = {}
+      if (selectedBorrowerTypeId) {
+        for (const t of compareTerms) {
+          const suggested = getSuggestedTnaForTerm(t)
+          if (suggested != null) tnaPerTerm[t.toString()] = suggested / 100
+        }
+      }
       compareTermsMutation.mutate({
         capital: cap,
         tnaTarget: tna / 100,
@@ -326,6 +333,7 @@ export default function SimulatorPage() {
         smartDueDate,
         firstInstallmentMonth: firstInstallmentMonth || undefined,
         terms: compareTerms,
+        ...(Object.keys(tnaPerTerm).length > 0 ? { tnaPerTerm } : {}),
       })
       setSingleResult(null)
     } else if (viewMode === 'single') {
