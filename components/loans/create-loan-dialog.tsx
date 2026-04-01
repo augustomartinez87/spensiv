@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn, formatDateToInput } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -67,6 +67,16 @@ export function CreateLoanDialog({
         const adjustment = adj ? Number(adj.adjustment) : 0
         return { baseTna, adjustment, total: baseTna + adjustment, borrowerName: bt.name }
     })()
+
+    // Auto-apply suggested rate when borrower type or term changes
+    useEffect(() => {
+        if (!suggestedRate) return
+        setTna(suggestedRate.total.toString())
+        setCustomInstallment('')
+        setImpliedTna(null)
+        const monthlyFromTna = (Math.pow(1 + suggestedRate.total / 100, 1 / 12) - 1) * 100
+        setMonthlyRate(Math.round(monthlyFromTna * 10) / 10 + '')
+    }, [selectedBorrowerTypeId, termMonths, borrowerTypes, durationAdjustments])
 
     const reverseMutation = trpc.loans.reverseFromInstallment.useMutation({
         onSuccess: (data) => {
