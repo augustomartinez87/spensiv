@@ -159,17 +159,11 @@ export default function SimulatorPage() {
   const [compareResults, setCompareResults] = useState<SimulationResult[] | null>(null)
 
   const simulateMutation = trpc.loans.simulate.useMutation({
-    onSuccess: (data) => {
-      setSingleResult(data)
-      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-    },
+    onSuccess: (data) => setSingleResult(data),
   })
 
   const compareTermsMutation = trpc.loans.compareTerms.useMutation({
-    onSuccess: (data) => {
-      setCompareResults(data)
-      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-    },
+    onSuccess: (data) => setCompareResults(data),
   })
 
   const reverseMutation = trpc.loans.reverseFromInstallment.useMutation({
@@ -317,54 +311,42 @@ export default function SimulatorPage() {
     }
   }
 
-  // Auto-simulate on parameter change with debounce (skip first render / mount)
-  const autoSimTimerRef = useRef<ReturnType<typeof setTimeout>>()
-  const hasMountedRef = useRef(false)
-  useEffect(() => {
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true
-      return
-    }
-    clearTimeout(autoSimTimerRef.current)
-    autoSimTimerRef.current = setTimeout(() => {
-      const cap = parseFloat(capital)
-      const tna = parseFloat(tnaTarget)
-      if (!cap || cap <= 0 || !tna || tna <= 0) return
+  function handleSimulate() {
+    const cap = parseFloat(capital)
+    const tna = parseFloat(tnaTarget)
+    if (!cap || cap <= 0 || !tna || tna <= 0) return
 
-      if (viewMode === 'compare' && compareTerms.length > 0) {
-        compareTermsMutation.mutate({
-          capital: cap,
-          tnaTarget: tna / 100,
-          accrualType: 'exponential',
-          startDate,
-          roundingMultiple: roundEnabled ? roundingMultiple : 0,
-          smartDueDate,
-          firstInstallmentMonth: firstInstallmentMonth || undefined,
-          terms: compareTerms,
-        })
-        setSingleResult(null)
-      } else if (viewMode === 'single') {
-        const term = parseInt(termMonths)
-        if (!term || term <= 0) return
-        simulateMutation.mutate({
-          capital: cap,
-          tnaTarget: tna / 100,
-          accrualType: 'exponential',
-          startDate,
-          roundingMultiple: roundEnabled ? roundingMultiple : 0,
-          smartDueDate,
-          firstInstallmentMonth: firstInstallmentMonth || undefined,
-          termMonths: term,
-          loanType: 'amortized',
-          ...(customInstallment ? { customInstallment: parseFloat(customInstallment) } : {}),
-        })
-        setCompareResults(null)
-      }
-      setActiveTab('results')
-    }, 600)
-    return () => clearTimeout(autoSimTimerRef.current)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capital, currency, tnaTarget, startDate, roundEnabled, roundingMultiple, smartDueDate, firstInstallmentMonth, compareTerms, viewMode, termMonths, customInstallment])
+    if (viewMode === 'compare' && compareTerms.length > 0) {
+      compareTermsMutation.mutate({
+        capital: cap,
+        tnaTarget: tna / 100,
+        accrualType: 'exponential',
+        startDate,
+        roundingMultiple: roundEnabled ? roundingMultiple : 0,
+        smartDueDate,
+        firstInstallmentMonth: firstInstallmentMonth || undefined,
+        terms: compareTerms,
+      })
+      setSingleResult(null)
+    } else if (viewMode === 'single') {
+      const term = parseInt(termMonths)
+      if (!term || term <= 0) return
+      simulateMutation.mutate({
+        capital: cap,
+        tnaTarget: tna / 100,
+        accrualType: 'exponential',
+        startDate,
+        roundingMultiple: roundEnabled ? roundingMultiple : 0,
+        smartDueDate,
+        firstInstallmentMonth: firstInstallmentMonth || undefined,
+        termMonths: term,
+        loanType: 'amortized',
+        ...(customInstallment ? { customInstallment: parseFloat(customInstallment) } : {}),
+      })
+      setCompareResults(null)
+    }
+    setActiveTab('results')
+  }
 
   const hasResults = singleResult || compareResults
 
@@ -683,12 +665,24 @@ export default function SimulatorPage() {
             </div>
           )}
 
-          {isLoading && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              Calculando...
-            </div>
-          )}
+          <Button
+            onClick={handleSimulate}
+            disabled={isLoading || !parseFloat(capital) || !parseFloat(tnaTarget)}
+            className="w-full"
+            size="lg"
+          >
+            {isLoading ? (
+              <>
+                <div className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                Calculando...
+              </>
+            ) : (
+              <>
+                <Calculator className="h-4 w-4 mr-2" />
+                Simular
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
 
@@ -865,7 +859,7 @@ function MetricCard({
 
 
 function ResultCardContent({ result, title, onCreateLoan, onPreApprove, suggestedTna }: { result: SimulationResult; title: string; onCreateLoan?: (result: SimulationResult) => void; onPreApprove?: (result: SimulationResult) => void; suggestedTna?: number | null }) {
-  const currentTna = result.tnaTarget * 100
+  const currentTna = Math.round(result.tnaTarget * 10000) / 100
   const belowSuggested = suggestedTna != null && currentTna < suggestedTna
   return (
     <Card>
