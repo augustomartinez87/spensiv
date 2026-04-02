@@ -75,6 +75,7 @@ import { MonthlyAccrualsTable } from '@/components/loans/monthly-accruals-table'
 import { RefinanceDialog } from '@/components/loans/refinance-dialog'
 import { CopyCollectionMessage } from '@/components/loans/copy-collection-message'
 import { LoanActivityTimeline } from '@/components/loans/loan-activity-timeline'
+import { LoanAttachments } from '@/components/loans/loan-attachments'
 
 export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
@@ -672,6 +673,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           <TabsTrigger value="installments">Cuotas</TabsTrigger>
           <TabsTrigger value="accounting">Contabilidad</TabsTrigger>
           <TabsTrigger value="activity">Actividad</TabsTrigger>
+          <TabsTrigger value="documents">Documentos</TabsTrigger>
         </TabsList>
         <TabsContent value="installments" className="mt-4">
           <Card>
@@ -907,6 +909,13 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         </TabsContent>
         <TabsContent value="activity" className="mt-4">
           <LoanActivityTimeline loanId={loanId} logs={loan.activityLogs || []} />
+        </TabsContent>
+        <TabsContent value="documents" className="mt-4">
+          <Card>
+            <CardContent className="pt-6">
+              <LoanAttachments loanId={loanId} />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
