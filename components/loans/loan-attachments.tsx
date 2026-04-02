@@ -76,22 +76,23 @@ export function LoanAttachments({ loanId }: { loanId: string }) {
     setUploading(true)
     let blobUrl: string | null = null
     try {
-      const { upload } = await import('@vercel/blob/client')
-      const blob = await upload(
-        `loan-attachments/${loanId}/${uploadType}/${file.name}`,
-        file,
-        {
-          access: 'public',
-          handleUploadUrl: '/api/upload',
-        }
-      )
-      blobUrl = blob.url
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('pathname', `loan-attachments/${loanId}/${uploadType}/${file.name}`)
+
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al subir archivo')
+      }
+      const { url } = await res.json()
+      blobUrl = url
 
       await createAttachment.mutateAsync({
         loanId,
         type: uploadType,
         fileName: file.name,
-        fileUrl: blob.url,
+        fileUrl: url,
         fileSize: file.size,
         mimeType: file.type,
       })

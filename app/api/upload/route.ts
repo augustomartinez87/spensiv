@@ -1,38 +1,35 @@
-import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
-import { del } from '@vercel/blob'
+import { put, del } from '@vercel/blob'
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const body = (await request.json()) as HandleUploadBody
+  const { userId } = await auth()
+  if (!userId) {
+    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  }
 
   try {
-    const jsonResponse = await handleUpload({
-      body,
-      request,
-      onBeforeGenerateToken: async (pathname) => {
-        const { userId } = await auth()
-        if (!userId) {
-          throw new Error('No autenticado')
-        }
+    const formData = await request.formData()
+    const file = formData.get('file') as File | null
+    const pathname = formData.get('pathname') as string | null
 
-        return {
-          allowedContentTypes: [
-            'image/jpeg',
-            'image/png',
-            'image/webp',
-            'application/pdf',
-          ],
-          maximumSizeInBytes: 10 * 1024 * 1024, // 10MB
-          tokenPayload: JSON.stringify({ userId }),
-        }
-      },
-      onUploadCompleted: async () => {
-        // No-op: metadata se guarda vía tRPC después del upload
-      },
-    })
+    if (!file || !pathname) {
+      return NextResponse.json({ error: 'Archivo y pathname requeridos' }, { status: 400 })
+    }
 
-    return NextResponse.json(jsonResponse)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json({ error: 'Tipo de archivo no permitido' }, { status: 400 })
+    }
+
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      return NextResponse.json({ error: 'El archivo excede 10MB' }, { status: 400 })
+    }
+
+    const blob = await put(pathname, file, { access: 'public' })
+
+    return NextResponse.json({ url: blob.url })
   } catch (error) {
     return NextResponse.json(
       { error: (error as Error).message },
