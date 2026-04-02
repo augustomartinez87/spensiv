@@ -80,7 +80,7 @@ const navigation: NavSection[] = [
 
 const mobileNavBase = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Movimientos', href: '/dashboard/transactions', icon: Receipt },
+  { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
 ]
 
 const mobileNavAdmin = [
