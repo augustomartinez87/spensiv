@@ -33,8 +33,9 @@ model User {
   persons             Person[]
   thirdPartyPurchases ThirdPartyPurchase[]
   budgetLimits        BudgetLimit[]
-  borrowerTypes       BorrowerType[]
-  durationAdjustments DurationAdjustment[]
+  borrowerTypes          BorrowerType[]
+  durationAdjustments    DurationAdjustment[]
+  publicSimulatorConfig  PublicSimulatorConfig?
 
   @@map("users")
 }
@@ -432,6 +433,7 @@ model Loan {
   loanPayments     LoanPayment[]
   realCashflows    LoanRealCashflow[]
   monthlyAccruals  LoanAccrualMonthly[]
+  attachments      LoanAttachment[]
 
   @@index([userId])
   @@index([userId, status])
@@ -613,6 +615,27 @@ model ThirdPartyInstallment {
 }
 
 // ============================================================================
+// LOAN ATTACHMENTS
+// ============================================================================
+
+model LoanAttachment {
+  id     String @id @default(cuid())
+  loanId String
+  loan   Loan   @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  type     String // "transfer_receipt" | "pagare" | "mutual" | "other"
+  fileName String
+  fileUrl  String
+  fileSize Int?
+  mimeType String?
+
+  createdAt DateTime @default(now())
+
+  @@index([loanId])
+  @@map("loan_attachments")
+}
+
+// ============================================================================
 // LOAN ACTIVITY LOGS
 // ============================================================================
 
@@ -685,4 +708,24 @@ model DurationAdjustment {
 
   @@index([userId])
   @@map("duration_adjustments")
+}
+
+// ============================================================================
+// PUBLIC SIMULATOR CONFIG
+// ============================================================================
+
+model PublicSimulatorConfig {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tna       Decimal @db.Decimal(5, 2) // TNA fija para el simulador publico
+  currency  String  @default("ARS")   // ARS | USD
+  terms     String  @default("3,6,9,12") // Plazos separados por coma
+  whatsapp  String  // Numero de WhatsApp (ej: 5491126369767)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("public_simulator_configs")
 }

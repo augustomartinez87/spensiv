@@ -88,7 +88,7 @@ export default function SimulatorPage() {
     const bt = borrowerTypes.find((b) => b.id === selectedBorrowerTypeId)
     if (!bt) return null
     const baseTna = Number(bt.baseTna)
-    const adj = durationAdjustments.find((a) => a.minMonths < term && a.maxMonths >= term)
+    const adj = [...durationAdjustments].sort((a, b) => b.minMonths - a.minMonths).find((a) => a.minMonths <= term && a.maxMonths >= term)
     return baseTna + (adj ? Number(adj.adjustment) : 0)
   }
 

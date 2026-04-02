@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Trash2, Pencil, Check, X, Users, Clock, ArrowUp, ArrowDown } from 'lucide-react'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Plus, Trash2, Pencil, Check, X, Users, Clock, ArrowUp, ArrowDown, Globe, Link2, Copy } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 // ── Borrower Types Section ────────────────────────────────────────────
@@ -506,6 +508,142 @@ function RatePreview() {
   )
 }
 
+// ── Public Simulator Config Section ──────────────────────────────────
+
+function PublicSimulatorSection() {
+  const utils = trpc.useUtils()
+  const { toast } = useToast()
+  const { data: config, isLoading } = trpc.rateRules.getPublicSimulatorConfig.useQuery()
+
+  const [tna, setTna] = useState('')
+  const [currency, setCurrency] = useState<'ARS' | 'USD'>('ARS')
+  const [terms, setTerms] = useState('3,6,9,12')
+  const [whatsapp, setWhatsapp] = useState('')
+  const [initialized, setInitialized] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  // Load saved values
+  if (config && !initialized) {
+    setTna(String(Number(config.tna)))
+    setCurrency(config.currency as 'ARS' | 'USD')
+    setTerms(config.terms)
+    setWhatsapp(config.whatsapp)
+    setInitialized(true)
+  }
+
+  const upsert = trpc.rateRules.upsertPublicSimulatorConfig.useMutation({
+    onSuccess: () => {
+      utils.rateRules.getPublicSimulatorConfig.invalidate()
+      toast({ title: 'Guardado', description: 'Configuración del simulador público actualizada' })
+    },
+    onError: (err) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  })
+
+  function handleSave() {
+    if (!tna || !whatsapp) return
+    upsert.mutate({
+      tna: parseFloat(tna),
+      currency,
+      terms,
+      whatsapp: whatsapp.replace(/\D/g, ''),
+    })
+  }
+
+  function copyLink() {
+    const url = `${window.location.origin}/simular`
+    navigator.clipboard.writeText(url)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2500)
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Simulador Publico
+            </CardTitle>
+            <CardDescription>
+              Configura la tasa y plazos que van a ver las personas que reciban tu link de simulacion
+            </CardDescription>
+          </div>
+          {config && (
+            <Button size="sm" variant="outline" onClick={copyLink} className="gap-1.5">
+              {linkCopied ? (
+                <><Check className="h-3.5 w-3.5 text-green-500" /> Copiado</>
+              ) : (
+                <><Link2 className="h-3.5 w-3.5" /> Copiar link</>
+              )}
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>TNA para el link publico (%)</Label>
+                <Input
+                  type="number"
+                  value={tna}
+                  onChange={(e) => setTna(e.target.value)}
+                  placeholder="55"
+                  min={0}
+                  step={1}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Moneda</Label>
+                <Select value={currency} onValueChange={(v) => setCurrency(v as 'ARS' | 'USD')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ARS">ARS</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Plazos disponibles (meses, separados por coma)</Label>
+                <Input
+                  value={terms}
+                  onChange={(e) => setTerms(e.target.value)}
+                  placeholder="3,6,9,12"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tu numero de WhatsApp</Label>
+                <Input
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value)}
+                  placeholder="5491126369767"
+                />
+                <p className="text-[10px] text-muted-foreground">Con codigo de pais, sin + ni espacios</p>
+              </div>
+            </div>
+            <Button
+              onClick={handleSave}
+              disabled={upsert.isPending || !tna || !whatsapp}
+              className="w-full sm:w-auto"
+            >
+              {upsert.isPending ? 'Guardando...' : 'Guardar configuracion'}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────
 
 export default function RateRulesPage() {
@@ -518,6 +656,7 @@ export default function RateRulesPage() {
         </p>
       </div>
 
+      <PublicSimulatorSection />
       <BorrowerTypesSection />
       <DurationAdjustmentsSection />
       <RatePreview />

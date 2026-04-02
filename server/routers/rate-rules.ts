@@ -145,6 +145,42 @@ export const rateRulesRouter = router({
       return ctx.prisma.durationAdjustment.delete({ where: { id: input.id } })
     }),
 
+  // ── Public Simulator Config ─────────────────────────────────────────
+
+  getPublicSimulatorConfig: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.publicSimulatorConfig.findUnique({
+      where: { userId: ctx.user.id },
+    })
+  }),
+
+  upsertPublicSimulatorConfig: protectedProcedure
+    .input(
+      z.object({
+        tna: z.number().min(0),
+        currency: z.enum(['ARS', 'USD']),
+        terms: z.string().min(1),
+        whatsapp: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.publicSimulatorConfig.upsert({
+        where: { userId: ctx.user.id },
+        create: {
+          userId: ctx.user.id,
+          tna: input.tna,
+          currency: input.currency,
+          terms: input.terms,
+          whatsapp: input.whatsapp,
+        },
+        update: {
+          tna: input.tna,
+          currency: input.currency,
+          terms: input.terms,
+          whatsapp: input.whatsapp,
+        },
+      })
+    }),
+
   // ── Rate Suggestion ─────────────────────────────────────────────────
 
   getSuggestedRate: protectedProcedure
@@ -165,9 +201,10 @@ export const rateRulesRouter = router({
       const adjustment = await ctx.prisma.durationAdjustment.findFirst({
         where: {
           userId: ctx.user.id,
-          minMonths: { lt: input.termMonths },
+          minMonths: { lte: input.termMonths },
           maxMonths: { gte: input.termMonths },
         },
+        orderBy: { minMonths: 'desc' },
       })
 
       const baseTna = Number(borrowerType.baseTna)
