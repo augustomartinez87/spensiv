@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { upload } from '@vercel/blob/client'
 import { trpc } from '@/lib/contexts/trpc-client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -78,6 +77,7 @@ export function LoanAttachments({ loanId }: { loanId: string }) {
     setUploading(true)
     let blobUrl: string | null = null
     try {
+      const { upload } = await import('@vercel/blob/client')
       const blob = await upload(
         `loan-attachments/${loanId}/${uploadType}/${file.name}`,
         file,
