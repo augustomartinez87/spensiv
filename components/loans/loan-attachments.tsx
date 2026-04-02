@@ -12,7 +12,6 @@ import {
   Upload,
   Trash2,
   FileText,
-  Image as ImageIcon,
   Loader2,
   ExternalLink,
 } from 'lucide-react'
