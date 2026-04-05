@@ -161,7 +161,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   const [assignCollectorOpen, setAssignCollectorOpen] = useState(false)
   const [assignCollectorId, setAssignCollectorId] = useState('')
   const { data: allPersons } = trpc.persons.list.useQuery()
-  const { data: allCollectors } = trpc.collectors.list.useQuery()
+  // allPersons is already queried above — reuse for collector assignment
   const { toast } = useToast()
 
   const deleteMutation = trpc.loans.delete.useMutation({
@@ -495,8 +495,8 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
             <Users className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-muted-foreground">Cobrador:</span>
             <strong className="text-foreground">{loan.collector.name}</strong>
-            {loan.collector.phone && (
-              <span className="text-muted-foreground text-xs">({loan.collector.phone})</span>
+            {loan.collector.alias && (
+              <span className="text-muted-foreground text-xs">({loan.collector.alias})</span>
             )}
             <Button
               variant="ghost"
@@ -507,7 +507,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
               Quitar
             </Button>
           </div>
-        ) : allCollectors && allCollectors.length > 0 ? (
+        ) : allPersons && allPersons.length > 0 ? (
           assignCollectorOpen ? (
             <div className="flex items-center gap-2 flex-wrap">
               <Select value={assignCollectorId} onValueChange={setAssignCollectorId}>
@@ -515,9 +515,9 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
                   <SelectValue placeholder="Seleccionar cobrador" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allCollectors.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} {c.activeLoanCount > 0 ? `(${c.activeLoanCount} activos)` : ''}
+                  {allPersons.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.alias ? `(${p.alias})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

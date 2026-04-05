@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ChevronDown, ChevronRight, Phone, Users } from 'lucide-react'
+import { ChevronDown, ChevronRight, Users } from 'lucide-react'
 import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { BulkCollectionMessage } from './bulk-collection-message'
@@ -16,7 +16,6 @@ import type { LoanListItem } from './types'
 interface CollectorGroup {
     id: string | null
     name: string
-    phone: string | null
     loans: LoanListItem[]
     totalCapital: number
     totalNextDue: number
@@ -39,7 +38,6 @@ export function CollectorView({ onSelect }: { onSelect: (id: string) => void }) 
                 map.set(key, {
                     id: loan.collector?.id || null,
                     name: loan.collector?.name || 'Sin cobrador',
-                    phone: null, // phone not in list include, only in getById
                     loans: [],
                     totalCapital: 0,
                     totalNextDue: 0,
@@ -77,7 +75,7 @@ export function CollectorView({ onSelect }: { onSelect: (id: string) => void }) 
             <Card>
                 <CardContent className="flex flex-col items-center justify-center py-16">
                     <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                    <p className="text-lg font-medium">Sin préstamos activos</p>
+                    <p className="text-lg font-medium">Sin prestamos activos</p>
                 </CardContent>
             </Card>
         )
@@ -126,15 +124,9 @@ function CollectorGroupCard({
                             <CardTitle className="text-base">
                                 {group.name}
                             </CardTitle>
-                            {group.phone && (
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                                    <Phone className="h-3 w-3" />
-                                    {group.phone}
-                                </div>
-                            )}
                         </div>
                         <Badge variant="outline" className="text-xs">
-                            {group.loans.length} {group.loans.length === 1 ? 'préstamo' : 'préstamos'}
+                            {group.loans.length} {group.loans.length === 1 ? 'prestamo' : 'prestamos'}
                         </Badge>
                     </div>
                     <div className="flex items-center gap-4">

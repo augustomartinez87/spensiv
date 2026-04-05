@@ -104,7 +104,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
     const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>('all')
     const [searchQuery, setSearchQuery] = useState('')
     const [collectorFilter, setCollectorFilter] = useState<string>('all')
-    const { data: collectors } = trpc.collectors.list.useQuery()
+    const { data: persons } = trpc.persons.list.useQuery()
 
     function handleSort(column: SortColumn) {
         if (sortColumn === column) {
@@ -274,7 +274,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                             {c === 'all' ? 'Todas' : c}
                         </Button>
                     ))}
-                    {collectors && collectors.length > 0 && (
+                    {persons && persons.length > 0 && (
                         <>
                             <div className="w-px bg-border mx-1" />
                             <Select value={collectorFilter} onValueChange={setCollectorFilter}>
@@ -284,9 +284,9 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                 <SelectContent>
                                     <SelectItem value="all">Todos</SelectItem>
                                     <SelectItem value="__none__">Sin cobrador</SelectItem>
-                                    {collectors.map((c) => (
-                                        <SelectItem key={c.id} value={c.id}>
-                                            {c.name}
+                                    {persons.map((p) => (
+                                        <SelectItem key={p.id} value={p.id}>
+                                            {p.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

@@ -31,7 +31,6 @@ model User {
   bankStatements      BankStatement[]
   loans               Loan[]
   persons             Person[]
-  collectors          Collector[]
   thirdPartyPurchases ThirdPartyPurchase[]
   budgetLimits        BudgetLimit[]
   borrowerTypes          BorrowerType[]
@@ -380,29 +379,11 @@ model Person {
 
   // Relations
   loans               Loan[]
+  collectedLoans      Loan[]   @relation("LoanCollector")
   thirdPartyPurchases ThirdPartyPurchase[]
 
   @@index([userId])
   @@map("persons")
-}
-
-model Collector {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  name  String
-  phone String?
-  notes String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  loans Loan[]
-
-  @@index([userId])
-  @@map("collectors")
 }
 
 model Loan {
@@ -414,7 +395,7 @@ model Loan {
   person   Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
 
   collectorId String?
-  collector   Collector? @relation(fields: [collectorId], references: [id], onDelete: SetNull)
+  collector   Person? @relation("LoanCollector", fields: [collectorId], references: [id], onDelete: SetNull)
 
   borrowerName      String // Nombre/alias del deudor
   capital           Decimal  @db.Decimal(12, 2)

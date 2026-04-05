@@ -308,7 +308,7 @@ export const loanCrudRouter = router({
             select: { id: true, name: true, alias: true },
           },
           collector: {
-            select: { id: true, name: true, phone: true },
+            select: { id: true, name: true, alias: true },
           },
           loanInstallments: { orderBy: { number: 'asc' } },
           activityLogs: { orderBy: { logDate: 'desc' } },
