@@ -22,6 +22,7 @@ const createLoanInput = z.object({
   firstInstallmentMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   direction: z.enum(['lender', 'borrower']).default('lender'),
   creditorName: z.string().optional(),
+  collectorId: z.string().optional(),
 })
 
 export const loanCrudRouter = router({
@@ -73,6 +74,7 @@ export const loanCrudRouter = router({
             personId: input.personId ?? null,
             direction: input.direction,
             creditorName: input.creditorName ?? null,
+            collectorId: input.collectorId ?? null,
             ...(installments.length > 0 ? { loanInstallments: { create: installments } } : {})
           },
           include: {
@@ -122,6 +124,7 @@ export const loanCrudRouter = router({
             personId: input.personId ?? null,
             direction: input.direction,
             creditorName: input.creditorName ?? null,
+            collectorId: input.collectorId ?? null,
             // Zero-rate loans have no installment schedule
             ...(input.tna > 0 ? {
               loanInstallments: {
@@ -187,6 +190,7 @@ export const loanCrudRouter = router({
           personId: input.personId ?? null,
           direction: input.direction,
           creditorName: input.creditorName ?? null,
+            collectorId: input.collectorId ?? null,
           // Zero-rate loans have no installment schedule
           ...(input.tna > 0 ? {
             loanInstallments: {
@@ -211,6 +215,7 @@ export const loanCrudRouter = router({
     .input(z.object({
       direction: z.enum(['lender', 'borrower']).optional(),
       status: z.enum(['active', 'completed', 'refinanced']).optional(),
+      collectorId: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
       const statusFilter: Prisma.LoanWhereInput =
@@ -222,6 +227,7 @@ export const loanCrudRouter = router({
         where: {
           userId: ctx.user.id,
           ...(input?.direction ? { direction: input.direction } : {}),
+          ...(input?.collectorId ? { collectorId: input.collectorId } : {}),
           ...statusFilter,
         },
         include: {
@@ -243,6 +249,9 @@ export const loanCrudRouter = router({
               recentJobChanges: true,
               previousDebts: true,
             },
+          },
+          collector: {
+            select: { id: true, name: true },
           },
           loanInstallments: {
             orderBy: { number: 'asc' },
@@ -298,6 +307,9 @@ export const loanCrudRouter = router({
           person: {
             select: { id: true, name: true, alias: true },
           },
+          collector: {
+            select: { id: true, name: true, phone: true },
+          },
           loanInstallments: { orderBy: { number: 'asc' } },
           activityLogs: { orderBy: { logDate: 'desc' } },
           loanPayments: { select: { amount: true } },
@@ -322,6 +334,7 @@ export const loanCrudRouter = router({
       borrowerName: z.string().min(1).optional(),
       startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       personId: z.string().nullable().optional(),
+      collectorId: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const loan = await ctx.prisma.loan.findFirst({
@@ -337,6 +350,7 @@ export const loanCrudRouter = router({
       if (input.borrowerName) updates.borrowerName = input.borrowerName
       if (input.startDate) updates.startDate = new Date(input.startDate + 'T12:00:00')
       if (input.personId !== undefined) updates.personId = input.personId
+      if (input.collectorId !== undefined) updates.collectorId = input.collectorId
 
       const updated = await ctx.prisma.loan.update({
         where: { id: input.id },
@@ -512,6 +526,7 @@ export const loanCrudRouter = router({
             personId: input.personId ?? null,
             direction: input.direction,
             creditorName: input.creditorName ?? null,
+            collectorId: input.collectorId ?? null,
           },
         })
 
@@ -559,6 +574,7 @@ export const loanCrudRouter = router({
           personId: input.personId ?? null,
           direction: input.direction,
           creditorName: input.creditorName ?? null,
+            collectorId: input.collectorId ?? null,
         },
       })
 

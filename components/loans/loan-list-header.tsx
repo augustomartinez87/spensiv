@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Banknote, CalendarDays, LayoutList } from 'lucide-react'
+import { Banknote, CalendarDays, LayoutList, Users } from 'lucide-react'
 import { CreateLoanDialog } from './create-loan-dialog'
 
 function formatCompact(amount: number) {
@@ -66,8 +66,8 @@ function DynamicSubtitle({ direction }: { direction: 'lender' | 'borrower' }) {
 }
 
 interface LoanListHeaderProps {
-    view: 'list' | 'table' | 'calendar'
-    onViewChange: (v: 'list' | 'table' | 'calendar') => void
+    view: 'list' | 'table' | 'calendar' | 'collector'
+    onViewChange: (v: 'list' | 'table' | 'calendar' | 'collector') => void
     direction: 'lender' | 'borrower'
     tab: 'lender' | 'borrower'
     onTabChange: (t: 'lender' | 'borrower') => void
@@ -84,7 +84,7 @@ export function LoanListHeader({ view, onViewChange, direction, tab, onTabChange
                     <h1 className="text-3xl font-bold text-foreground tracking-tight">
                         {direction === 'lender' ? 'Préstamos' : 'Mis Deudas'}
                     </h1>
-                    {view === 'table' ? (
+                    {view === 'table' || view === 'collector' ? (
                         <DynamicSubtitle direction={direction} />
                     ) : (
                         <p className="text-sm text-muted-foreground mt-0.5">
@@ -120,6 +120,15 @@ export function LoanListHeader({ view, onViewChange, direction, tab, onTabChange
                         >
                             <CalendarDays className="h-4 w-4 mr-1.5" />
                             Calendario
+                        </Button>
+                        <Button
+                            variant={view === 'collector' ? 'default' : 'ghost'}
+                            size="sm"
+                            className="h-8"
+                            onClick={() => onViewChange('collector')}
+                        >
+                            <Users className="h-4 w-4 mr-1.5" />
+                            Cobradores
                         </Button>
                     </div>
                     <CreateLoanDialog open={createOpen} onOpenChange={setCreateOpen} direction={direction} />

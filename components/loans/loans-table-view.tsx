@@ -6,6 +6,7 @@ import { formatCurrency, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
     Table,
@@ -102,6 +103,8 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
     const [quickFilter, setQuickFilter] = useState<StatusFilter>('all')
     const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>('all')
     const [searchQuery, setSearchQuery] = useState('')
+    const [collectorFilter, setCollectorFilter] = useState<string>('all')
+    const { data: collectors } = trpc.collectors.list.useQuery()
 
     function handleSort(column: SortColumn) {
         if (sortColumn === column) {
@@ -130,6 +133,13 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
             result = result.filter(l => l.currency === currencyFilter)
         }
 
+        // Collector filter
+        if (collectorFilter === '__none__') {
+            result = result.filter(l => !l.collector)
+        } else if (collectorFilter !== 'all') {
+            result = result.filter(l => l.collector?.id === collectorFilter)
+        }
+
         // Search
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase()
@@ -140,7 +150,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
         }
 
         return result
-    }, [loans, quickFilter, currencyFilter, searchQuery])
+    }, [loans, quickFilter, currencyFilter, collectorFilter, searchQuery])
 
     const sorted = useMemo(() => {
         const arr = [...filtered]
@@ -264,6 +274,25 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                             {c === 'all' ? 'Todas' : c}
                         </Button>
                     ))}
+                    {collectors && collectors.length > 0 && (
+                        <>
+                            <div className="w-px bg-border mx-1" />
+                            <Select value={collectorFilter} onValueChange={setCollectorFilter}>
+                                <SelectTrigger className="h-7 w-[140px] text-xs">
+                                    <SelectValue placeholder="Cobrador" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos</SelectItem>
+                                    <SelectItem value="__none__">Sin cobrador</SelectItem>
+                                    {collectors.map((c) => (
+                                        <SelectItem key={c.id} value={c.id}>
+                                            {c.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </>
+                    )}
                 </div>
             </div>
 

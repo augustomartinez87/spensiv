@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import { Plus, Zap, Shield, ShieldX, Info, Clock, AlertTriangle, ChevronDown } from 'lucide-react'
+import { CollectorSelector } from './collector-selector'
 import { tnaToMonthlyRate } from '@/lib/loan-calculator'
 import { getSmartFirstDueDate } from '@/lib/business-days'
 import { getNextMonths } from '@/lib/periods'
@@ -50,6 +51,7 @@ export function CreateLoanDialog({
     const [firstInstallmentMonth, setFirstInstallmentMonth] = useState<string>('')
     const [noInterest, setNoInterest] = useState(false)
     const [showAdvanced, setShowAdvanced] = useState(false)
+    const [selectedCollectorId, setSelectedCollectorId] = useState<string>('')
 
     const { data: persons } = trpc.persons.list.useQuery()
     const { data: borrowerTypes } = trpc.rateRules.listBorrowerTypes.useQuery()
@@ -156,6 +158,7 @@ export function CreateLoanDialog({
             setRoundingMultiple(1000)
             setFirstInstallmentMonth('')
             setNoInterest(false)
+            setSelectedCollectorId('')
         },
     })
 
@@ -172,6 +175,7 @@ export function CreateLoanDialog({
                 personId: selectedPersonId || undefined,
                 direction,
                 creditorName: direction === 'borrower' ? creditorName || undefined : undefined,
+                collectorId: selectedCollectorId || undefined,
                 smartDueDate,
             })
         } else {
@@ -186,6 +190,7 @@ export function CreateLoanDialog({
                 personId: selectedPersonId || undefined,
                 direction,
                 creditorName: direction === 'borrower' ? creditorName || undefined : undefined,
+                collectorId: selectedCollectorId || undefined,
                 smartDueDate,
                 roundingMultiple: roundEnabled ? roundingMultiple : 0,
                 firstInstallmentMonth: firstInstallmentMonth || undefined,
@@ -336,6 +341,11 @@ export function CreateLoanDialog({
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {/* Collector selector — only for lender */}
+                    {direction === 'lender' && (
+                        <CollectorSelector value={selectedCollectorId} onChange={setSelectedCollectorId} />
                     )}
 
                     {/* Loan type & currency */}

@@ -44,6 +44,7 @@ import {
   MinusCircle,
   Ban,
   MoreHorizontal,
+  Users,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -76,10 +77,11 @@ import { RefinanceDialog } from '@/components/loans/refinance-dialog'
 import { CopyCollectionMessage } from '@/components/loans/copy-collection-message'
 import { LoanActivityTimeline } from '@/components/loans/loan-activity-timeline'
 import { LoanAttachments } from '@/components/loans/loan-attachments'
+import { CollectorView } from '@/components/loans/collector-view'
 
 export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
-  const [view, setView] = useState<'list' | 'table' | 'calendar'>('table')
+  const [view, setView] = useState<'list' | 'table' | 'calendar' | 'collector'>('table')
   const [tab, setTab] = useState<'lender' | 'borrower'>('lender')
 
   if (selectedLoanId) {
@@ -90,7 +92,13 @@ export default function LoansPage() {
     <div className="space-y-6">
       <LoanListHeader view={view} onViewChange={setView} direction={tab} tab={tab} onTabChange={setTab} />
 
-      {view === 'table' ? (
+      {view === 'collector' ? (
+        /* ── Collector grouped view ── */
+        <div className="space-y-4">
+          <OverdueBanner />
+          <CollectorView onSelect={setSelectedLoanId} />
+        </div>
+      ) : view === 'table' ? (
         /* ── Table view: no Tabs wrapper, no expanded KPIs, no sidebar ── */
         <div className="space-y-4">
           {tab === 'lender' && <OverdueBanner />}
@@ -150,7 +158,10 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   const [editTna, setEditTna] = useState('')
   const [assignPersonOpen, setAssignPersonOpen] = useState(false)
   const [assignPersonId, setAssignPersonId] = useState('')
+  const [assignCollectorOpen, setAssignCollectorOpen] = useState(false)
+  const [assignCollectorId, setAssignCollectorId] = useState('')
   const { data: allPersons } = trpc.persons.list.useQuery()
+  const { data: allCollectors } = trpc.collectors.list.useQuery()
   const { toast } = useToast()
 
   const deleteMutation = trpc.loans.delete.useMutation({
@@ -475,6 +486,63 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           )}
           <Link2 className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />
         </button>
+      )}
+
+      {/* Collector assignment */}
+      {loan.direction === 'lender' && (
+        loan.collector ? (
+          <div className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-muted w-full">
+            <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground">Cobrador:</span>
+            <strong className="text-foreground">{loan.collector.name}</strong>
+            {loan.collector.phone && (
+              <span className="text-muted-foreground text-xs">({loan.collector.phone})</span>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-6 text-xs text-muted-foreground"
+              onClick={() => updateMutation.mutate({ id: loanId, collectorId: null })}
+            >
+              Quitar
+            </Button>
+          </div>
+        ) : allCollectors && allCollectors.length > 0 ? (
+          assignCollectorOpen ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={assignCollectorId} onValueChange={setAssignCollectorId}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Seleccionar cobrador" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCollectors.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} {c.activeLoanCount > 0 ? `(${c.activeLoanCount} activos)` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                disabled={!assignCollectorId || updateMutation.isPending}
+                onClick={() => {
+                  updateMutation.mutate({ id: loanId, collectorId: assignCollectorId })
+                  setAssignCollectorOpen(false)
+                }}
+              >
+                Asignar
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAssignCollectorOpen(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setAssignCollectorOpen(true)}>
+              <Users className="h-4 w-4 mr-2" />
+              Asignar cobrador
+            </Button>
+          )
+        ) : null
       )}
 
       {/* Summary cards */}

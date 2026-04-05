@@ -280,6 +280,9 @@ export function LoanListContent({ onSelect, direction }: { onSelect: (id: string
                             chips.push({ label: 'Alto riesgo', variant: 'destructive' })
                         }
                     }
+                    if (loan.collector) {
+                        chips.push({ label: loan.collector.name, variant: 'outline' })
+                    }
 
                     return (
                         <Card
