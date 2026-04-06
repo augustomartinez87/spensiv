@@ -130,9 +130,9 @@ export default function PortfolioPage() {
                   {yieldMetrics.amortizedLoansCount > 0 && (
                     <div className="border-l border-border pl-4">
                       <p className="text-base font-semibold text-accent-blue">
-                        {(yieldMetrics.weightedIRR * 100).toFixed(1)}% <span className="text-xs font-normal text-muted-foreground">TEA</span>
+                        {(yieldMetrics.weightedIRR * 100).toFixed(1)}% <span className="text-xs font-normal text-muted-foreground">TIR anual</span>
                       </p>
-                      <p className="text-xs text-muted-foreground">TIR · {yieldMetrics.amortizedLoansCount} amortizados</p>
+                      <p className="text-xs text-muted-foreground">Ponderada · {yieldMetrics.amortizedLoansCount} amortizados</p>
                     </div>
                   )}
                 </div>

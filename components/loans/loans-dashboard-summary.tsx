@@ -142,7 +142,7 @@ export function LoansDashboardSummary() {
                     {/* Left: Pending amount + health */}
                     <div className="flex flex-col justify-center gap-2 min-w-0">
                         <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
-                            Pendiente de cobro
+                            Pendiente de cobro (capital + interés)
                         </p>
                         <PrivateAmount>
                             <p className="text-[28px] font-bold text-foreground leading-tight tabular-nums tracking-tight">
