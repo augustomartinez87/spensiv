@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { trpc } from '@/lib/contexts/trpc-client'
-import { formatCurrency, cn } from '@/lib/utils'
+import { formatCurrency, cn, pluralize } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -81,7 +81,7 @@ export function InstallmentCalendar({ onSelectLoan }: { onSelectLoan: (id: strin
                             </h2>
                             {monthTotal > 0 && (
                                 <p className="text-sm text-muted-foreground">
-                                    {monthInstallments.length} cuotas - {formatCurrency(monthTotal)} a cobrar
+                                    {monthInstallments.length} {pluralize(monthInstallments.length, 'cuota')} - {formatCurrency(monthTotal)} a cobrar
                                 </p>
                             )}
                         </div>

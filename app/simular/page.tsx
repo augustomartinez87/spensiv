@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { trpc } from '@/lib/contexts/trpc-client'
-import { formatCurrency, cn } from '@/lib/utils'
+import { formatCurrency, cn, pluralize } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -84,9 +84,22 @@ function SimulatorForm({ config }: { config: SimulatorConfig }) {
   const [capital, setCapital] = useState(String(defaultCapital))
   const [selectedTerms, setSelectedTerms] = useState<number[]>(availableTerms.slice(0, 3))
   const [results, setResults] = useState<SimulationResult[] | null>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
+
+  const [shouldScroll, setShouldScroll] = useState(false)
+
+  useEffect(() => {
+    if (shouldScroll && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth' })
+      setShouldScroll(false)
+    }
+  }, [shouldScroll, results])
 
   const simulateMutation = trpc.publicSimulator.simulate.useMutation({
-    onSuccess: (data) => setResults(data),
+    onSuccess: (data) => {
+      setResults(data)
+      setShouldScroll(true)
+    },
   })
 
   function handleSimulate() {
@@ -108,7 +121,7 @@ function SimulatorForm({ config }: { config: SimulatorConfig }) {
   const isLoading = simulateMutation.isPending
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       {/* Header */}
       <header className="border-b bg-card">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center">
@@ -163,7 +176,7 @@ function SimulatorForm({ config }: { config: SimulatorConfig }) {
 
             {/* Term pills */}
             <div className="space-y-3">
-              <Label>Cantidad de cuotas</Label>
+              <Label>Plazos a comparar</Label>
               <div className="flex flex-wrap gap-2">
                 {availableTerms.map((term) => {
                   const isSelected = selectedTerms.includes(term)
@@ -178,7 +191,7 @@ function SimulatorForm({ config }: { config: SimulatorConfig }) {
                           : "bg-muted text-muted-foreground hover:bg-muted/80"
                       )}
                     >
-                      {term} meses
+                      {term} {pluralize(term, 'mes', 'meses')}
                     </button>
                   )
                 })}
@@ -208,7 +221,9 @@ function SimulatorForm({ config }: { config: SimulatorConfig }) {
 
         {/* Results */}
         {results && results.length > 0 && (
-          <PublicResults results={results} currency={currency} whatsapp={config.whatsapp} />
+          <div ref={resultsRef}>
+            <PublicResults results={results} currency={currency} whatsapp={config.whatsapp} />
+          </div>
         )}
       </main>
     </div>
@@ -242,7 +257,7 @@ function PublicResults({ results, currency, whatsapp }: { results: SimulationRes
       ``,
       `Me interesa:`,
       `- Monto: ${fmtClean(capital)}`,
-      `- ${selectedResult.termMonths} cuotas de ${fmtClean(amt)}`,
+      `- ${selectedResult.termMonths} ${pluralize(selectedResult.termMonths, 'cuota')} de ${fmtClean(amt)}`,
       selectedResult.amortizationTable?.[0]?.date
         ? `- Primera cuota: ${formatFirstDueDate(selectedResult.amortizationTable[0].date)}`
         : '',
@@ -298,7 +313,7 @@ function PublicResults({ results, currency, whatsapp }: { results: SimulationRes
               >
                 <CardContent className="p-5 text-center space-y-1">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {result.termMonths} cuotas
+                    {result.termMonths} {pluralize(result.termMonths, 'cuota')}
                   </p>
                   <p className="text-2xl font-black text-foreground">
                     {fmtClean(amt)}
@@ -326,7 +341,7 @@ function PublicResults({ results, currency, whatsapp }: { results: SimulationRes
               </div>
               <div>
                 <p className="font-bold text-foreground">
-                  {selectedResult.termMonths} cuotas de{' '}
+                  {selectedResult.termMonths} {pluralize(selectedResult.termMonths, 'cuota')} de{' '}
                   {fmtClean(selectedResult.roundedInstallmentAmount || selectedResult.installmentAmount || 0)}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -358,7 +373,7 @@ function PublicResults({ results, currency, whatsapp }: { results: SimulationRes
         <Card>
           <CardContent className="p-4 sm:p-5">
             <p className="font-bold text-sm mb-3">
-              Detalle de cuotas — {selectedResult.termMonths} meses
+              Detalle de cuotas — {selectedResult.termMonths} {pluralize(selectedResult.termMonths, 'mes', 'meses')}
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

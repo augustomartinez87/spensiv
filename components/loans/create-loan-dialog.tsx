@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { trpc } from '@/lib/contexts/trpc-client'
-import { formatCurrency, cn, formatDateToInput } from '@/lib/utils'
+import { formatCurrency, cn, formatDateToInput, pluralize } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -635,7 +635,7 @@ export function CreateLoanDialog({
                                 <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-lg px-3 py-2">
                                     <Clock className="h-3.5 w-3.5 shrink-0" />
                                     <span>
-                                        {term} cuotas de ~{formatCurrency(installment, currency)} — 1er vencimiento:{' '}
+                                        {term} {pluralize(term, 'cuota')} de ~{formatCurrency(installment, currency)} — 1er vencimiento:{' '}
                                         <span className="font-semibold">{dueDateStr}</span>
                                     </span>
                                 </div>

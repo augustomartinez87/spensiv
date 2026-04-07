@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/contexts/trpc-client'
-import { formatCurrency, formatDateToInput, cn } from '@/lib/utils'
+import { formatCurrency, formatDateToInput, cn, pluralize } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -747,7 +747,7 @@ export default function SimulatorPage() {
             {/* ── Table Tab ── */}
             <TabsContent value="table" className="space-y-6 mt-6">
               {compareResults && compareResults.map((r) => (
-                <AmortizationTable key={r.termMonths} result={r} title={`${r.termMonths} meses`} />
+                <AmortizationTable key={r.termMonths} result={r} title={`${r.termMonths} ${pluralize(r.termMonths, 'mes', 'meses')}`} />
               ))}
               {singleResult && (
                 <AmortizationTable result={singleResult} title="Amortizado (Cuotas)" />
@@ -787,7 +787,7 @@ export default function SimulatorPage() {
                 </div>
                 <div className="bg-muted rounded-lg p-3">
                   <p className="text-xs text-muted-foreground">Plazo</p>
-                  <p className="font-bold">{createLoanDefaults.termMonths} meses</p>
+                  <p className="font-bold">{createLoanDefaults.termMonths} {pluralize(Number(createLoanDefaults.termMonths), 'mes', 'meses')}</p>
                 </div>
                 <div className="bg-muted rounded-lg p-3">
                   <p className="text-xs text-muted-foreground">Inicio</p>
@@ -799,7 +799,7 @@ export default function SimulatorPage() {
               <div className="flex items-center gap-2 text-sm bg-primary/10 text-primary rounded-lg px-3 py-2">
                 <Clock className="h-3.5 w-3.5 shrink-0" />
                 <span>
-                  {createLoanDefaults.termMonths} cuotas — 1er vencimiento:{' '}
+                  {createLoanDefaults.termMonths} {pluralize(Number(createLoanDefaults.termMonths), 'cuota')} — 1er vencimiento:{' '}
                   <span className="font-semibold">{computeFirstDueDate(createLoanDefaults.startDate, createLoanDefaults.smartDueDate)}</span>
                 </span>
               </div>
@@ -947,7 +947,7 @@ function CompareTermsResultCards({ results, onCreateLoan, onPreApprove, getSugge
         <ResultCardContent
           key={result.termMonths}
           result={result}
-          title={`${result.termMonths} meses`}
+          title={`${result.termMonths} ${pluralize(result.termMonths, 'mes', 'meses')}`}
           onCreateLoan={onCreateLoan}
           onPreApprove={onPreApprove}
           suggestedTna={getSuggestedTna?.(result.termMonths)}
@@ -1049,7 +1049,7 @@ function InstallmentPlanCard({
       >
         <CardContent className="p-5 text-center space-y-1">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {termMonths} cuotas
+            {termMonths} {pluralize(termMonths, 'cuota')}
           </p>
           <p className="text-2xl font-black text-foreground">
             {formatClean(installmentAmount)}
@@ -1116,8 +1116,8 @@ function ShareableSimulationView({
         const amt = r.roundedInstallmentAmount || r.installmentAmount || r.nominalValue || 0
         const dueDateStr = r.amortizationTable?.[0]?.date ? ` (1ra cuota: ${formatFirstDueDate(r.amortizationTable[0].date)})` : ''
         return r.loanType === 'amortized'
-          ? `${r.termMonths} cuotas de ${fmtClean(amt)}${dueDateStr}`
-          : `${r.termMonths} meses → ${fmtClean(amt)}`
+          ? `${r.termMonths} ${pluralize(r.termMonths, 'cuota')} de ${fmtClean(amt)}${dueDateStr}`
+          : `${r.termMonths} ${pluralize(r.termMonths, 'mes', 'meses')} → ${fmtClean(amt)}`
       }),
       ``,
       `Elegí la opción que te quede más cómoda.`,
@@ -1227,7 +1227,7 @@ function ShareableSimulationView({
       ctx.fillStyle = '#6b7280'
       ctx.font = '600 12px Inter, system-ui, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText(`${r.termMonths} CUOTAS`, cx, cardY + 40)
+      ctx.fillText(`${r.termMonths} ${pluralize(r.termMonths, 'CUOTA')}`, cx, cardY + 40)
 
       // Amount
       ctx.fillStyle = '#111827'
@@ -1311,7 +1311,7 @@ function ShareableSimulationView({
               </div>
               <div>
                 <p className="font-bold text-foreground">
-                  Plan seleccionado: {selectedResult.termMonths} cuotas de{' '}
+                  Plan seleccionado: {selectedResult.termMonths} {pluralize(selectedResult.termMonths, 'cuota')} de{' '}
                   {fmtClean(selectedResult.roundedInstallmentAmount || selectedResult.installmentAmount || selectedResult.nominalValue || 0)}
                 </p>
                 <p className="text-xs text-muted-foreground">
