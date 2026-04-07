@@ -204,12 +204,6 @@ export default function DashboardPage() {
           nextEstimatedDate={nextIncomeEstimate}
           sparklineData={incomeSparkline}
         />
-        <StatCard
-          title="Balance neto"
-          value={convert(balance.balance)}
-          type="balance"
-          previousValue={prevBalance ? convert(prevBalance.balance) : undefined}
-        />
         <CompactProjection
           balance={convert(balance.balance)}
           totalIncome={convert(balance.totalIncome)}
