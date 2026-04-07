@@ -160,6 +160,9 @@ export const rateRulesRouter = router({
         currency: z.enum(['ARS', 'USD']),
         terms: z.string().min(1),
         whatsapp: z.string().min(1),
+        minCapital: z.number().int().positive(),
+        maxCapital: z.number().int().positive(),
+        borrowerTypeId: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -171,12 +174,18 @@ export const rateRulesRouter = router({
           currency: input.currency,
           terms: input.terms,
           whatsapp: input.whatsapp,
+          minCapital: input.minCapital,
+          maxCapital: input.maxCapital,
+          borrowerTypeId: input.borrowerTypeId ?? null,
         },
         update: {
           tna: input.tna,
           currency: input.currency,
           terms: input.terms,
           whatsapp: input.whatsapp,
+          minCapital: input.minCapital,
+          maxCapital: input.maxCapital,
+          borrowerTypeId: input.borrowerTypeId ?? null,
         },
       })
     }),

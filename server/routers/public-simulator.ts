@@ -6,15 +6,22 @@ import type { SimulationResult } from '@/lib/loan-calculator'
 
 export const publicSimulatorRouter = router({
   getConfig: publicProcedure.query(async ({ ctx }) => {
-    const config = await ctx.prisma.publicSimulatorConfig.findFirst()
+    const config = await ctx.prisma.publicSimulatorConfig.findFirst({
+      include: { borrowerType: true },
+    })
     if (!config) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Simulador no configurado' })
     }
+    const baseTna = config.borrowerType
+      ? Number(config.borrowerType.baseTna)
+      : Number(config.tna)
     return {
-      tna: Number(config.tna),
+      tna: baseTna,
       currency: config.currency,
       terms: config.terms.split(',').map(Number).filter(n => n > 0),
       whatsapp: config.whatsapp,
+      minCapital: config.minCapital,
+      maxCapital: config.maxCapital,
     }
   }),
 
@@ -24,12 +31,16 @@ export const publicSimulatorRouter = router({
       terms: z.array(z.number().int().min(1).max(360)).min(1).max(4),
     }))
     .mutation(async ({ ctx, input }): Promise<SimulationResult[]> => {
-      const config = await ctx.prisma.publicSimulatorConfig.findFirst()
+      const config = await ctx.prisma.publicSimulatorConfig.findFirst({
+        include: { borrowerType: true },
+      })
       if (!config) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Simulador no configurado' })
       }
 
-      const baseTna = Number(config.tna)
+      const baseTna = config.borrowerType
+        ? Number(config.borrowerType.baseTna)
+        : Number(config.tna)
 
       // Leer ajustes por plazo del mismo usuario
       const adjustments = await ctx.prisma.durationAdjustment.findMany({

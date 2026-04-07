@@ -519,8 +519,13 @@ function PublicSimulatorSection() {
   const [currency, setCurrency] = useState<'ARS' | 'USD'>('ARS')
   const [terms, setTerms] = useState('3,6,9,12')
   const [whatsapp, setWhatsapp] = useState('')
+  const [minCapital, setMinCapital] = useState('50000')
+  const [maxCapital, setMaxCapital] = useState('20000000')
+  const [borrowerTypeId, setBorrowerTypeId] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+
+  const { data: borrowerTypes } = trpc.rateRules.listBorrowerTypes.useQuery()
 
   // Load saved values
   if (config && !initialized) {
@@ -528,8 +533,13 @@ function PublicSimulatorSection() {
     setCurrency(config.currency as 'ARS' | 'USD')
     setTerms(config.terms)
     setWhatsapp(config.whatsapp)
+    setMinCapital(String(config.minCapital))
+    setMaxCapital(String(config.maxCapital))
+    setBorrowerTypeId(config.borrowerTypeId ?? null)
     setInitialized(true)
   }
+
+  const selectedBorrowerType = borrowerTypes?.find(t => t.id === borrowerTypeId) ?? null
 
   const upsert = trpc.rateRules.upsertPublicSimulatorConfig.useMutation({
     onSuccess: () => {
@@ -540,12 +550,16 @@ function PublicSimulatorSection() {
   })
 
   function handleSave() {
-    if (!tna || !whatsapp) return
+    const effectiveTna = selectedBorrowerType ? Number(selectedBorrowerType.baseTna) : parseFloat(tna)
+    if ((!borrowerTypeId && !tna) || !whatsapp || !minCapital || !maxCapital) return
     upsert.mutate({
-      tna: parseFloat(tna),
+      tna: effectiveTna,
       currency,
       terms,
       whatsapp: whatsapp.replace(/\D/g, ''),
+      minCapital: parseInt(minCapital),
+      maxCapital: parseInt(maxCapital),
+      borrowerTypeId,
     })
   }
 
@@ -590,15 +604,41 @@ function PublicSimulatorSection() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>TNA para el link publico (%)</Label>
-                <Input
-                  type="number"
-                  value={tna}
-                  onChange={(e) => setTna(e.target.value)}
-                  placeholder="55"
-                  min={0}
-                  step={1}
-                />
+                <Label>Tasa base</Label>
+                <Select
+                  value={borrowerTypeId ?? '__manual__'}
+                  onValueChange={(v) => setBorrowerTypeId(v === '__manual__' ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Elegir tipo de prestatario..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__manual__">Manual</SelectItem>
+                    {borrowerTypes?.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name} — {Number(t.baseTna)}% TNA
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {borrowerTypeId && selectedBorrowerType ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Tasa base: <span className="font-medium text-foreground">{Number(selectedBorrowerType.baseTna)}%</span> + ajuste por plazo configurado
+                  </p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={tna}
+                      onChange={(e) => setTna(e.target.value)}
+                      placeholder="55"
+                      min={0}
+                      step={1}
+                      className="h-8"
+                    />
+                    <span className="text-sm text-muted-foreground shrink-0">% TNA</span>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Moneda</Label>
@@ -629,10 +669,32 @@ function PublicSimulatorSection() {
                 />
                 <p className="text-[10px] text-muted-foreground">Con codigo de pais, sin + ni espacios</p>
               </div>
+              <div className="space-y-2">
+                <Label>Monto minimo ({currency})</Label>
+                <Input
+                  type="number"
+                  value={minCapital}
+                  onChange={(e) => setMinCapital(e.target.value)}
+                  placeholder={currency === 'USD' ? '100' : '50000'}
+                  min={1}
+                  step={currency === 'USD' ? 100 : 10000}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Monto maximo ({currency})</Label>
+                <Input
+                  type="number"
+                  value={maxCapital}
+                  onChange={(e) => setMaxCapital(e.target.value)}
+                  placeholder={currency === 'USD' ? '50000' : '20000000'}
+                  min={1}
+                  step={currency === 'USD' ? 1000 : 100000}
+                />
+              </div>
             </div>
             <Button
               onClick={handleSave}
-              disabled={upsert.isPending || !tna || !whatsapp}
+              disabled={upsert.isPending || (!borrowerTypeId && !tna) || !whatsapp}
               className="w-full sm:w-auto"
             >
               {upsert.isPending ? 'Guardando...' : 'Guardar configuracion'}

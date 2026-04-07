@@ -68,18 +68,21 @@ interface SimulatorConfig {
   currency: string
   terms: number[]
   whatsapp: string
+  minCapital: number
+  maxCapital: number
 }
 
 function SimulatorForm({ config }: { config: SimulatorConfig }) {
   const currency = config.currency as 'ARS' | 'USD'
   const availableTerms = config.terms
 
-  const minCapital = currency === 'USD' ? 100 : 50000
-  const maxCapital = currency === 'USD' ? 50000 : 20000000
-  const step = currency === 'USD' ? 100 : 50000
+  const minCapital = config.minCapital
+  const maxCapital = config.maxCapital
+  const step = currency === 'USD' ? 100 : 10000
 
-  const [capital, setCapital] = useState(currency === 'USD' ? '1000' : '1000000')
-  const [selectedTerms, setSelectedTerms] = useState<number[]>(availableTerms.slice(0, 4))
+  const defaultCapital = Math.round((minCapital + maxCapital) / 2 / (currency === 'USD' ? 100 : 10000)) * (currency === 'USD' ? 100 : 10000)
+  const [capital, setCapital] = useState(String(defaultCapital))
+  const [selectedTerms, setSelectedTerms] = useState<number[]>(availableTerms.slice(0, 3))
   const [results, setResults] = useState<SimulationResult[] | null>(null)
 
   const simulateMutation = trpc.publicSimulator.simulate.useMutation({

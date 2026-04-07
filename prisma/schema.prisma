@@ -692,6 +692,8 @@ model BorrowerType {
   baseTna Decimal @db.Decimal(5, 2) // TNA mínima base (ej: 110.00 = 110%)
   order   Int     @default(0)
 
+  publicSimulatorConfigs PublicSimulatorConfig[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -724,10 +726,14 @@ model PublicSimulatorConfig {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tna       Decimal @db.Decimal(5, 2) // TNA fija para el simulador publico
-  currency  String  @default("ARS")   // ARS | USD
-  terms     String  @default("3,6,9,12") // Plazos separados por coma
-  whatsapp  String  // Numero de WhatsApp (ej: 5491126369767)
+  tna            Decimal      @db.Decimal(5, 2) // TNA fija (usado cuando no hay tipo de prestatario)
+  currency       String       @default("ARS")   // ARS | USD
+  terms          String       @default("3,6,9,12") // Plazos separados por coma
+  whatsapp       String       // Numero de WhatsApp (ej: 5491126369767)
+  minCapital     Int          @default(50000)    // Monto minimo del simulador
+  maxCapital     Int          @default(20000000) // Monto maximo del simulador
+  borrowerTypeId String?      // Tipo de prestatario para la tasa base (opcional)
+  borrowerType   BorrowerType? @relation(fields: [borrowerTypeId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
