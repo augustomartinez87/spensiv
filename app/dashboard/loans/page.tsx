@@ -78,6 +78,7 @@ import { CopyCollectionMessage } from '@/components/loans/copy-collection-messag
 import { LoanActivityTimeline } from '@/components/loans/loan-activity-timeline'
 import { LoanAttachments } from '@/components/loans/loan-attachments'
 import { CollectorView } from '@/components/loans/collector-view'
+import { GenerateContractButton } from '@/components/loans/generate-contract-button'
 
 export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
@@ -685,6 +686,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           <CopyCollectionMessage loan={loan} />
           <RegisterPaymentDialog loanId={loanId} cur={cur} loan={loan} />
           <RefinanceDialog loan={loan} onBack={onBack} />
+          <GenerateContractButton loan={loan} />
           <Button
             variant="ghost"
             size="sm"
@@ -712,6 +714,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
             </Button>
           )}
           {isZeroRate && <RegisterPaymentDialog loanId={loanId} cur={cur} loan={loan} />}
+          <GenerateContractButton loan={loan} />
           {confirmComplete ? (
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Devolvió el capital?</span>
