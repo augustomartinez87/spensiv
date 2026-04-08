@@ -4,6 +4,12 @@ import { calculatePersonScore, calculateExpectedValue } from '@/lib/loan-scoring
 import { getDolarMep, pesify } from '@/lib/dolar'
 import { calculateIRR, monthlyToAnnualRate } from '@/lib/loan-calculator'
 import { formatPeriod } from '@/lib/periods'
+import {
+  calculatePersonRiskLimits,
+  runStressTest,
+  calculateBreakevenTNA,
+  type PersonExposure,
+} from '@/lib/risk-engine'
 import type { PrismaClient } from '@prisma/client'
 
 // ── Shared data loader ───────────────────────────────────────────────
@@ -402,4 +408,128 @@ export const portfolioRouter = router({
     for (const p of persons) personScores.set(p.id, calculatePersonScore(p))
     return computeRiskBreakdown(persons, personScores, mepRate)
   }),
+
+  getRiskAnalysis: protectedProcedure.query(async ({ ctx }) => {
+    const { loans, persons, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
+    const lenderLoans = loans.filter((l) => l.direction === 'lender')
+    const capitalCache = buildCapitalCache(lenderLoans, mepRate)
+    const totalCapital = capitalCache.reduce((s, c) => s + c, 0)
+
+    // Build person scores
+    const personScores = new Map<string, ReturnType<typeof calculatePersonScore>>()
+    for (const p of persons) personScores.set(p.id, calculatePersonScore(p))
+
+    // Build per-person capital (pesified)
+    const personCapital = new Map<string, number>()
+    for (let i = 0; i < lenderLoans.length; i++) {
+      const loan = lenderLoans[i]
+      if (!loan.personId) continue
+      personCapital.set(loan.personId, (personCapital.get(loan.personId) ?? 0) + capitalCache[i])
+    }
+
+    // Average term for breakeven calc
+    const amortizedLoans = lenderLoans.filter((l) => l.loanType === 'amortized' && l.termMonths)
+    const avgTerm = amortizedLoans.length > 0
+      ? amortizedLoans.reduce((s, l) => s + (l.termMonths ?? 0), 0) / amortizedLoans.length
+      : 12
+
+    // Risk limits per person
+    const personsForLimits = persons
+      .filter((p) => personCapital.has(p.id))
+      .map((p) => {
+        const score = personScores.get(p.id)!
+        return {
+          id: p.id,
+          name: p.name,
+          category: score.category,
+          score: score.score,
+          defaultProbability: score.defaultProbability,
+          capital: personCapital.get(p.id) ?? 0,
+        }
+      })
+
+    const riskLimits = calculatePersonRiskLimits(personsForLimits, totalCapital, avgTerm)
+
+    // Stress test exposures
+    const exposures: PersonExposure[] = personsForLimits.map((p) => ({
+      personId: p.id,
+      name: p.name,
+      capital: p.capital,
+      category: p.category,
+      defaultProbability: p.defaultProbability,
+    }))
+
+    // Weighted TEM for income loss calc
+    const yieldMetrics = computeYieldMetrics(lenderLoans, capitalCache, mepRate)
+    const stressResults = runStressTest(exposures, totalCapital, yieldMetrics.weightedTEM)
+
+    // Breakeven rates by category
+    const breakevenByCategory = (['bajo', 'medio', 'alto', 'critico'] as const).map((cat) => {
+      const pd = cat === 'bajo' ? 0.02 : cat === 'medio' ? 0.08 : cat === 'alto' ? 0.18 : 0.40
+      const rates = calculateBreakevenTNA(pd, Math.round(avgTerm))
+      return { category: cat, pd, ...rates }
+    })
+
+    return {
+      totalCapital,
+      avgTermMonths: Math.round(avgTerm),
+      riskLimits,
+      stressResults,
+      breakevenByCategory,
+      portfolioHealth: {
+        overLimitCount: riskLimits.filter((r) => r.overLimit).length,
+        totalPersons: riskLimits.length,
+        worstScenarioLoss: stressResults.length > 0
+          ? Math.max(...stressResults.map((s) => s.portfolioLostPct))
+          : 0,
+      },
+    }
+  }),
+
+  /** Lightweight endpoint for the create-loan dialog risk alerts */
+  getPersonRiskCheck: protectedProcedure
+    .input(z.object({ personId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const { loans, persons, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
+      const lenderLoans = loans.filter((l) => l.direction === 'lender')
+      const capitalCache = buildCapitalCache(lenderLoans, mepRate)
+      const totalCapital = capitalCache.reduce((s, c) => s + c, 0)
+
+      const person = persons.find((p) => p.id === input.personId)
+      if (!person) return null
+
+      const score = calculatePersonScore(person)
+
+      // Current exposure for this person
+      let currentExposure = 0
+      for (let i = 0; i < lenderLoans.length; i++) {
+        if (lenderLoans[i].personId === input.personId) {
+          currentExposure += capitalCache[i]
+        }
+      }
+
+      // Average term
+      const amortizedLoans = lenderLoans.filter((l) => l.loanType === 'amortized' && l.termMonths)
+      const avgTerm = amortizedLoans.length > 0
+        ? amortizedLoans.reduce((s, l) => s + (l.termMonths ?? 0), 0) / amortizedLoans.length
+        : 12
+
+      const maxExposure = totalCapital > 0
+        ? totalCapital * (score.category === 'bajo' ? 0.20 : score.category === 'medio' ? 0.10 : score.category === 'alto' ? 0.05 : 0)
+        : 0
+
+      const { breakeven, suggested } = calculateBreakevenTNA(score.defaultProbability, Math.round(avgTerm))
+
+      return {
+        totalCapital,
+        currentExposure,
+        maxExposure,
+        remainingRoom: Math.max(0, maxExposure - currentExposure),
+        overLimit: currentExposure > maxExposure,
+        category: score.category,
+        defaultProbability: score.defaultProbability,
+        breakevenTNA: breakeven,
+        suggestedTNA: suggested,
+      }
+    }),
 })

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
-import { Plus, Zap, Shield, ShieldX, Info, Clock, AlertTriangle, ChevronDown } from 'lucide-react'
+import { Plus, Zap, Shield, ShieldX, Info, Clock, AlertTriangle, ChevronDown, TrendingDown } from 'lucide-react'
 import { CollectorSelector } from './collector-selector'
 import { tnaToMonthlyRate } from '@/lib/loan-calculator'
 import { getSmartFirstDueDate } from '@/lib/business-days'
@@ -56,6 +56,12 @@ export function CreateLoanDialog({
     const { data: persons } = trpc.persons.list.useQuery()
     const { data: borrowerTypes } = trpc.rateRules.listBorrowerTypes.useQuery()
     const { data: durationAdjustments } = trpc.rateRules.listDurationAdjustments.useQuery()
+
+    // Risk check for selected person
+    const { data: riskCheck } = trpc.portfolio.getPersonRiskCheck.useQuery(
+        { personId: selectedPersonId },
+        { enabled: !!selectedPersonId && direction === 'lender' },
+    )
 
     // Calculate suggested rate from borrower type + term
     const suggestedRate = (() => {
@@ -290,6 +296,78 @@ export function CreateLoanDialog({
                             })()}
                         </div>
                     )}
+
+                    {/* Risk alerts for selected person */}
+                    {riskCheck && selectedPersonId && direction === 'lender' && (() => {
+                        const cap = parseFloat(capital) || 0
+                        const newTotal = riskCheck.currentExposure + cap
+                        const wouldExceed = riskCheck.maxExposure > 0 && newTotal > riskCheck.maxExposure
+                        const isCritical = riskCheck.category === 'critico'
+                        const currentTna = parseFloat(tna) / 100 || (parseFloat(monthlyRate) / 100 * 12) || 0
+
+                        return (
+                            <div className="space-y-1.5">
+                                {/* Exposure limit */}
+                                <div className={cn(
+                                    'text-xs px-3 py-2 rounded-lg flex items-start gap-2',
+                                    isCritical
+                                        ? 'bg-red-500/10 text-red-400'
+                                        : wouldExceed
+                                            ? 'bg-orange-500/10 text-orange-400'
+                                            : 'bg-muted text-muted-foreground'
+                                )}>
+                                    <TrendingDown className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                    <div>
+                                        {isCritical ? (
+                                            <span>Riesgo crítico — límite de exposición: <strong>$0</strong></span>
+                                        ) : (
+                                            <>
+                                                <span>
+                                                    Exposición actual: <strong>{formatCurrency(riskCheck.currentExposure)}</strong>
+                                                    {' / '}
+                                                    Límite: <strong>{formatCurrency(riskCheck.maxExposure)}</strong>
+                                                </span>
+                                                {cap > 0 && wouldExceed && (
+                                                    <span className="block mt-0.5">
+                                                        Este préstamo excede el límite por {formatCurrency(newTotal - riskCheck.maxExposure)}
+                                                    </span>
+                                                )}
+                                                {cap > 0 && !wouldExceed && riskCheck.remainingRoom > 0 && (
+                                                    <span className="block mt-0.5">
+                                                        Margen disponible: {formatCurrency(riskCheck.remainingRoom - cap)}
+                                                    </span>
+                                                )}
+                                                {cap === 0 && riskCheck.remainingRoom <= 0 && !isCritical && (
+                                                    <span className="block mt-0.5">Sin margen — ya excede el límite recomendado</span>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Breakeven rate */}
+                                {riskCheck.breakevenTNA > 0 && !noInterest && (
+                                    <div className={cn(
+                                        'text-xs px-3 py-2 rounded-lg flex items-center gap-2',
+                                        currentTna > 0 && currentTna < riskCheck.breakevenTNA
+                                            ? 'bg-red-500/10 text-red-400'
+                                            : currentTna >= riskCheck.breakevenTNA && currentTna < riskCheck.suggestedTNA
+                                                ? 'bg-yellow-500/10 text-yellow-400'
+                                                : 'bg-muted text-muted-foreground'
+                                    )}>
+                                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                        <span>
+                                            Tasa break-even: <strong>{(riskCheck.breakevenTNA * 100).toFixed(1)}% TNA</strong>
+                                            {' · '}Sugerida: <strong>{(riskCheck.suggestedTNA * 100).toFixed(1)}%</strong>
+                                            {currentTna > 0 && currentTna < riskCheck.breakevenTNA && (
+                                                <span className="font-semibold"> — tu tasa no cubre el riesgo</span>
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })()}
 
                     {/* Borrower type selector */}
                     {borrowerTypes && borrowerTypes.length > 0 && direction === 'lender' && (

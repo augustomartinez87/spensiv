@@ -24,6 +24,7 @@ import {
   EyeOff,
   Percent,
   ShieldCheck,
+  ShieldAlert,
   HandCoins,
   Layers,
 } from 'lucide-react'
@@ -63,6 +64,7 @@ const navigation: NavSection[] = [
     adminOnly: true,
     items: [
       { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
+      { name: 'Riesgo', href: '/dashboard/risk', icon: ShieldAlert },
       { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
       { name: 'Personas', href: '/dashboard/persons', icon: Users },
       { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
