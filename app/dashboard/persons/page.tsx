@@ -124,7 +124,7 @@ function PersonsHeader() {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h1 className="text-3xl font-bold text-foreground tracking-tight">Personas</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Personas</h1>
         <p className="text-muted-foreground mt-1">Gestiona tus deudores y su perfil de riesgo</p>
       </div>
       <PersonFormDialog open={createOpen} onOpenChange={setCreateOpen} />

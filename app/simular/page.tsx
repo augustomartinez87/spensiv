@@ -28,16 +28,18 @@ export default function PublicSimulatorPage() {
   if (configLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b bg-card">
+        <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm">
           <div className="max-w-3xl mx-auto px-4 h-14 flex items-center">
             <div className="flex items-center gap-2">
-              <Calculator className="h-5 w-5 text-primary" />
-              <span className="font-bold text-lg">Simulador de Credito</span>
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Calculator className="h-4 w-4 text-primary" />
+              </div>
+              <span className="font-bold text-lg">Simulador de Crédito</span>
             </div>
           </div>
         </header>
         <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-          <Skeleton className="h-[400px] w-full rounded-xl" />
+          <Skeleton className="h-[400px] w-full rounded-2xl" />
         </main>
       </div>
     )
@@ -50,7 +52,7 @@ export default function PublicSimulatorPage() {
           <CardContent className="p-8 text-center space-y-3">
             <p className="text-lg font-bold text-foreground">Simulador no disponible</p>
             <p className="text-sm text-muted-foreground">
-              El simulador todavia no fue configurado. Contacta al prestamista para mas info.
+              El simulador todavía no fue configurado. Contactá al prestamista para más info.
             </p>
           </CardContent>
         </Card>
@@ -121,36 +123,43 @@ function SimulatorForm({ config }: { config: SimulatorConfig }) {
   const isLoading = simulateMutation.isPending
 
   return (
-    <div className="bg-background">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Ambient background glow */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+
       {/* Header */}
-      <header className="border-b bg-card">
+      <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-30">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center">
           <div className="flex items-center gap-2">
-            <Calculator className="h-5 w-5 text-primary" />
-            <span className="font-bold text-lg">Simulador de Credito</span>
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Calculator className="h-4 w-4 text-primary" />
+            </div>
+            <span className="font-bold text-lg">Simulador de Crédito</span>
           </div>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-3xl mx-auto px-4 py-8 sm:py-12 space-y-10 relative z-10">
         {/* Form */}
-        <Card>
-          <CardContent className="p-6 space-y-6">
-            <div className="text-center space-y-1">
-              <h1 className="text-2xl font-bold text-foreground">
-                Simula tu prestamo
+        <Card className="max-w-xl mx-auto border-border/50">
+          <CardContent className="p-6 sm:p-10 space-y-8">
+            <div className="text-center space-y-2">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+                Simulá tu préstamo
               </h1>
               <p className="text-sm text-muted-foreground">
-                Elegi el monto y el plazo que mejor te quede
+                Elegí el monto y el plazo que mejor te quede
               </p>
             </div>
 
             {/* Capital slider */}
-            <div className="space-y-3">
-              <Label className="text-sm text-muted-foreground">Monto del prestamo</Label>
-              <p className="text-3xl font-black text-foreground tabular-nums tracking-tight text-center">
-                {formatCurrency(parseFloat(capital) || 0, currency)}
-              </p>
+            <div className="space-y-4">
+              <div className="flex flex-col items-center space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-widest text-primary">Monto a solicitar</span>
+                <p className="text-4xl sm:text-5xl font-extrabold text-foreground tabular-nums tracking-tighter text-center">
+                  {formatCurrency(parseFloat(capital) || 0, currency)}
+                </p>
+              </div>
               <input
                 type="range"
                 min={minCapital}
@@ -158,26 +167,41 @@ function SimulatorForm({ config }: { config: SimulatorConfig }) {
                 step={step}
                 value={capital}
                 onChange={(e) => setCapital(e.target.value)}
-                className="w-full h-2 rounded-full appearance-none cursor-pointer bg-muted accent-primary"
+                className="w-full slider-premium"
               />
-              <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
-                <span>{formatCurrency(minCapital, currency)}</span>
-                <span>{formatCurrency(maxCapital, currency)}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-semibold text-muted-foreground/60 bg-muted px-2 py-1 rounded-md border border-border tabular-nums">
+                  {formatCurrency(minCapital, currency)}
+                </span>
+                <Input
+                  type="number"
+                  value={capital}
+                  onChange={(e) => setCapital(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="Monto exacto"
+                  className="h-8 w-28 text-sm text-center tabular-nums"
+                />
+                <span className="text-[10px] font-semibold text-muted-foreground/60 bg-muted px-2 py-1 rounded-md border border-border tabular-nums">
+                  {formatCurrency(maxCapital, currency)}
+                </span>
               </div>
-              <Input
-                type="number"
-                value={capital}
-                onChange={(e) => setCapital(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                placeholder="Monto exacto"
-                className="h-8 text-sm text-center"
-              />
             </div>
+
+            {/* Divider */}
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-border to-transparent" />
 
             {/* Term pills */}
             <div className="space-y-3">
-              <Label>Plazos a comparar</Label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex justify-between items-end">
+                <Label>Plazos a comparar</Label>
+                <span className="text-[10px] uppercase font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                  Hasta 4
+                </span>
+              </div>
+              <div className={cn(
+                "grid gap-2",
+                availableTerms.length <= 4 ? `grid-cols-${availableTerms.length}` : "grid-cols-4"
+              )}>
                 {availableTerms.map((term) => {
                   const isSelected = selectedTerms.includes(term)
                   return (
@@ -185,23 +209,26 @@ function SimulatorForm({ config }: { config: SimulatorConfig }) {
                       key={term}
                       onClick={() => toggleTerm(term)}
                       className={cn(
-                        "px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200",
+                        "h-12 rounded-xl border text-lg font-bold transition-all duration-200",
                         isSelected
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          ? "bg-primary text-primary-foreground border-primary shadow-[0_0_15px_-3px_rgba(59,130,246,0.5)]"
+                          : "bg-muted/30 text-muted-foreground border-border hover:bg-muted/50"
                       )}
                     >
-                      {term} {pluralize(term, 'mes', 'meses')}
+                      {term}
                     </button>
                   )
                 })}
               </div>
+              <p className="text-[10px] text-muted-foreground text-center">
+                {selectedTerms.length} {pluralize(selectedTerms.length, 'plazo seleccionado', 'plazos seleccionados')}
+              </p>
             </div>
 
             <Button
               onClick={handleSimulate}
               disabled={isLoading || !parseFloat(capital) || selectedTerms.length === 0}
-              className="w-full"
+              className="w-full h-14 text-lg font-bold rounded-xl shadow-[0_0_30px_-10px_rgba(59,130,246,0.4)]"
               size="lg"
             >
               {isLoading ? (
@@ -211,8 +238,8 @@ function SimulatorForm({ config }: { config: SimulatorConfig }) {
                 </>
               ) : (
                 <>
-                  <Calculator className="h-4 w-4 mr-2" />
-                  Simular
+                  <Calculator className="h-5 w-5 mr-2" />
+                  Simular Opciones
                 </>
               )}
             </Button>
@@ -253,7 +280,7 @@ function PublicResults({ results, currency, whatsapp }: { results: SimulationRes
     if (!selectedResult) return
     const amt = selectedResult.roundedInstallmentAmount || selectedResult.installmentAmount || 0
     const message = [
-      `Hola! Estuve viendo el simulador de prestamos.`,
+      `Hola! Estuve viendo el simulador de préstamos.`,
       ``,
       `Me interesa:`,
       `- Monto: ${fmtClean(capital)}`,
@@ -262,143 +289,175 @@ function PublicResults({ results, currency, whatsapp }: { results: SimulationRes
         ? `- Primera cuota: ${formatFirstDueDate(selectedResult.amortizationTable[0].date)}`
         : '',
       ``,
-      `Me pasas mas info?`,
+      `Me pasás más info?`,
     ].filter(Boolean).join('\n')
 
     window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="text-center space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-          Tu simulacion
-        </p>
-        <h2 className="text-3xl font-black text-foreground">
-          {formatCurrency(capital, currency)}
-        </h2>
-        <p className="text-muted-foreground text-sm">
-          Elegi la opcion que te quede mas comoda
-        </p>
+      <div className="flex items-center gap-3 border-b border-border pb-4">
+        <CheckCircle className="h-5 w-5 text-primary" />
+        <div>
+          <h2 className="text-xl font-bold text-foreground">Tu simulación lista</h2>
+          <p className="text-sm text-muted-foreground">
+            Capital solicitado: <strong className="text-foreground">{formatCurrency(capital, currency)}</strong>
+          </p>
+        </div>
       </div>
 
       {/* Plan cards */}
       <div className={cn(
         "grid gap-4",
-        results.length <= 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 sm:grid-cols-3",
+        results.length <= 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-3",
       )}>
         {results.map((result, index) => {
           const amt = result.roundedInstallmentAmount || result.installmentAmount || 0
           const isRecommended = index === maxTermIndex
           const isSelected = selectedIndex === index
           return (
-            <div key={result.termMonths} className="relative">
-              {isRecommended && (
+            <button
+              key={result.termMonths}
+              onClick={() => setSelectedIndex(index)}
+              className={cn(
+                "relative rounded-2xl p-5 text-left transition-all duration-200 outline-none",
+                isSelected
+                  ? "bg-primary/[0.08] border-2 border-primary ring-2 ring-primary/20"
+                  : "bg-card border border-border hover:bg-muted/50 hover:shadow-md"
+              )}
+            >
+              {isSelected && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-lg shadow-primary/30 flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3" /> Elegido
+                </div>
+              )}
+              {isRecommended && !isSelected && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
-                  <Badge className="text-[10px] px-2.5 py-0.5 shadow-sm">
-                    Cuota mas baja
+                  <Badge variant="success" className="text-[10px] px-2.5 py-0.5 shadow-sm">
+                    Cuota más baja
                   </Badge>
                 </div>
               )}
-              <Card
-                className={cn(
-                  "cursor-pointer transition-all duration-200 hover:border-primary/50",
+              <div className={cn("mb-3", isSelected && "mt-1")}>
+                <span className={cn(
+                  "text-sm font-semibold uppercase tracking-wider",
+                  isSelected ? "text-foreground" : "text-muted-foreground"
+                )}>
+                  {result.termMonths} {pluralize(result.termMonths, 'cuota')}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className={cn(
+                  "font-extrabold tracking-tight tabular-nums",
+                  isSelected ? "text-3xl text-primary" : "text-2xl text-foreground"
+                )}>
+                  {fmtClean(amt)}
+                </span>
+                <span className={cn(
+                  "text-xs px-2 py-0.5 rounded w-max border",
                   isSelected
-                    ? "border-primary ring-2 ring-primary/20 bg-primary/[0.03]"
-                    : "hover:shadow-md",
-                  isRecommended && !isSelected && "border-primary/30"
-                )}
-                onClick={() => setSelectedIndex(index)}
-              >
-                <CardContent className="p-5 text-center space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {result.termMonths} {pluralize(result.termMonths, 'cuota')}
-                  </p>
-                  <p className="text-2xl font-black text-foreground">
-                    {fmtClean(amt)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">por mes</p>
-                  {result.amortizationTable?.[0]?.date && (
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Primera cuota: {formatFirstDueDate(result.amortizationTable[0].date)}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                    ? "text-primary/80 bg-primary/10 border-primary/20"
+                    : "text-muted-foreground bg-muted/50 border-border"
+                )}>
+                  por mes
+                </span>
+              </div>
+              {result.amortizationTable?.[0]?.date && (
+                <p className="text-[10px] text-muted-foreground mt-2">
+                  1ra cuota: {formatFirstDueDate(result.amortizationTable[0].date)}
+                </p>
+              )}
+              <div className="mt-3 pt-3 border-t border-border/50">
+                <p className="text-xs text-muted-foreground flex justify-between">
+                  <span>Total:</span>
+                  <span className={cn("font-semibold", isSelected ? "text-foreground" : "text-muted-foreground")}>
+                    {fmtClean(result.totalPaid || 0)}
+                  </span>
+                </p>
+              </div>
+            </button>
           )
         })}
       </div>
 
       {/* Selection summary + WhatsApp CTA */}
       {selectedResult && (
-        <Card className="border-primary/20 bg-primary/[0.03]">
-          <CardContent className="p-4 sm:p-5 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <CheckCircle className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-bold text-foreground">
-                  {selectedResult.termMonths} {pluralize(selectedResult.termMonths, 'cuota')} de{' '}
-                  {fmtClean(selectedResult.roundedInstallmentAmount || selectedResult.installmentAmount || 0)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Cuotas fijas mensuales.
-                  {selectedResult.amortizationTable?.[0]?.date && (
-                    <> Primera cuota: {formatFirstDueDate(selectedResult.amortizationTable[0].date)}</>
-                  )}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Total a pagar: {fmtClean(selectedResult.totalPaid || 0)}
-                </p>
-              </div>
-            </div>
+        <div className="relative overflow-hidden bg-gradient-to-r from-card to-card/80 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 border border-border/50 shadow-lg">
+          {/* BG Decoration */}
+          <div className="absolute right-0 top-0 w-64 h-64 bg-[#25D366]/5 rounded-full blur-[80px] pointer-events-none" />
 
-            <Button
-              onClick={openWhatsApp}
-              size="lg"
-              className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white gap-2"
-            >
-              <MessageCircle className="h-5 w-5" />
-              Solicitar por WhatsApp
-            </Button>
-          </CardContent>
-        </Card>
+          <div className="flex-1 space-y-2 w-full text-center sm:text-left relative z-10">
+            <h4 className="text-lg font-bold text-foreground">
+              Plan seleccionado: <span className="text-primary">{selectedResult.termMonths} {pluralize(selectedResult.termMonths, 'cuota')}</span>
+            </h4>
+            <p className="text-sm text-muted-foreground">
+              {fmtClean(selectedResult.roundedInstallmentAmount || selectedResult.installmentAmount || 0)} por mes.
+              {selectedResult.amortizationTable?.[0]?.date && (
+                <> Primera cuota: <strong className="text-foreground">{formatFirstDueDate(selectedResult.amortizationTable[0].date)}</strong></>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Total a pagar: {fmtClean(selectedResult.totalPaid || 0)}
+            </p>
+          </div>
+
+          <Button
+            onClick={openWhatsApp}
+            size="lg"
+            className="w-full sm:w-auto bg-[#25D366] hover:bg-[#20bd5a] text-white gap-2 font-bold shadow-[0_0_30px_-10px_rgba(37,211,102,0.4)] relative z-10"
+          >
+            <MessageCircle className="h-5 w-5" />
+            Solicitar por WhatsApp
+          </Button>
+        </div>
       )}
 
       {/* Amortization table */}
       {selectedResult?.amortizationTable && (
-        <Card>
-          <CardContent className="p-4 sm:p-5">
-            <p className="font-bold text-sm mb-3">
-              Detalle de cuotas — {selectedResult.termMonths} {pluralize(selectedResult.termMonths, 'mes', 'meses')}
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="text-left py-2 px-2 font-medium text-xs">N</th>
-                    <th className="text-left py-2 px-2 font-medium text-xs">Fecha</th>
-                    <th className="text-right py-2 px-2 font-medium text-xs">Cuota</th>
-                    <th className="text-right py-2 px-2 font-medium text-xs">Saldo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedResult.amortizationTable.map((row) => (
-                    <tr key={row.month} className="border-b border-border/50">
-                      <td className="py-1.5 px-2 text-xs">{row.month}</td>
-                      <td className="py-1.5 px-2 text-xs text-muted-foreground">{row.date}</td>
-                      <td className="py-1.5 px-2 text-right text-xs">{fmtClean(row.installment)}</td>
-                      <td className="py-1.5 px-2 text-right text-xs font-medium">{fmtClean(row.balance)}</td>
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold text-foreground uppercase tracking-wider pl-1">
+            Tabla de Amortización — {selectedResult.termMonths} {pluralize(selectedResult.termMonths, 'mes', 'meses')}
+          </h4>
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50 border-b border-border text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                      <th className="p-3 sm:p-4 w-16 text-center">N</th>
+                      <th className="p-3 sm:p-4 text-left">Vencimiento</th>
+                      <th className="p-3 sm:p-4 text-right">Cuota</th>
+                      <th className="p-3 sm:p-4 text-right">Saldo</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                  </thead>
+                  <tbody>
+                    {selectedResult.amortizationTable.map((row, i) => (
+                      <tr
+                        key={row.month}
+                        className={cn(
+                          "border-b border-border/30 hover:bg-muted/30 transition-colors",
+                          i % 2 === 1 && "bg-muted/10"
+                        )}
+                      >
+                        <td className="p-3 sm:p-4 text-center text-muted-foreground font-medium tabular-nums">{row.month}</td>
+                        <td className="p-3 sm:p-4 text-foreground font-medium">{row.date}</td>
+                        <td className="p-3 sm:p-4 text-right font-bold text-primary tabular-nums">{fmtClean(row.installment)}</td>
+                        <td className={cn(
+                          "p-3 sm:p-4 text-right tabular-nums font-medium",
+                          row.balance === 0 ? "text-accent-positive font-bold" : "text-muted-foreground"
+                        )}>
+                          {fmtClean(row.balance)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   )

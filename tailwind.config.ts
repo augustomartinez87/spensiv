@@ -46,7 +46,8 @@ const config = {
   				positive: 'hsl(var(--accent-positive))',
   				danger: 'hsl(var(--accent-danger))',
   				warning: 'hsl(var(--accent-warning))',
-  				blue: 'hsl(var(--accent-blue))'
+  				blue: 'hsl(var(--accent-blue))',
+  				cyan: 'hsl(var(--accent-cyan))'
   			},
   			popover: {
   				DEFAULT: 'hsl(var(--popover))',

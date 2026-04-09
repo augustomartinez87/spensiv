@@ -72,11 +72,11 @@ export function MonthlyEvolutionChart({ data }: { data: DataPoint[] }) {
         <p className="text-sm font-semibold text-foreground">Evolución mensual</p>
         <div className="flex items-center gap-5">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <div className="w-4 h-px rounded" style={{ background: '#3b82f6', height: 2 }} />
+            <div className="w-4 rounded" style={{ background: 'hsl(var(--chart-income))', height: 2 }} />
             Ingresos
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <div className="w-4 h-px rounded" style={{ background: '#ef4444', height: 2 }} />
+            <div className="w-4 rounded" style={{ background: 'hsl(var(--chart-expense))', height: 2 }} />
             Egresos
           </div>
         </div>
@@ -87,12 +87,12 @@ export function MonthlyEvolutionChart({ data }: { data: DataPoint[] }) {
         <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -8, bottom: 0 }}>
           <defs>
             <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.15} />
-              <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+              <stop offset="0%" stopColor="hsl(var(--chart-income))" stopOpacity={0.15} />
+              <stop offset="100%" stopColor="hsl(var(--chart-income))" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ef4444" stopOpacity={0.15} />
-              <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+              <stop offset="0%" stopColor="hsl(var(--chart-expense))" stopOpacity={0.15} />
+              <stop offset="100%" stopColor="hsl(var(--chart-expense))" stopOpacity={0} />
             </linearGradient>
           </defs>
 
@@ -123,21 +123,21 @@ export function MonthlyEvolutionChart({ data }: { data: DataPoint[] }) {
             type="monotone"
             dataKey="income"
             name="Ingresos"
-            stroke="#3b82f6"
+            stroke="hsl(var(--chart-income))"
             strokeWidth={1.5}
             fill="url(#incomeGrad)"
             dot={false}
-            activeDot={{ r: 3, fill: '#3b82f6', strokeWidth: 0 }}
+            activeDot={{ r: 3, fill: 'hsl(var(--chart-income))', strokeWidth: 0 }}
           />
           <Area
             type="monotone"
             dataKey="expense"
             name="Egresos"
-            stroke="#ef4444"
+            stroke="hsl(var(--chart-expense))"
             strokeWidth={1.5}
             fill="url(#expenseGrad)"
             dot={false}
-            activeDot={{ r: 3, fill: '#ef4444', strokeWidth: 0 }}
+            activeDot={{ r: 3, fill: 'hsl(var(--chart-expense))', strokeWidth: 0 }}
           />
         </AreaChart>
       </ResponsiveContainer>

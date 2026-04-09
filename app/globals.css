@@ -35,6 +35,12 @@
     --accent-danger: 359 100% 65%;
     --accent-warning: 37 91% 55%;
     --accent-blue: 217 91% 60%;
+    --accent-cyan: 187 72% 53%;
+
+    /* Chart palette (hex-ready via hsl) */
+    --chart-income: 217 91% 60%;
+    --chart-expense: 0 76% 58%;
+    --chart-green: 142 71% 45%;
 
     /* Sidebar */
     --sidebar: 215 35% 5%;
@@ -43,45 +49,6 @@
     --sidebar-active-foreground: 0 0% 100%;
   }
 
-  .dark {
-    --background: 215 30% 6%;
-    --foreground: 216 33% 97%;
-    --card: 214 23% 11%;
-    --card-foreground: 216 33% 97%;
-    --popover: 214 23% 11%;
-    --popover-foreground: 216 33% 97%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 215 27% 9%;
-    --secondary-foreground: 212 12% 65%;
-    --muted: 215 27% 9%;
-    --muted-foreground: 220 4% 46%;
-    --accent: 215 27% 9%;
-    --accent-foreground: 216 33% 97%;
-    --destructive: 359 100% 65%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 215 20% 14%;
-    --input: 215 18% 15%;
-    --ring: 217 91% 60%;
-    --radius: 1rem;
-    --chart-1: 217 91% 60%;
-    --chart-2: 160 76% 51%;
-    --chart-3: 37 91% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-
-    /* Semantic accent tokens */
-    --accent-positive: 160 76% 51%;
-    --accent-danger: 359 100% 65%;
-    --accent-warning: 37 91% 55%;
-    --accent-blue: 217 91% 60%;
-
-    /* Sidebar */
-    --sidebar: 215 35% 5%;
-    --sidebar-foreground: 220 4% 46%;
-    --sidebar-active: 217 91% 60%;
-    --sidebar-active-foreground: 0 0% 100%;
-  }
 }
 
 @layer base {
@@ -92,6 +59,47 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Custom range slider */
+input[type=range].slider-premium {
+  -webkit-appearance: none;
+  background: transparent;
+}
+input[type=range].slider-premium::-webkit-slider-runnable-track {
+  height: 6px;
+  cursor: pointer;
+  background: hsl(var(--muted));
+  border-radius: 999px;
+}
+input[type=range].slider-premium::-webkit-slider-thumb {
+  height: 24px;
+  width: 24px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  -webkit-appearance: none;
+  margin-top: -9px;
+  box-shadow: 0 0 0 5px hsla(var(--primary) / 0.2), inset 0 0 0 2px hsl(var(--primary));
+  transition: box-shadow 0.2s ease;
+}
+input[type=range].slider-premium::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 8px hsla(var(--primary) / 0.3), inset 0 0 0 2px hsl(var(--primary));
+}
+input[type=range].slider-premium::-moz-range-track {
+  height: 6px;
+  cursor: pointer;
+  background: hsl(var(--muted));
+  border-radius: 999px;
+}
+input[type=range].slider-premium::-moz-range-thumb {
+  height: 24px;
+  width: 24px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: 2px solid hsl(var(--primary));
+  box-shadow: 0 0 0 5px hsla(var(--primary) / 0.2);
 }
 
 /* Premium dark card shadows */

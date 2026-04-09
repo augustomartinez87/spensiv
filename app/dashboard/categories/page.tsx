@@ -184,7 +184,7 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">Categorias</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Categorias</h1>
           <p className="text-muted-foreground mt-1">
             Administra categorias y subcategorias de egresos
           </p>

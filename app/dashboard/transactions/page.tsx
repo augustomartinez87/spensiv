@@ -9,6 +9,7 @@ import { IncomeList } from '@/components/transactions/income-list'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn, formatCurrency } from '@/lib/utils'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { LayoutGrid, Table, Download, Search } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -141,7 +142,7 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Movimientos</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Movimientos</h1>
           <p className="text-muted-foreground">
             Registra y administra tus gastos e ingresos
           </p>
@@ -184,30 +185,14 @@ export default function TransactionsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
-        <button
-          onClick={() => setActiveTab('gastos')}
-          className={cn(
-            "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-            activeTab === 'gastos'
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Gastos
-        </button>
-        <button
-          onClick={() => setActiveTab('ingresos')}
-          className={cn(
-            "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-            activeTab === 'ingresos'
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Ingresos
-        </button>
-      </div>
+      <SegmentedControl
+        options={[
+          { value: 'gastos', label: 'Gastos' },
+          { value: 'ingresos', label: 'Ingresos' },
+        ]}
+        value={activeTab}
+        onValueChange={setActiveTab}
+      />
 
       {/* Filtros - solo mostrar en pestaña de gastos */}
       {activeTab === 'gastos' && (

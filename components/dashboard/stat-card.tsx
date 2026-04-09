@@ -52,104 +52,103 @@ export function StatCard({
 
     const hasPreviousData = previousValue !== undefined && previousValue !== 0
 
-    const sparkColor = type === 'expense' ? '#e54352' : '#22c55e'
+    const sparkColor = type === 'expense'
+        ? 'hsl(var(--accent-danger))'
+        : 'hsl(var(--accent-positive))'
     const sparkPoints = (sparklineData ?? []).map((v, i) => ({ v, i }))
 
+    // Badge color logic: expenses up = bad, income up = good
+    const isVariationGood = type === 'expense'
+        ? variation !== null && variation <= 0
+        : variation !== null && variation >= 0
+
     return (
-        <Card className="hover:shadow-md h-full min-h-[160px]">
-            <CardContent className="p-5 flex flex-col h-full">
-                {/* Fila 1: título + badge */}
+        <Card className="hover:shadow-md h-full min-h-[176px] relative overflow-hidden">
+            <CardContent className="p-5 flex flex-col h-full relative z-10">
+                {/* Row 1: title + badge */}
                 <div className="flex items-start justify-between gap-2">
                     <p className="text-xs font-medium text-muted-foreground leading-snug">{title}</p>
                     {hasPreviousData ? (
                         <span className={cn(
-                            'text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-0.5',
-                            // For expenses: higher spend = bad (red), lower = good (green)
-                            // For income/balance: higher = good (green), lower = bad (red)
-                            type === 'expense'
-                                ? variation !== null && variation > 0
-                                    ? 'bg-[hsl(var(--accent-danger))]/15 text-accent-danger'
-                                    : 'bg-[hsl(var(--accent-positive))]/15 text-accent-positive'
-                                : variation !== null && variation >= 0
-                                    ? 'bg-[hsl(var(--accent-positive))]/15 text-accent-positive'
-                                    : 'bg-[hsl(var(--accent-danger))]/15 text-accent-danger'
+                            'text-xs font-semibold px-2 py-0.5 rounded-md shrink-0 flex items-center gap-0.5 border',
+                            isVariationGood
+                                ? 'bg-accent-positive/10 text-accent-positive border-accent-positive/20'
+                                : 'bg-accent-danger/10 text-accent-danger border-accent-danger/20'
                         )}>
                             {variation !== null && variation > 0 ? '↑' : variation !== null && variation < 0 ? '↓' : ''}{Math.abs(variation ?? 0).toFixed(1)}%
                         </span>
                     ) : (
-                        <span className="text-[10px] font-medium text-muted-foreground/70 bg-muted/50 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                        <span className="text-[10px] font-medium text-muted-foreground/70 bg-muted/50 px-2 py-0.5 rounded-md shrink-0 flex items-center gap-1 border border-border">
                             <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
                             Sin datos previos
                         </span>
                     )}
                 </div>
 
-                {/* Fila 2: valor principal */}
+                {/* Row 2: main value */}
                 <PrivateAmount>
-                    <div className={cn('text-xl sm:text-2xl font-bold tracking-tight break-all mt-2 tabular-nums', valueColor)}>
+                    <div className={cn('text-3xl sm:text-4xl font-bold tracking-tighter break-all mt-3 tabular-nums', valueColor)}>
                         {isBalance && !isPositive && '-'}
-                        ${Math.abs(value).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${Math.abs(value).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </div>
                 </PrivateAmount>
 
-                {/* Sparkline */}
-                {mounted && sparkPoints.length > 1 && (
-                    <div className="h-8 w-full mt-1 -mx-1">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart
-                                data={sparkPoints}
-                                margin={{ top: 2, right: 0, left: 0, bottom: 0 }}
-                            >
-                                <Area
-                                    type="monotone"
-                                    dataKey="v"
-                                    stroke={sparkColor}
-                                    fill={sparkColor}
-                                    fillOpacity={0.08}
-                                    strokeWidth={1.5}
-                                    dot={false}
-                                    isAnimationActive={false}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                )}
-
-                {/* Insights */}
-                <div className="mt-auto pt-2">
+                {/* Row 3: footer insights */}
+                <div className="mt-auto pt-3 border-t border-border/50 flex justify-between items-end">
                     {type === 'expense' && (
-                        <p className="text-[11px] text-muted-foreground leading-tight tabular-nums">
-                            {dailyAverage !== undefined && (
-                                <span>Prom: {fmtAvg(dailyAverage)}/día</span>
-                            )}
+                        <>
+                            <span className="text-[11px] text-muted-foreground tabular-nums">
+                                {dailyAverage !== undefined && <>Prom: <span className="text-foreground font-medium">{fmtAvg(dailyAverage)}/día</span></>}
+                            </span>
                             {count !== undefined && (
-                                <>
-                                    <span className="opacity-40"> · </span>
-                                    <span>{count} {count === 1 ? 'mov.' : 'movs.'}</span>
-                                </>
+                                <span className="text-[11px] text-muted-foreground tabular-nums">
+                                    {count} {count === 1 ? 'mov.' : 'movs.'}
+                                </span>
                             )}
-                        </p>
+                        </>
                     )}
                     {type === 'income' && (
-                        <p className="text-[11px] text-muted-foreground leading-tight tabular-nums">
-                            {count !== undefined && (
-                                <span>{count} {count === 1 ? 'movimiento' : 'movimientos'}</span>
-                            )}
+                        <>
+                            <span className="text-[11px] text-muted-foreground tabular-nums">
+                                {count !== undefined && <>{count} {count === 1 ? 'movimiento' : 'movimientos'}</>}
+                            </span>
                             {nextEstimatedDate && (
-                                <>
-                                    <span className="opacity-40"> · </span>
-                                    <span>Próx: ~{nextEstimatedDate}</span>
-                                </>
+                                <span className="text-[11px] text-muted-foreground tabular-nums">
+                                    Próx: <span className="text-foreground font-medium">~{nextEstimatedDate}</span>
+                                </span>
                             )}
-                        </p>
+                        </>
                     )}
                     {isBalance && (
                         <p className={cn('text-xs font-medium', isPositive ? 'text-accent-positive' : 'text-accent-danger')}>
-                            {isPositive ? 'Superavit' : 'Deficit'}
+                            {isPositive ? 'Superávit' : 'Déficit'}
                         </p>
                     )}
                 </div>
             </CardContent>
+
+            {/* Background sparkline — positioned absolute behind content */}
+            {mounted && sparkPoints.length > 1 && (
+                <div className="absolute bottom-12 left-0 right-0 h-16 opacity-40 pointer-events-none">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart
+                            data={sparkPoints}
+                            margin={{ top: 2, right: 0, left: 0, bottom: 0 }}
+                        >
+                            <Area
+                                type="monotone"
+                                dataKey="v"
+                                stroke={sparkColor}
+                                fill={sparkColor}
+                                fillOpacity={0.15}
+                                strokeWidth={1.5}
+                                dot={false}
+                                isAnimationActive={false}
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
         </Card>
     )
 }

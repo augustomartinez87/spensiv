@@ -43,9 +43,9 @@ export function InsightBanner({ expenseVariation, balance, daysRemaining }: Insi
           </Link>
         </>
       ),
-      borderColor: 'border-l-red-500',
-      bgColor: 'bg-red-500/5',
-      iconColor: 'text-red-400',
+      borderColor: 'border-l-accent-danger',
+      bgColor: 'bg-accent-danger/5',
+      iconColor: 'text-accent-danger',
     }
   }
   // Priority 2 (orange): spending 10%+ above previous month
@@ -57,9 +57,9 @@ export function InsightBanner({ expenseVariation, balance, daysRemaining }: Insi
           Vas gastando <strong>{expenseVariation.toFixed(0)}% más</strong> que el mes pasado. Revisá tus gastos.
         </>
       ),
-      borderColor: 'border-l-orange-500',
-      bgColor: 'bg-orange-500/5',
-      iconColor: 'text-orange-400',
+      borderColor: 'border-l-accent-warning',
+      bgColor: 'bg-accent-warning/5',
+      iconColor: 'text-accent-warning',
     }
   }
   // Priority 3 (green): finishing the month with positive balance
@@ -71,9 +71,9 @@ export function InsightBanner({ expenseVariation, balance, daysRemaining }: Insi
           Buen mes. Vas a cerrar con <strong>{formatCurrency(balance)}</strong> de ahorro.
         </>
       ),
-      borderColor: 'border-l-green-500',
-      bgColor: 'bg-green-500/5',
-      iconColor: 'text-green-400',
+      borderColor: 'border-l-accent-positive',
+      bgColor: 'bg-accent-positive/5',
+      iconColor: 'text-accent-positive',
     }
   }
 

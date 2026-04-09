@@ -361,7 +361,7 @@ export default function SimulatorPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Simulador de Crédito</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Simulador de Crédito</h1>
         <p className="text-muted-foreground mt-1">
           Simulá préstamos amortizados y compara distintos plazos
         </p>

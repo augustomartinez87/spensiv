@@ -54,8 +54,8 @@ export function ProjectionChart({ data }: ProjectionChartProps) {
                     formatter={(val: number) => [formatCurrency(val), '']}
                 />
                 <Legend iconType="circle" />
-                <Bar dataKey="Total" name="Gasto Cuotas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Incomes" name="Ingresos Estimados" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Total" name="Gasto Cuotas" fill="hsl(var(--chart-income))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Incomes" name="Ingresos Estimados" fill="hsl(var(--chart-green))" radius={[4, 4, 0, 0]} />
             </BarChart>
         </ResponsiveContainer>
     )

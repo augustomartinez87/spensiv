@@ -37,7 +37,7 @@ export default function RiskPage() {
     return (
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">Análisis de Riesgo</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Análisis de Riesgo</h1>
           <p className="text-muted-foreground mt-1">Límites, tasas y stress test de tu cartera</p>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
@@ -52,7 +52,7 @@ export default function RiskPage() {
     return (
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">Análisis de Riesgo</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Análisis de Riesgo</h1>
           <p className="text-muted-foreground mt-1">Límites, tasas y stress test de tu cartera</p>
         </div>
         <Card>
@@ -71,7 +71,7 @@ export default function RiskPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground tracking-tight">Análisis de Riesgo</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Análisis de Riesgo</h1>
         <p className="text-muted-foreground mt-1">
           Límites de exposición, tasas break-even y stress test · Plazo promedio: {data.avgTermMonths} meses
         </p>
