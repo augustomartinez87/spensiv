@@ -355,37 +355,23 @@ export class LoanAccountingService {
         }
       }
 
-      // Update current-period installment (dueDate in same month as paymentDate)
+      // Distribute waterfall total FIFO across due installments (overdue first, then current month)
+      // This ensures paying one installment's worth marks one installment as paid,
+      // instead of splitting interest/principal across multiple installments.
       let currentInstNowPaid = false
-      const currentInst = unpaidInstallments.find(
-        (i) => yearMonthKey(new Date(i.dueDate)) === currentInstKey,
-      )
-      if (currentInst && (waterfall.interestCurrentApplied + waterfall.principalApplied) > 0) {
-        const alreadyPaid = Number(currentInst.paidAmount ?? 0)
-        const newTotal = alreadyPaid + waterfall.interestCurrentApplied + waterfall.principalApplied
-        const fullyPaid = newTotal >= Number(currentInst.amount) - CENT_TOLERANCE.toNumber()
-        await tx.loanInstallment.update({
-          where: { id: currentInst.id },
-          data: {
-            paidAmount: { increment: waterfall.interestCurrentApplied + waterfall.principalApplied },
-            ...(fullyPaid ? { isPaid: true, paidAt: paymentDate } : {}),
-          },
-        })
-        if (fullyPaid) currentInstNowPaid = true
-      }
+      let fifoRemaining = money(waterfall.totalApplied)
+      const dueInstallments = [...overdueInstallments, ...currentMonthInstallments]
 
-      // Update paidAmount for overdue installments (past months) — FIFO order
-      let overdueRemaining = money(waterfall.interestOverdueApplied)
-      for (const inst of overdueInstallments) {
-        if (overdueRemaining.lte(CENT_TOLERANCE)) break
+      for (const inst of dueInstallments) {
+        if (fifoRemaining.lte(CENT_TOLERANCE)) break
 
         const alreadyPaid = money(inst.paidAmount ?? 0)
         const instAmount = money(inst.amount)
         const remaining = Decimal.max(instAmount.minus(alreadyPaid), ZERO)
         if (remaining.lte(CENT_TOLERANCE)) continue
 
-        const toApply = Decimal.min(overdueRemaining, remaining)
-        overdueRemaining = overdueRemaining.minus(toApply)
+        const toApply = Decimal.min(fifoRemaining, remaining)
+        fifoRemaining = fifoRemaining.minus(toApply)
 
         const newTotal = alreadyPaid.plus(toApply)
         const fullyPaid = newTotal.gte(instAmount.minus(CENT_TOLERANCE))
@@ -396,6 +382,9 @@ export class LoanAccountingService {
             ...(fullyPaid ? { isPaid: true, paidAt: paymentDate } : {}),
           },
         })
+
+        const isCurrentMonth = yearMonthKey(new Date(inst.dueDate)) === currentInstKey
+        if (isCurrentMonth && fullyPaid) currentInstNowPaid = true
       }
 
       const advancedCount = advancePaid.filter((a) => a.fullyPaid).length
@@ -883,76 +872,36 @@ export class LoanAccountingService {
       select: { flowDate: true, amountSigned: true, component: true },
     })
 
-    // Group by yearMonth of flowDate (interest_current + principal go to their month)
-    const paidByMonth = new Map<string, Decimal>()
-    // interest_overdue flows need to be applied to the oldest unpaid installment, not their flowDate month
-    let totalOverduePaid = ZERO
+    // Sum all payment cashflows into a single pool
+    let totalPaid = ZERO
     for (const flow of cashflows) {
-      const amount = money(flow.amountSigned).abs()
-      if (flow.component === 'interest_overdue') {
-        totalOverduePaid = totalOverduePaid.plus(amount)
-      } else {
-        const key = yearMonthKey(new Date(flow.flowDate))
-        paidByMonth.set(key, (paidByMonth.get(key) ?? ZERO).plus(amount))
-      }
+      totalPaid = totalPaid.plus(money(flow.amountSigned).abs())
     }
 
-    // Match installments by yearMonth of dueDate and update states
+    // Distribute FIFO across installments (oldest first)
+    // This ensures overdue installments get fully paid before current/future ones,
+    // instead of splitting interest/principal across multiple installments.
     const installments = await tx.loanInstallment.findMany({
       where: { loanId },
       select: { id: true, dueDate: true, amount: true },
       orderBy: { number: 'asc' },
     })
 
-    // First pass: apply current-month payments
+    let fifoRemaining = totalPaid
     for (const inst of installments) {
-      const key = yearMonthKey(new Date(inst.dueDate))
-      const paid = paidByMonth.get(key) ?? ZERO
-      if (paid.lte(CENT_TOLERANCE)) continue
+      if (fifoRemaining.lte(CENT_TOLERANCE)) break
       const instAmt = money(inst.amount)
-      const clampedPaid = Decimal.min(paid, instAmt)
-      const fullyPaid = clampedPaid.gte(instAmt.minus(CENT_TOLERANCE))
+      const toApply = Decimal.min(fifoRemaining, instAmt)
+      fifoRemaining = fifoRemaining.minus(toApply)
+      const fullyPaid = toApply.gte(instAmt.minus(CENT_TOLERANCE))
       await tx.loanInstallment.update({
         where: { id: inst.id },
         data: {
-          paidAmount: round2(clampedPaid),
+          paidAmount: round2(toApply),
           isPaid: fullyPaid,
           paidAt: fullyPaid ? new Date() : null,
         },
       })
-      // Reduce available amount in map so it doesn't double-count
-      paidByMonth.set(key, paid.minus(clampedPaid))
-    }
-
-    // Second pass: distribute overdue interest payments to oldest unpaid installments (FIFO)
-    if (totalOverduePaid.gt(CENT_TOLERANCE)) {
-      const updatedInstallments = await tx.loanInstallment.findMany({
-        where: { loanId, isPaid: false },
-        select: { id: true, dueDate: true, amount: true, paidAmount: true },
-        orderBy: { number: 'asc' },
-      })
-
-      let overdueRemaining = totalOverduePaid
-      for (const inst of updatedInstallments) {
-        if (overdueRemaining.lte(CENT_TOLERANCE)) break
-        const alreadyPaid = money(inst.paidAmount ?? 0)
-        const instAmt = money(inst.amount)
-        const remaining = Decimal.max(instAmt.minus(alreadyPaid), ZERO)
-        if (remaining.lte(CENT_TOLERANCE)) continue
-
-        const toApply = Decimal.min(overdueRemaining, remaining)
-        overdueRemaining = overdueRemaining.minus(toApply)
-        const newTotal = alreadyPaid.plus(toApply)
-        const fullyPaid = newTotal.gte(instAmt.minus(CENT_TOLERANCE))
-        await tx.loanInstallment.update({
-          where: { id: inst.id },
-          data: {
-            paidAmount: round2(newTotal),
-            isPaid: fullyPaid,
-            paidAt: fullyPaid ? new Date() : null,
-          },
-        })
-      }
     }
 
     // Third pass: apply waivers by flowDate month (mark as fully paid)
