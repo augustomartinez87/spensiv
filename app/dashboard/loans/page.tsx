@@ -201,6 +201,10 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
       utils.loans.list.invalidate()
       utils.loans.getDashboardMetrics.invalidate()
       setConfirmComplete(false)
+      toast({ title: 'Préstamo completado' })
+    },
+    onError: (err) => {
+      toast({ title: 'Error al completar', description: err.message, variant: 'destructive' })
     },
   })
 
@@ -697,6 +701,36 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
             <RefreshCw className={cn("h-4 w-4 mr-2", recalculateMutation.isPending && "animate-spin")} />
             Recalcular
           </Button>
+        </div>
+      )}
+
+      {/* Amortized loan fully paid but not auto-completed */}
+      {!isInterestOnly && !isZeroRateAmortized && loan.status === 'active' && unpaidCount === 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 text-sm text-green-400">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>Todas las cuotas están pagas.</span>
+          </div>
+          {confirmComplete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Confirmar cierre?</span>
+              <Button
+                size="sm"
+                onClick={() => completeMutation.mutate({ loanId })}
+                disabled={completeMutation.isPending}
+              >
+                {completeMutation.isPending ? 'Completando...' : 'Si, completar'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConfirmComplete(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" onClick={() => setConfirmComplete(true)}>
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Completar préstamo
+            </Button>
+          )}
         </div>
       )}
 
