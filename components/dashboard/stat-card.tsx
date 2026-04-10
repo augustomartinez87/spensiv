@@ -16,6 +16,7 @@ interface StatCardProps {
     dailyAverage?: number
     nextEstimatedDate?: string
     sparklineData?: number[]
+    accentBorder?: string
 }
 
 function fmtAvg(n: number): string {
@@ -33,6 +34,7 @@ export function StatCard({
     dailyAverage,
     nextEstimatedDate,
     sparklineData,
+    accentBorder,
 }: StatCardProps) {
     const [mounted, setMounted] = useState(false)
     useEffect(() => setMounted(true), [])
@@ -74,7 +76,7 @@ export function StatCard({
     }
 
     return (
-        <Card className="hover:shadow-md h-full min-h-[176px] relative overflow-hidden">
+        <Card className={cn("hover:shadow-md h-full min-h-[176px] relative overflow-hidden", accentBorder && `border-l-[3px] ${accentBorder}`)}>
             <CardContent className="p-5 flex flex-col h-full relative z-10">
                 {/* Row 1: title + badge */}
                 <div className="flex items-start justify-between gap-2">

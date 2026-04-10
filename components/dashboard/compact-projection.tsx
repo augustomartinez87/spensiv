@@ -11,12 +11,14 @@ interface CompactProjectionProps {
   balance: number
   totalIncome: number
   totalExpense: number
+  accentBorder?: string
 }
 
 export function CompactProjection({
   balance,
   totalIncome,
   totalExpense,
+  accentBorder,
 }: CompactProjectionProps) {
   const budgetStatus = getBudgetStatus(balance, totalIncome, totalExpense, formatCurrency)
   const daysRemaining = daysRemainingInMonth()
@@ -24,7 +26,7 @@ export function CompactProjection({
   const balanceColor = balance >= 0 ? 'text-accent-positive' : 'text-accent-danger'
 
   return (
-    <Card className="overflow-hidden h-full min-h-[140px] hover:shadow-md">
+    <Card className={cn("overflow-hidden h-full min-h-[140px] hover:shadow-md", accentBorder && `border-l-[3px] ${accentBorder}`)}>
       <CardContent className="p-5 flex flex-col h-full">
         <div className="flex items-start justify-between gap-2">
           <p className="text-xs font-medium text-muted-foreground leading-snug">

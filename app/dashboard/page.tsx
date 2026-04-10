@@ -41,6 +41,11 @@ import {
   AlertCircle,
   ArrowRight,
   TrendingUp,
+  ChevronUp,
+  ChevronDown,
+  CreditCard as CreditCardIcon,
+  ArrowLeftRight,
+  Banknote,
 } from 'lucide-react'
 import { getCategoryIconInfo } from '@/lib/categories/category-icons'
 import Link from 'next/link'
@@ -89,9 +94,8 @@ function getCategoryBadgeClass(category: string): string {
 
 export default function DashboardPage() {
   const now = new Date()
-  const [period, setPeriod] = useState(
-    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  )
+  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const [period, setPeriod] = useState(currentPeriod)
 
   const previousPeriod = getPreviousPeriod(period)
   const { mode, setMode, mepRate, setMepRate, convert, symbol } = useCurrency()
@@ -146,7 +150,7 @@ export default function DashboardPage() {
   // ── Métricas derivadas para hero cards ──────────────────────────────
   const [periodYear, periodMonth] = period.split('-').map(Number)
   const daysElapsed =
-    period === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    period === currentPeriod
       ? now.getDate()
       : new Date(periodYear, periodMonth, 0).getDate()
   const dailyExpenseAverage = daysElapsed > 0 ? balance.totalExpense / daysElapsed : 0
@@ -165,8 +169,7 @@ export default function DashboardPage() {
   const expenseSparkline = evolutionData?.map((d) => d.expense) ?? []
   const incomeSparkline = evolutionData?.map((d) => d.income) ?? []
 
-  const isCurrentPeriod =
-    period === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const isCurrentPeriod = period === currentPeriod
   const daysInMonth = new Date(periodYear, periodMonth, 0).getDate()
   const daysRemaining = daysInMonth - now.getDate()
   const expenseVariation =
@@ -211,6 +214,7 @@ export default function DashboardPage() {
           previousValue={prevBalance ? convert(prevBalance.expense) : undefined}
           dailyAverage={convert(dailyExpenseAverage)}
           sparklineData={expenseSparkline}
+          accentBorder="border-l-red-500"
         />
         <StatCard
           title="Ingresos del mes"
@@ -220,11 +224,13 @@ export default function DashboardPage() {
           previousValue={prevBalance ? convert(prevBalance.income) : undefined}
           nextEstimatedDate={nextIncomeEstimate}
           sparklineData={incomeSparkline}
+          accentBorder="border-l-emerald-500"
         />
         <CompactProjection
           balance={convert(balance.balance)}
           totalIncome={convert(balance.totalIncome)}
           totalExpense={convert(balance.totalExpense)}
+          accentBorder="border-l-amber-500"
         />
         {/* Tasa de ahorro */}
         {(() => {
@@ -233,7 +239,7 @@ export default function DashboardPage() {
           const savingsRate = totalInc > 0 ? (1 - totalExp / totalInc) * 100 : 0
           const savingsColor = savingsRate > 20 ? 'text-green-400' : savingsRate >= 5 ? 'text-amber-400' : 'text-red-400'
           return (
-            <Card className="hover:shadow-md h-full min-h-[140px] relative overflow-hidden">
+            <Card className="hover:shadow-md h-full min-h-[140px] relative overflow-hidden border-l-[3px] border-l-sky-500">
               <CardContent className="p-5 flex flex-col h-full">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-xs font-medium text-muted-foreground leading-snug">Tasa de ahorro</p>
@@ -281,13 +287,21 @@ export default function DashboardPage() {
             emptyMessage="Sin egresos registrados"
             convert={convert}
           />
-          <CategoryDonut
-            title="De dónde viene la plata"
-            data={balance.aggregations.incomesByCategory}
-            total={balance.totalIncome}
-            emptyMessage="Sin ingresos registrados"
-            convert={convert}
-          />
+          {Object.keys(balance.aggregations.incomesByCategory).length > 1 ? (
+            <CategoryDonut
+              title="De dónde viene la plata"
+              data={balance.aggregations.incomesByCategory}
+              total={balance.totalIncome}
+              emptyMessage="Sin ingresos registrados"
+              convert={convert}
+            />
+          ) : (
+            <PaymentMethodSummary
+              installments={balance.installments}
+              cashTransactions={balance.cashTransactions || []}
+              convert={convert}
+            />
+          )}
         </div>
       </div>
 
@@ -390,6 +404,122 @@ interface UnifiedMovement {
   type: 'expense' | 'income'
 }
 
+// ── Payment Method Summary ───────────────────────────────────────────
+
+function getMethodIcon(method: string) {
+  const lower = method.toLowerCase()
+  if (lower.includes('efectivo') || lower.includes('cash')) return Banknote
+  if (lower.includes('transferencia') || lower.includes('transfer')) return ArrowLeftRight
+  return CreditCardIcon
+}
+
+function PaymentMethodSummary({
+  installments,
+  cashTransactions,
+  convert,
+}: {
+  installments: any[]
+  cashTransactions: any[]
+  convert: (v: number) => number
+}) {
+  const methodTotals: Record<string, number> = {}
+
+  for (const inst of installments) {
+    const method = inst.transaction.card?.name || 'Tarjeta'
+    methodTotals[method] = (methodTotals[method] || 0) + Number(inst.amount)
+  }
+  for (const tx of cashTransactions) {
+    const method = tx.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia'
+    methodTotals[method] = (methodTotals[method] || 0) + Number(tx.totalAmount)
+  }
+
+  const sorted = Object.entries(methodTotals)
+    .map(([name, amount]) => ({ name, amount: convert(amount) }))
+    .sort((a, b) => b.amount - a.amount)
+
+  const maxAmount = sorted.length > 0 ? sorted[0].amount : 1
+
+  return (
+    <Card className="flex flex-col h-full min-h-[220px]">
+      <CardHeader className="py-2.5 px-4">
+        <CardTitle className="text-sm font-semibold">Gasto por medio de pago</CardTitle>
+      </CardHeader>
+      <CardContent className="px-4 pt-0 pb-4 flex flex-col flex-1">
+        {sorted.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic text-center py-8">
+            Sin gastos registrados
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {sorted.map((item) => {
+              const Icon = getMethodIcon(item.name)
+              const percentage = maxAmount > 0 ? (item.amount / maxAmount) * 100 : 0
+              return (
+                <div key={item.name} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-foreground truncate">{item.name}</span>
+                    </div>
+                    <PrivateAmount>
+                      <span className="text-sm font-semibold text-foreground tabular-nums shrink-0">
+                        {formatCurrency(item.amount)}
+                      </span>
+                    </PrivateAmount>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── Unified Recent Movements ──────────────────────────────────────────
+
+type SortField = 'date' | 'description' | 'method' | 'amount'
+type SortDirection = 'asc' | 'desc'
+
+function SortHeader({
+  label,
+  field,
+  currentField,
+  currentDirection,
+  onSort,
+  className,
+}: {
+  label: string
+  field: SortField
+  currentField: SortField
+  currentDirection: SortDirection
+  onSort: (field: SortField) => void
+  className?: string
+}) {
+  const isActive = currentField === field
+  return (
+    <th
+      className={cn(
+        'text-xs font-medium uppercase tracking-wider text-gray-400 cursor-pointer select-none hover:text-gray-200 transition-colors py-3 px-4',
+        className
+      )}
+      onClick={() => onSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {isActive && (currentDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+      </span>
+    </th>
+  )
+}
+
 function UnifiedRecentMovements({
   installments,
   cashTransactions,
@@ -400,7 +530,18 @@ function UnifiedRecentMovements({
   incomes: any[]
 }) {
   const [filter, setFilter] = useState<'both' | 'expense' | 'income'>('both')
+  const [sortField, setSortField] = useState<SortField>('date')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const { convert } = useCurrency()
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection(field === 'date' ? 'desc' : 'asc')
+    }
+  }
 
   const allMovements: UnifiedMovement[] = [
     ...installments.map((inst) => ({
@@ -438,7 +579,21 @@ function UnifiedRecentMovements({
     })),
   ]
     .filter((m) => filter === 'both' || m.type === filter)
-    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .sort((a, b) => {
+      const dir = sortDirection === 'asc' ? 1 : -1
+      switch (sortField) {
+        case 'date':
+          return (a.date.getTime() - b.date.getTime()) * dir
+        case 'description':
+          return a.description.localeCompare(b.description) * dir
+        case 'method':
+          return a.method.localeCompare(b.method) * dir
+        case 'amount':
+          return (a.amount - b.amount) * dir
+        default:
+          return 0
+      }
+    })
 
   const display = allMovements.slice(0, 10)
 
@@ -477,65 +632,123 @@ function UnifiedRecentMovements({
             </p>
           </div>
         ) : (
-          <div>
-            {display.map((m, idx) => {
-              const catInfo = getCategoryIconInfo(m.category)
-              const CatIcon = catInfo.icon
-              const isIncome = m.type === 'income'
-              const isLast = idx === display.length - 1
-              const badgeClass = getCategoryBadgeClass(m.category)
-              return (
-                <div
-                  key={m.id}
-                  className={cn(
-                    'group flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors cursor-default',
-                    !isLast && 'border-b border-white/5'
-                  )}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="h-9 w-9 rounded-full flex items-center justify-center shrink-0 border transition-transform group-hover:scale-110"
-                      style={{
-                        backgroundColor: `${catInfo.color}10`,
-                        borderColor: `${catInfo.color}25`,
-                      }}
-                    >
-                      <CatIcon
-                        className="h-4 w-4"
-                        style={{ color: catInfo.color }}
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm text-foreground truncate leading-tight group-hover:text-foreground/90">
-                          {m.description}
-                        </p>
-                        <span className={cn('text-[10px] rounded-full px-2 py-0.5 shrink-0', badgeClass)}>
-                          {m.category}
-                        </span>
+          <>
+            {/* Desktop: sortable table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/5">
+                    <SortHeader label="Descripción" field="description" currentField={sortField} currentDirection={sortDirection} onSort={handleSort} className="text-left" />
+                    <SortHeader label="Fecha" field="date" currentField={sortField} currentDirection={sortDirection} onSort={handleSort} className="text-left" />
+                    <SortHeader label="Medio de pago" field="method" currentField={sortField} currentDirection={sortDirection} onSort={handleSort} className="text-left" />
+                    <SortHeader label="Monto" field="amount" currentField={sortField} currentDirection={sortDirection} onSort={handleSort} className="text-right" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {display.map((m) => {
+                    const catInfo = getCategoryIconInfo(m.category)
+                    const CatIcon = catInfo.icon
+                    const isIncome = m.type === 'income'
+                    const badgeClass = getCategoryBadgeClass(m.category)
+                    return (
+                      <tr
+                        key={m.id}
+                        className="border-b border-white/5 last:border-b-0 hover:bg-white/5 transition-colors"
+                      >
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border"
+                              style={{
+                                backgroundColor: `${catInfo.color}10`,
+                                borderColor: `${catInfo.color}25`,
+                              }}
+                            >
+                              <CatIcon className="h-3.5 w-3.5" style={{ color: catInfo.color }} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm text-foreground truncate">{m.description}</p>
+                              <span className={cn('text-[10px] rounded-full px-2 py-0.5 inline-block mt-0.5', badgeClass)}>
+                                {m.category}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-sm text-muted-foreground whitespace-nowrap">
+                          {format(m.date, 'd MMM yyyy', { locale: es })}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-muted-foreground">
+                          {m.method}
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <PrivateAmount>
+                            <p className={cn('font-semibold text-sm tabular-nums tracking-tight', isIncome ? 'text-green-400' : 'text-red-400')}>
+                              {isIncome ? '+' : '-'}{formatCurrency(convert(m.amount))}
+                            </p>
+                          </PrivateAmount>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: list layout */}
+            <div className="md:hidden">
+              {display.map((m, idx) => {
+                const catInfo = getCategoryIconInfo(m.category)
+                const CatIcon = catInfo.icon
+                const isIncome = m.type === 'income'
+                const isLast = idx === display.length - 1
+                const badgeClass = getCategoryBadgeClass(m.category)
+                return (
+                  <div
+                    key={m.id}
+                    className={cn(
+                      'group flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors cursor-default',
+                      !isLast && 'border-b border-white/5'
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="h-9 w-9 rounded-full flex items-center justify-center shrink-0 border transition-transform group-hover:scale-110"
+                        style={{
+                          backgroundColor: `${catInfo.color}10`,
+                          borderColor: `${catInfo.color}25`,
+                        }}
+                      >
+                        <CatIcon className="h-4 w-4" style={{ color: catInfo.color }} />
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {format(m.date, 'd MMM', { locale: es })}
-                        {' · '}
-                        {m.method}
-                      </p>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm text-foreground truncate leading-tight group-hover:text-foreground/90">
+                            {m.description}
+                          </p>
+                          <span className={cn('text-[10px] rounded-full px-2 py-0.5 shrink-0', badgeClass)}>
+                            {m.category}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {format(m.date, 'd MMM', { locale: es })} · {m.method}
+                        </p>
+                      </div>
                     </div>
+                    <PrivateAmount>
+                      <p
+                        className={cn(
+                          'font-semibold text-sm shrink-0 ml-3 tabular-nums tracking-tight',
+                          isIncome ? 'text-green-400' : 'text-red-400'
+                        )}
+                      >
+                        {isIncome ? '+' : '-'}{formatCurrency(convert(m.amount))}
+                      </p>
+                    </PrivateAmount>
                   </div>
-                  <PrivateAmount>
-                    <p
-                      className={cn(
-                        'font-semibold text-sm shrink-0 ml-3 tabular-nums tracking-tight',
-                        isIncome ? 'text-green-400' : 'text-red-400'
-                      )}
-                    >
-                      {isIncome ? '+' : '-'}
-                      {formatCurrency(convert(m.amount))}
-                    </p>
-                  </PrivateAmount>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          </>
         )}
       </CardContent>
     </Card>
