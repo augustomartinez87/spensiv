@@ -27,25 +27,23 @@ export function InsightBanner({ expenseVariation, balance, daysRemaining }: Insi
     iconColor: string
   } | null = null
 
-  // Priority 1 (red): overdue loan installments
+  // Priority 1 (amber): overdue loan installments — prominent alert
   if (loansData && loansData.overdueCount > 0) {
     config = {
       icon: AlertTriangle,
       message: (
         <>
-          Tenés{' '}
-          <strong>
-            {loansData.overdueCount} cuota{loansData.overdueCount !== 1 ? 's' : ''} vencida{loansData.overdueCount !== 1 ? 's' : ''}
-          </strong>{' '}
-          por <strong>{formatCurrency(loansData.overdueAmount)}</strong>.{' '}
-          <Link href="/dashboard/loans" className="underline hover:no-underline font-medium">
+          <span className="font-semibold">
+            Tenés {loansData.overdueCount} cuota{loansData.overdueCount !== 1 ? 's' : ''} vencida{loansData.overdueCount !== 1 ? 's' : ''} · {formatCurrency(loansData.overdueAmount)} pendiente
+          </span>{' '}
+          <Link href="/dashboard/loans" className="text-amber-400 underline hover:no-underline font-medium">
             Revisá tu cartera →
           </Link>
         </>
       ),
-      borderColor: 'border-l-accent-danger',
-      bgColor: 'bg-accent-danger/5',
-      iconColor: 'text-accent-danger',
+      borderColor: 'border-l-amber-500',
+      bgColor: 'bg-amber-500/10',
+      iconColor: 'text-amber-400',
     }
   }
   // Priority 2 (orange): spending 10%+ above previous month
@@ -84,7 +82,7 @@ export function InsightBanner({ expenseVariation, balance, daysRemaining }: Insi
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-border/40 border-l-4',
+        'flex items-center justify-between gap-3 px-4 py-4 rounded-lg border border-border/40 border-l-4',
         config.borderColor,
         config.bgColor
       )}

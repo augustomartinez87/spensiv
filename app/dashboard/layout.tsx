@@ -161,14 +161,17 @@ function DashboardLayoutInner({
         {/* Nav Links */}
         <nav className={cn("flex-1 py-4 overflow-y-auto transition-all duration-300", sidebarCollapsed ? "px-2" : "px-3")}>
           {visibleNavigation.map((section, sectionIdx) => (
-            <div key={section.label} className={cn(sectionIdx > 0 && "mt-5")}>
+            <div key={section.label} className={cn(sectionIdx > 0 && "mt-7")}>
+              {!sidebarCollapsed && sectionIdx > 0 && (
+                <div className="mx-3 mb-3 border-t border-border/30" />
+              )}
               {!sidebarCollapsed && (
-                <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-[hsl(var(--sidebar-foreground))]/50">
+                <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
                   {section.label}
                 </p>
               )}
               {sidebarCollapsed && sectionIdx > 0 && (
-                <div className="mx-auto mb-2 w-6 border-t border-white/[0.08]" />
+                <div className="mx-auto mb-3 w-6 border-t border-white/[0.08]" />
               )}
               <div className="space-y-0.5">
                 {section.items.map((item) => {

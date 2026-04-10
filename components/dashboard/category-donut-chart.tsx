@@ -19,15 +19,15 @@ export function CategoryDonutChart({ data, total, formatHero }: CategoryDonutCha
   return (
     <div className="flex items-center gap-5 flex-1">
       {/* Donut chart */}
-      <div className="relative shrink-0" style={{ width: 110, height: 110 }}>
+      <div className="relative shrink-0" style={{ width: 170, height: 170 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={35}
-              outerRadius={52}
+              innerRadius={60}
+              outerRadius={85}
               paddingAngle={2}
               dataKey="value"
               stroke="none"
@@ -41,7 +41,7 @@ export function CategoryDonutChart({ data, total, formatHero }: CategoryDonutCha
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">Total</span>
           <PrivateAmount>
-            <span className="text-sm font-bold text-foreground tabular-nums">
+            <span className="text-xl font-bold text-foreground tabular-nums">
               {formatHero(total)}
             </span>
           </PrivateAmount>
@@ -49,11 +49,11 @@ export function CategoryDonutChart({ data, total, formatHero }: CategoryDonutCha
       </div>
 
       {/* Legend — right side */}
-      <div className="flex-1 flex flex-col gap-2">
+      <div className="flex-1 flex flex-col gap-2 pl-2">
         {data.map(({ name, value, color }) => {
           const pct = total > 0 ? (value / total) * 100 : 0
           return (
-            <div key={name} className="flex items-center justify-between text-xs hover:bg-muted/50 py-0.5 px-1 -mx-1 rounded transition-colors">
+            <div key={name} className="flex items-center justify-between text-xs hover:bg-muted/50 py-1 px-1.5 -mx-1 rounded transition-colors">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }} />
                 <span className="text-foreground truncate">{name}</span>

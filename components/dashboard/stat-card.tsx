@@ -57,10 +57,21 @@ export function StatCard({
         : 'hsl(var(--accent-positive))'
     const sparkPoints = (sparklineData ?? []).map((v, i) => ({ v, i }))
 
-    // Badge color logic: expenses up = bad, income up = good
-    const isVariationGood = type === 'expense'
-        ? variation !== null && variation <= 0
-        : variation !== null && variation >= 0
+    // Badge color logic: semantic colors based on what's good/bad for the user
+    // Expenses down = good (green), Expenses up = bad (red)
+    // Income up = good (green), Income down = warning (amber)
+    const getBadgeColors = () => {
+        if (variation === null) return ''
+        if (type === 'expense') {
+            return variation <= 0
+                ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                : 'bg-red-500/20 text-red-400 border-red-500/30'
+        }
+        // income
+        return variation >= 0
+            ? 'bg-green-500/20 text-green-400 border-green-500/30'
+            : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+    }
 
     return (
         <Card className="hover:shadow-md h-full min-h-[176px] relative overflow-hidden">
@@ -71,9 +82,7 @@ export function StatCard({
                     {hasPreviousData ? (
                         <span className={cn(
                             'text-xs font-semibold px-2 py-0.5 rounded-md shrink-0 flex items-center gap-0.5 border',
-                            isVariationGood
-                                ? 'bg-accent-positive/10 text-accent-positive border-accent-positive/20'
-                                : 'bg-accent-danger/10 text-accent-danger border-accent-danger/20'
+                            getBadgeColors()
                         )}>
                             {variation !== null && variation > 0 ? '↑' : variation !== null && variation < 0 ? '↓' : ''}{Math.abs(variation ?? 0).toFixed(1)}%
                         </span>
