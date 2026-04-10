@@ -87,12 +87,12 @@ export function MonthlyEvolutionChart({ data }: { data: DataPoint[] }) {
         <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -8, bottom: 0 }}>
           <defs>
             <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="hsl(var(--chart-income))" stopOpacity={0.15} />
-              <stop offset="100%" stopColor="hsl(var(--chart-income))" stopOpacity={0} />
+              <stop offset="0%" stopColor="rgba(59,130,246,0.3)" stopOpacity={1} />
+              <stop offset="100%" stopColor="rgba(59,130,246,0)" stopOpacity={1} />
             </linearGradient>
             <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="hsl(var(--chart-expense))" stopOpacity={0.15} />
-              <stop offset="100%" stopColor="hsl(var(--chart-expense))" stopOpacity={0} />
+              <stop offset="0%" stopColor="rgba(239,68,68,0.3)" stopOpacity={1} />
+              <stop offset="100%" stopColor="rgba(239,68,68,0)" stopOpacity={1} />
             </linearGradient>
           </defs>
 

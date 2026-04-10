@@ -19,15 +19,15 @@ export function CategoryDonutChart({ data, total, formatHero }: CategoryDonutCha
   return (
     <div className="flex items-center gap-5 flex-1">
       {/* Donut chart */}
-      <div className="relative shrink-0" style={{ width: 170, height: 170 }}>
+      <div className="relative shrink-0" style={{ width: 160, height: 160 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={60}
-              outerRadius={85}
+              innerRadius={55}
+              outerRadius={80}
               paddingAngle={2}
               dataKey="value"
               stroke="none"

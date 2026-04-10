@@ -40,6 +40,7 @@ import { useCurrency } from '@/lib/contexts/currency-context'
 import {
   AlertCircle,
   ArrowRight,
+  TrendingUp,
 } from 'lucide-react'
 import { getCategoryIconInfo } from '@/lib/categories/category-icons'
 import Link from 'next/link'
@@ -61,6 +62,27 @@ function formatHero(value: number): string {
   if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`
   if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
   return formatCurrency(value)
+}
+
+const CATEGORY_BADGE_CLASSES: Record<string, string> = {
+  'Educación': 'bg-purple-500/20 text-purple-400',
+  'Educacion': 'bg-purple-500/20 text-purple-400',
+  'Lujos': 'bg-pink-500/20 text-pink-400',
+  'Gastos Fijos': 'bg-slate-500/20 text-slate-400',
+  'Servicios': 'bg-blue-500/20 text-blue-400',
+  'Transporte': 'bg-cyan-500/20 text-cyan-400',
+  'Salud': 'bg-yellow-500/20 text-yellow-400',
+  'Comida': 'bg-orange-500/20 text-orange-400',
+  'Compras': 'bg-amber-500/20 text-amber-400',
+  'Deudas': 'bg-red-500/20 text-red-400',
+  'Inversiones': 'bg-teal-500/20 text-teal-400',
+  'Ingresos Activos': 'bg-green-500/20 text-green-400',
+  'Ingresos Pasivos': 'bg-emerald-500/20 text-emerald-400',
+  'Ingresos': 'bg-green-500/20 text-green-400',
+}
+
+function getCategoryBadgeClass(category: string): string {
+  return CATEGORY_BADGE_CLASSES[category] || 'bg-zinc-500/20 text-zinc-400'
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────
@@ -179,60 +201,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── HERO CARD: Balance Neto del Mes ── */}
-      {(() => {
-        const netBalance = convert(balance.balance)
-        const totalInc = convert(balance.totalIncome)
-        const totalExp = convert(balance.totalExpense)
-        const expPct = totalInc > 0 ? Math.min((totalExp / totalInc) * 100, 100) : 0
-        const isNet = netBalance >= 0
-        return (
-          <div className={cn(
-            'rounded-xl border p-5',
-            isNet
-              ? 'bg-gradient-to-r from-green-950/40 to-transparent border-green-800/30'
-              : 'bg-gradient-to-r from-red-950/40 to-transparent border-red-800/30'
-          )}>
-            <p className="text-sm text-muted-foreground">Balance Neto del Mes</p>
-            <PrivateAmount>
-              <p className={cn(
-                'text-4xl font-bold tracking-tight tabular-nums mt-1',
-                isNet ? 'text-green-400' : 'text-red-400'
-              )}>
-                {isNet ? '' : '-'}${Math.abs(netBalance).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </p>
-            </PrivateAmount>
-            <p className="text-xs text-muted-foreground mt-1">
-              {isCurrentPeriod ? `${daysRemaining} días restantes` : 'Período cerrado'}
-            </p>
-            <div className="mt-3">
-              <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-                <span>Gastos</span>
-                <span>{expPct.toFixed(0)}% de ingresos</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                <div
-                  className={cn(
-                    'h-full rounded-full transition-all',
-                    expPct > 90 ? 'bg-red-500' : expPct > 70 ? 'bg-amber-500' : 'bg-green-500'
-                  )}
-                  style={{ width: `${expPct}%` }}
-                />
-              </div>
-            </div>
-            {isNet && totalInc > 0 && (
-              <PrivateAmount>
-                <p className="text-green-400 text-sm mt-2">
-                  Podrías ahorrar {formatCurrency(netBalance)} este mes
-                </p>
-              </PrivateAmount>
-            )}
-          </div>
-        )
-      })()}
-
-      {/* ── ROW 1: KPI cards (2×2 on mobile, 3 in a row on lg) ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* ── ROW 1: 4 KPI cards (2×2 on mobile, 4 in a row on lg) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Egresos del mes"
           value={convert(balance.totalExpense)}
@@ -251,13 +221,36 @@ export default function DashboardPage() {
           nextEstimatedDate={nextIncomeEstimate}
           sparklineData={incomeSparkline}
         />
-        <div className="col-span-2 lg:col-span-1">
-          <CompactProjection
-            balance={convert(balance.balance)}
-            totalIncome={convert(balance.totalIncome)}
-            totalExpense={convert(balance.totalExpense)}
-          />
-        </div>
+        <CompactProjection
+          balance={convert(balance.balance)}
+          totalIncome={convert(balance.totalIncome)}
+          totalExpense={convert(balance.totalExpense)}
+        />
+        {/* Tasa de ahorro */}
+        {(() => {
+          const totalInc = convert(balance.totalIncome)
+          const totalExp = convert(balance.totalExpense)
+          const savingsRate = totalInc > 0 ? (1 - totalExp / totalInc) * 100 : 0
+          const savingsColor = savingsRate > 20 ? 'text-green-400' : savingsRate >= 5 ? 'text-amber-400' : 'text-red-400'
+          return (
+            <Card className="hover:shadow-md h-full min-h-[140px] relative overflow-hidden">
+              <CardContent className="p-5 flex flex-col h-full">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium text-muted-foreground leading-snug">Tasa de ahorro</p>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <PrivateAmount>
+                  <p className={cn('text-3xl sm:text-4xl font-bold tracking-tighter mt-3 tabular-nums', savingsColor)}>
+                    {Math.round(savingsRate)}%
+                  </p>
+                </PrivateAmount>
+                <div className="mt-auto pt-3 border-t border-border/50">
+                  <span className="text-[11px] text-muted-foreground">del ingreso mensual</span>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })()}
       </div>
 
       {/* ── InsightBanner (solo mes actual) ── */}
@@ -367,7 +360,7 @@ function CategoryDonut({
   }
 
   return (
-    <Card className="flex flex-col h-full min-h-[200px]">
+    <Card className="flex flex-col h-full min-h-[220px]">
       <CardHeader className="py-2.5 px-4">
         <CardTitle className="text-sm font-semibold">{title}</CardTitle>
       </CardHeader>
@@ -484,15 +477,20 @@ function UnifiedRecentMovements({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-border/50">
-            {display.map((m) => {
+          <div>
+            {display.map((m, idx) => {
               const catInfo = getCategoryIconInfo(m.category)
               const CatIcon = catInfo.icon
               const isIncome = m.type === 'income'
+              const isLast = idx === display.length - 1
+              const badgeClass = getCategoryBadgeClass(m.category)
               return (
                 <div
                   key={m.id}
-                  className="group flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors cursor-default"
+                  className={cn(
+                    'group flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors cursor-default',
+                    !isLast && 'border-b border-white/5'
+                  )}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
@@ -512,13 +510,7 @@ function UnifiedRecentMovements({
                         <p className="font-medium text-sm text-foreground truncate leading-tight group-hover:text-foreground/90">
                           {m.description}
                         </p>
-                        <span
-                          className="text-xs rounded-full px-2 py-0.5 shrink-0"
-                          style={{
-                            backgroundColor: `${catInfo.color}20`,
-                            color: catInfo.color,
-                          }}
-                        >
+                        <span className={cn('text-[10px] rounded-full px-2 py-0.5 shrink-0', badgeClass)}>
                           {m.category}
                         </span>
                       </div>
@@ -533,7 +525,7 @@ function UnifiedRecentMovements({
                     <p
                       className={cn(
                         'font-semibold text-sm shrink-0 ml-3 tabular-nums tracking-tight',
-                        isIncome ? 'text-accent-positive' : 'text-accent-danger'
+                        isIncome ? 'text-green-400' : 'text-red-400'
                       )}
                     >
                       {isIncome ? '+' : '-'}
