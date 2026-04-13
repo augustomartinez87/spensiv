@@ -21,10 +21,11 @@ export const dashboardRouter = router({
     .input(
       z.object({
         period: z.string().regex(/^\d{4}-\d{2}$/), // "2025-01"
+        viewMode: z.enum(['economic', 'financial']).default('financial'),
       })
     )
     .query(async ({ ctx, input }) => {
-      return getMonthlyBalance(ctx.user.id, input.period)
+      return getMonthlyBalance(ctx.user.id, input.period, input.viewMode)
     }),
 
   /**
@@ -50,7 +51,10 @@ export const dashboardRouter = router({
    * Evolución mensual: ingresos y egresos de los últimos N meses
    */
   getEvolutionData: protectedProcedure
-    .input(z.object({ months: z.number().min(2).max(12).default(6) }))
+    .input(z.object({
+      months: z.number().min(2).max(12).default(6),
+      viewMode: z.enum(['economic', 'financial']).optional().default('financial'),
+    }))
     .query(async ({ ctx, input }) => {
       const now = new Date()
       const base = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -59,7 +63,7 @@ export const dashboardRouter = router({
         periods.push(formatPeriod(subMonths(base, i)))
       }
       const results = await Promise.all(
-        periods.map((period) => getMonthlyTotals(ctx.user.id, period))
+        periods.map((period) => getMonthlyTotals(ctx.user.id, period, input.viewMode))
       )
       return results.map((r) => ({
         period: r.period,

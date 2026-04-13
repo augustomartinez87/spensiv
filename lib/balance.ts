@@ -1,19 +1,60 @@
 import { prisma } from './prisma'
 import { formatPeriod, parsePeriod } from './periods'
-import { getNonCreditPaymentMethodLabel, type NonCreditPaymentMethod } from './transaction-utils'
+import { getPaymentMethodLabelWithCard } from './transaction-utils'
 import { getExpenseTypeLabel } from './transaction-utils'
+
+export type BalanceViewMode = 'economic' | 'financial'
+
+const DIRECT_PAYMENT_METHODS: Record<BalanceViewMode, string[]> = {
+    financial: ['cash', 'transfer', 'debit_card'],
+    economic: ['cash', 'transfer', 'debit_card', 'credit_card'],
+}
 
 /**
  * Obtener balance mensual (Ingresos - Egresos)
- * 
- * Esta función calcula el balance de un mes específico considerando:
- * - INGRESOS: Todos los ingresos registrados en ese mes
- * - EGRESOS: Todas las CUOTAS que impactan en ese mes (no las compras)
+ *
+ * Soporta dos modos contables:
+ * - 'financial' (default): agrupa por cuándo sale la plata. Cuotas de tarjeta por
+ *   periodo del resumen, cash/débito/transfer por purchaseDate.
+ * - 'economic': agrupa por cuándo se concreta la operación. Las compras con tarjeta
+ *   se muestran completas (totalAmount) en el mes de purchaseDate, sin cuotas.
  */
-export async function getMonthlyBalance(userId: string, period: string) {
+export async function getMonthlyBalance(
+    userId: string,
+    period: string,
+    viewMode: BalanceViewMode = 'financial'
+) {
     const { year, month } = parsePeriod(period)
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)
+
+    const installmentsQuery = prisma.installment.findMany({
+        where: {
+            billingCycle: {
+                period,
+                card: {
+                    userId,
+                },
+            },
+            transaction: {
+                isVoided: false,
+                isForThirdParty: false,
+            },
+        },
+        include: {
+            transaction: {
+                include: {
+                    category: true,
+                    card: true,
+                },
+            },
+            billingCycle: true,
+        },
+        orderBy: {
+            impactDate: 'asc',
+        },
+    })
+    type InstallmentRow = Awaited<typeof installmentsQuery>[number]
 
     // ========== INGRESOS Y EGRESOS EN PARALELO ==========
     const [incomes, installments, cashTransactions] = await Promise.all([
@@ -29,39 +70,17 @@ export async function getMonthlyBalance(userId: string, period: string) {
                 date: 'desc',
             },
         }),
-        prisma.installment.findMany({
-            where: {
-                billingCycle: {
-                    period,
-                    card: {
-                        userId,
-                    },
-                },
-                transaction: {
-                    isVoided: false,
-                    isForThirdParty: false,
-                },
-            },
-            include: {
-                transaction: {
-                    include: {
-                        category: true,
-                        card: true,
-                    },
-                },
-                billingCycle: true,
-            },
-            orderBy: {
-                impactDate: 'asc',
-            },
-        }),
-        // Transacciones no-crédito (efectivo, transferencia, débito)
+        viewMode === 'economic'
+            ? Promise.resolve([] as InstallmentRow[])
+            : installmentsQuery,
+        // Transacciones directas. En 'financial' solo cash/transfer/debit.
+        // En 'economic' también credit_card (la compra completa en su mes).
         prisma.transaction.findMany({
             where: {
                 userId,
                 isVoided: false,
                 isForThirdParty: false,
-                paymentMethod: { in: ['cash', 'transfer', 'debit_card'] },
+                paymentMethod: { in: DIRECT_PAYMENT_METHODS[viewMode] },
                 purchaseDate: {
                     gte: startDate,
                     lt: endDate,
@@ -69,6 +88,7 @@ export async function getMonthlyBalance(userId: string, period: string) {
             },
             include: {
                 category: true,
+                card: true,
             },
             orderBy: {
                 purchaseDate: 'asc',
@@ -128,9 +148,8 @@ export async function getMonthlyBalance(userId: string, period: string) {
         },
         {} as Record<string, number>
     )
-    // Sumar transacciones no-crédito agrupadas por medio de pago
     for (const tx of cashTransactions) {
-        const label = getNonCreditPaymentMethodLabel(tx.paymentMethod as NonCreditPaymentMethod)
+        const label = getPaymentMethodLabelWithCard(tx.paymentMethod, tx.card)
         expensesByCard[label] = (expensesByCard[label] || 0) + Number(tx.totalAmount)
     }
 
@@ -167,29 +186,37 @@ export async function getMonthlyBalance(userId: string, period: string) {
  * Versión ligera de getMonthlyBalance: solo devuelve totales usando aggregations.
  * Evita cargar todos los registros en memoria — ideal para evolution/sparklines.
  */
-export async function getMonthlyTotals(userId: string, period: string) {
+export async function getMonthlyTotals(
+    userId: string,
+    period: string,
+    viewMode: BalanceViewMode = 'financial'
+) {
     const { year, month } = parsePeriod(period)
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)
+
+    const installmentAggPromise = viewMode === 'economic'
+        ? null
+        : prisma.installment.aggregate({
+            where: {
+                billingCycle: { period, card: { userId } },
+                transaction: { isVoided: false, isForThirdParty: false },
+            },
+            _sum: { amount: true },
+        })
 
     const [incomeAgg, creditAgg, cashAgg] = await Promise.all([
         prisma.income.aggregate({
             where: { userId, date: { gte: startDate, lt: endDate } },
             _sum: { amount: true },
         }),
-        prisma.installment.aggregate({
-            where: {
-                billingCycle: { period, card: { userId } },
-                transaction: { isVoided: false, isForThirdParty: false },
-            },
-            _sum: { amount: true },
-        }),
+        installmentAggPromise,
         prisma.transaction.aggregate({
             where: {
                 userId,
                 isVoided: false,
                 isForThirdParty: false,
-                paymentMethod: { in: ['cash', 'transfer', 'debit_card'] },
+                paymentMethod: { in: DIRECT_PAYMENT_METHODS[viewMode] },
                 purchaseDate: { gte: startDate, lt: endDate },
             },
             _sum: { totalAmount: true },
@@ -197,7 +224,7 @@ export async function getMonthlyTotals(userId: string, period: string) {
     ])
 
     const totalIncome = Number(incomeAgg._sum.amount ?? 0)
-    const totalExpense = Number(creditAgg._sum.amount ?? 0) + Number(cashAgg._sum.totalAmount ?? 0)
+    const totalExpense = Number(creditAgg?._sum.amount ?? 0) + Number(cashAgg._sum.totalAmount ?? 0)
 
     return { period, totalIncome, totalExpense, balance: totalIncome - totalExpense }
 }

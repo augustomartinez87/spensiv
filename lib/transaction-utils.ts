@@ -17,6 +17,14 @@ export function getNonCreditPaymentMethodLabel(method: NonCreditPaymentMethod): 
   }
 }
 
+export function getPaymentMethodLabelWithCard(
+  method: string,
+  card?: { name: string } | null
+): string {
+  if (method === 'credit_card') return card?.name || 'Tarjeta'
+  return getNonCreditPaymentMethodLabel(method as NonCreditPaymentMethod)
+}
+
 // ── Expense classification ──────────────────────────────────────────
 
 export const PENDING_CLASSIFICATION_FILTER = '__pending_classification__'

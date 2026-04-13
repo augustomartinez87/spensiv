@@ -37,6 +37,8 @@ import { es } from 'date-fns/locale'
 import { formatCurrency, cn } from '@/lib/utils'
 import { PrivateAmount } from '@/lib/contexts/privacy-context'
 import { useCurrency } from '@/lib/contexts/currency-context'
+import { getPaymentMethodLabelWithCard } from '@/lib/transaction-utils'
+import type { BalanceViewMode } from '@/lib/balance'
 import {
   AlertCircle,
   ArrowRight,
@@ -96,12 +98,13 @@ export default function DashboardPage() {
   const now = new Date()
   const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const [period, setPeriod] = useState(currentPeriod)
+  const [viewMode, setViewMode] = useState<BalanceViewMode>('financial')
 
   const previousPeriod = getPreviousPeriod(period)
   const { mode, setMode, mepRate, setMepRate, convert, symbol } = useCurrency()
 
-  const { data: balance, isLoading: isLoadingBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period })
-  const { data: evolutionData } = trpc.dashboard.getEvolutionData.useQuery({ months: 6 })
+  const { data: balance, isLoading: isLoadingBalance } = trpc.dashboard.getMonthlyBalance.useQuery({ period, viewMode })
+  const { data: evolutionData } = trpc.dashboard.getEvolutionData.useQuery({ months: 6, viewMode })
   const { data: mepData } = trpc.dashboard.getMepRate.useQuery()
 
   // Derive previous period data from evolution instead of a separate query
@@ -184,6 +187,15 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-foreground tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-2 flex-wrap">
           <MonthSelector value={period} onChange={setPeriod} />
+          <SegmentedControl
+            options={[
+              { value: 'financial', label: 'Financiero' },
+              { value: 'economic', label: 'Económico' },
+            ]}
+            value={viewMode}
+            onValueChange={(v) => setViewMode(v as BalanceViewMode)}
+            size="sm"
+          />
           <SegmentedControl
             options={[
               { value: 'ARS', label: '$ ARS' },
@@ -429,7 +441,7 @@ function PaymentMethodSummary({
     methodTotals[method] = (methodTotals[method] || 0) + Number(inst.amount)
   }
   for (const tx of cashTransactions) {
-    const method = tx.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia'
+    const method = getPaymentMethodLabelWithCard(tx.paymentMethod, tx.card)
     methodTotals[method] = (methodTotals[method] || 0) + Number(tx.totalAmount)
   }
 
@@ -563,7 +575,7 @@ function UnifiedRecentMovements({
       description: tx.description,
       category: tx.category?.name || 'Sin categoría',
       expenseType: tx.expenseType,
-      method: tx.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia',
+      method: getPaymentMethodLabelWithCard(tx.paymentMethod, tx.card),
       amount: Number(tx.totalAmount),
       type: 'expense' as const,
     })),
