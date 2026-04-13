@@ -7,8 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { PrivateAmount } from '@/lib/contexts/privacy-context'
-
-type InterestViewMode = 'economic' | 'financial'
+import type { BalanceViewMode } from '@/lib/balance'
 
 function HealthChip({ overdueCount }: { overdueCount: number }) {
     if (overdueCount === 0) {
@@ -111,7 +110,7 @@ function formatRentByCurrency(rent: Record<string, number>, zeroLabel = '$0') {
 
 export function LoansDashboardSummary() {
     const { data: metrics, isLoading } = trpc.loans.getDashboardMetrics.useQuery()
-    const [interestView, setInterestView] = useState<InterestViewMode>('economic')
+    const [interestView, setInterestView] = useState<BalanceViewMode>('economic')
 
     if (isLoading) {
         return <Skeleton className="h-[160px] w-full rounded-xl" />
@@ -221,7 +220,7 @@ export function LoansDashboardSummary() {
                                         : 'Lo que efectivamente entró a caja'}
                                 </p>
                             </div>
-                            <SegmentedControl<InterestViewMode>
+                            <SegmentedControl<BalanceViewMode>
                                 value={interestView}
                                 onValueChange={setInterestView}
                                 options={[
