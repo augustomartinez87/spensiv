@@ -1,14 +1,16 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
 import { getDolarMep, pesify } from '@/lib/dolar'
+import { getCurrentPeriod, parsePeriod } from '@/lib/periods'
 
 export const loanDashboardRouter = router({
   getDashboardMetrics: protectedProcedure.query(async ({ ctx }) => {
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+    const { year: currentYear, month: currentMonth } = parsePeriod(getCurrentPeriod())
 
-    const [activeLoans, mepRate] = await Promise.all([
+    const [activeLoans, mepRate, monthlyAccruals] = await Promise.all([
       ctx.prisma.loan.findMany({
         where: { userId: ctx.user.id, status: 'active', direction: 'lender' },
         include: {
@@ -32,6 +34,19 @@ export const loanDashboardRouter = router({
         },
       }),
       getDolarMep(),
+      ctx.prisma.loanAccrualMonthly.findMany({
+        where: {
+          year: currentYear,
+          month: currentMonth,
+          loan: { userId: ctx.user.id, direction: 'lender' },
+        },
+        select: {
+          interestExpected: true,
+          interestCollectedCurrent: true,
+          overdueInterestCollected: true,
+          loan: { select: { currency: true } },
+        },
+      }),
     ])
 
     const totalCapitalActive = activeLoans.reduce(
@@ -115,6 +130,22 @@ export const loanDashboardRouter = router({
       interestOnlyCollected[i.currency] = (interestOnlyCollected[i.currency] || 0) + Number(i.paidAmount)
     }
 
+    // Intereses devengados vs cobrados del mes actual (pesificado a ARS).
+    // Económico = lo que ya se ganó por calendario (interestExpected).
+    // Financiero = lo que efectivamente entró a caja (interestCollectedCurrent + overdueInterestCollected).
+    let interestAccruedThisMonth = 0
+    let interestCollectedThisMonth = 0
+    for (const row of monthlyAccruals) {
+      const currency = row.loan.currency
+      interestAccruedThisMonth += pesify(Number(row.interestExpected), currency, mepRate)
+      interestCollectedThisMonth += pesify(
+        Number(row.interestCollectedCurrent) + Number(row.overdueInterestCollected),
+        currency,
+        mepRate,
+      )
+    }
+    const interestGap = Math.max(interestAccruedThisMonth - interestCollectedThisMonth, 0)
+
     return {
       activeLoansCount: activeLoans.length,
       totalCapitalActive,
@@ -129,6 +160,9 @@ export const loanDashboardRouter = router({
       interestOnlyRent,
       interestOnlyCollected,
       interestOnlyCapital,
+      interestAccruedThisMonth,
+      interestCollectedThisMonth,
+      interestGap,
     }
   }),
 

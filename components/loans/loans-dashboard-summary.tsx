@@ -1,10 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { PrivateAmount } from '@/lib/contexts/privacy-context'
+import type { BalanceViewMode } from '@/lib/balance'
 
 function HealthChip({ overdueCount }: { overdueCount: number }) {
     if (overdueCount === 0) {
@@ -107,6 +110,7 @@ function formatRentByCurrency(rent: Record<string, number>, zeroLabel = '$0') {
 
 export function LoansDashboardSummary() {
     const { data: metrics, isLoading } = trpc.loans.getDashboardMetrics.useQuery()
+    const [interestView, setInterestView] = useState<BalanceViewMode>('economic')
 
     if (isLoading) {
         return <Skeleton className="h-[160px] w-full rounded-xl" />
@@ -119,6 +123,8 @@ export function LoansDashboardSummary() {
     )
 
     const hasInterestOnlyRent = Object.values(metrics.interestOnlyRent).some(v => v > 0)
+    const hasInterestMovement =
+        metrics.interestAccruedThisMonth > 0 || metrics.interestCollectedThisMonth > 0
 
     return (
         <div className="flex flex-col gap-3">
@@ -196,6 +202,59 @@ export function LoansDashboardSummary() {
                     </div>
                 </div>
             </Card>
+
+            {/* Intereses del mes: devengado (económico) vs cobrado (financiero) */}
+            {hasInterestMovement && (
+                <Card className="border-border/50 bg-card/80">
+                    <div className="flex flex-col gap-4 px-6 py-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div className="flex flex-col gap-0.5">
+                                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
+                                    {interestView === 'economic'
+                                        ? 'Intereses devengados este mes'
+                                        : 'Intereses cobrados este mes'}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground/70">
+                                    {interestView === 'economic'
+                                        ? 'Lo que ya te corresponde por calendario'
+                                        : 'Lo que efectivamente entró a caja'}
+                                </p>
+                            </div>
+                            <SegmentedControl<BalanceViewMode>
+                                value={interestView}
+                                onValueChange={setInterestView}
+                                options={[
+                                    { value: 'economic', label: 'Devengado' },
+                                    { value: 'financial', label: 'Cobrado' },
+                                ]}
+                                className="self-start sm:self-auto"
+                            />
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-baseline gap-4 sm:gap-8">
+                            <PrivateAmount>
+                                <p className={cn(
+                                    'text-2xl font-bold tabular-nums',
+                                    interestView === 'economic' ? 'text-accent-blue' : 'text-accent-positive'
+                                )}>
+                                    {formatCurrency(
+                                        interestView === 'economic'
+                                            ? metrics.interestAccruedThisMonth
+                                            : metrics.interestCollectedThisMonth
+                                    )}
+                                </p>
+                            </PrivateAmount>
+                            {metrics.interestGap > 0.01 && (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-500/15 px-2.5 py-0.5 text-xs font-medium text-yellow-500">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+                                    <PrivateAmount>
+                                        <span>Brecha: {formatCurrency(metrics.interestGap)} sin cobrar</span>
+                                    </PrivateAmount>
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </Card>
+            )}
 
             {/* Renta mensual section for interest-only loans */}
             {hasInterestOnlyRent && (
