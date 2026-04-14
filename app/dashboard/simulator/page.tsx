@@ -127,7 +127,6 @@ export default function SimulatorPage() {
       if (saved.capital) setCapital(saved.capital)
       if (saved.currency) setCurrency(saved.currency)
       if (saved.tnaTarget) setTnaTarget(saved.tnaTarget)
-      if (saved.startDate) setStartDate(saved.startDate)
       if (saved.roundEnabled !== undefined) setRoundEnabled(saved.roundEnabled)
       if (saved.roundingMultiple) setRoundingMultiple(saved.roundingMultiple)
       if (saved.smartDueDate !== undefined) setSmartDueDate(saved.smartDueDate)
@@ -189,7 +188,6 @@ export default function SimulatorPage() {
           capital,
           currency,
           tnaTarget,
-          startDate,
           roundEnabled,
           roundingMultiple,
           smartDueDate,
@@ -202,7 +200,7 @@ export default function SimulatorPage() {
       } catch {}
     }, 300)
     return () => clearTimeout(saveTimerRef.current)
-  }, [capital, currency, tnaTarget, startDate, roundEnabled, roundingMultiple, smartDueDate, firstInstallmentMonth, compareTerms, viewMode, termMonths, customInstallment])
+  }, [capital, currency, tnaTarget, roundEnabled, roundingMultiple, smartDueDate, firstInstallmentMonth, compareTerms, viewMode, termMonths, customInstallment])
 
   function handleInstallmentChange(value: string) {
     setCustomInstallment(value)
@@ -219,6 +217,9 @@ export default function SimulatorPage() {
           capital: cap,
           termMonths: term,
           desiredInstallment: installment,
+          smartDueDate,
+          startDate,
+          firstInstallmentMonth: firstInstallmentMonth || undefined,
         })
       }
     }, 300)

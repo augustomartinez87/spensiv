@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '@/lib/trpc'
-import { simulateLoan, reverseFromInstallment } from '@/lib/loan-calculator'
+import { simulateLoan, reverseFromInstallment, reverseFromInstallmentSmart } from '@/lib/loan-calculator'
 import type { SimulationResult } from '@/lib/loan-calculator'
 
 const simulateInput = z.object({
@@ -58,9 +58,21 @@ export const loanSimulationRouter = router({
       capital: z.number().positive(),
       termMonths: z.number().int().min(1).max(360),
       desiredInstallment: z.number().positive(),
+      smartDueDate: z.boolean().optional(),
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      firstInstallmentMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
     }))
     .mutation(({ input }) => {
-      const result = reverseFromInstallment(input.capital, input.termMonths, input.desiredInstallment)
+      const useSmart = (input.smartDueDate || !!input.firstInstallmentMonth) && !!input.startDate
+      const result = useSmart
+        ? reverseFromInstallmentSmart({
+            capital: input.capital,
+            termMonths: input.termMonths,
+            desiredInstallment: input.desiredInstallment,
+            startDate: input.startDate!,
+            firstInstallmentMonth: input.firstInstallmentMonth,
+          })
+        : reverseFromInstallment(input.capital, input.termMonths, input.desiredInstallment)
       if (!result) {
         return { success: false as const, monthlyRate: 0, tna: 0 }
       }

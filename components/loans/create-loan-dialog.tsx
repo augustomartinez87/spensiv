@@ -111,6 +111,9 @@ export function CreateLoanDialog({
                 capital: cap,
                 termMonths: term,
                 desiredInstallment: installment,
+                smartDueDate,
+                startDate,
+                firstInstallmentMonth: firstInstallmentMonth || undefined,
             })
         }
     }
@@ -133,7 +136,14 @@ export function CreateLoanDialog({
         const t = parseInt(term)
         const i = parseFloat(installment)
         if (i > 0 && c > 0 && t > 0 && i > c / t) {
-            reverseMutation.mutate({ capital: c, termMonths: t, desiredInstallment: i })
+            reverseMutation.mutate({
+                capital: c,
+                termMonths: t,
+                desiredInstallment: i,
+                smartDueDate,
+                startDate,
+                firstInstallmentMonth: firstInstallmentMonth || undefined,
+            })
         }
     }
 

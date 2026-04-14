@@ -172,6 +172,86 @@ export function generateSmartAmortizationTable(
   return { rows, installmentAmount: smart.installmentAmount, totalPaid: smart.totalPaid, effectiveTna: smart.effectiveTna }
 }
 
+/**
+ * Computes the TNA required for `generateSmartSchedule` (actual-day simple
+ * interest with calendar-aware dates) to yield `desiredInstallment`.
+ *
+ * The plain French-formula reverse assumes equal monthly periods, so it
+ * under/overshoots when the first period is shorter than a month or when
+ * days-per-month vary across the schedule. This variant bisects TNA directly
+ * against the smart schedule to match the installment the simulator actually
+ * produces.
+ */
+export function reverseFromInstallmentSmart(params: {
+  capital: number
+  termMonths: number
+  desiredInstallment: number
+  startDate: string
+  firstInstallmentMonth?: string
+  maxIterations?: number
+  tolerance?: number
+}): { monthlyRate: number; tna: number } | null {
+  const { capital, termMonths, desiredInstallment, startDate, firstInstallmentMonth } = params
+  const maxIterations = params.maxIterations ?? 500
+  const tolerance = params.tolerance ?? 1e-8
+
+  if (!Number.isFinite(capital) || capital <= 0 || !Number.isInteger(termMonths) || termMonths <= 0) {
+    throw new Error('Invalid reverseFromInstallmentSmart inputs')
+  }
+  if (!Number.isFinite(desiredInstallment) || desiredInstallment <= 0) {
+    throw new Error('desiredInstallment must be > 0')
+  }
+
+  const start = parseIsoDate(startDate)
+  const dueDates = resolveDueDates(start, termMonths, firstInstallmentMonth)
+
+  const zeroRateInstallment = capital / termMonths
+  if (desiredInstallment < zeroRateInstallment - tolerance) {
+    return null
+  }
+  if (Math.abs(desiredInstallment - zeroRateInstallment) <= tolerance) {
+    return { monthlyRate: 0, tna: 0 }
+  }
+
+  const installmentAt = (tna: number): number =>
+    generateSmartSchedule(capital, tna, start, dueDates, 0).installmentAmount
+
+  const f = (tna: number) => installmentAt(tna) - desiredInstallment
+
+  let low = 0
+  let high = 1
+  let fLow = f(low)
+  let fHigh = f(high)
+  let expansions = 0
+  while (fLow * fHigh > 0 && expansions < 80) {
+    high *= 2
+    fHigh = f(high)
+    expansions++
+  }
+  if (fLow * fHigh > 0 || !Number.isFinite(fHigh)) {
+    return null
+  }
+
+  for (let i = 0; i < maxIterations; i++) {
+    const mid = (low + high) / 2
+    const fMid = f(mid)
+    if (!Number.isFinite(fMid)) return null
+    if (Math.abs(fMid) <= tolerance || Math.abs(high - low) <= tolerance) {
+      return { monthlyRate: tnaNominalToMonthlyRate(mid), tna: mid }
+    }
+    if (fLow * fMid <= 0) {
+      high = mid
+      fHigh = fMid
+    } else {
+      low = mid
+      fLow = fMid
+    }
+  }
+
+  const tna = (low + high) / 2
+  return { monthlyRate: tnaNominalToMonthlyRate(tna), tna }
+}
+
 export function reverseFromInstallment(
   capital: number,
   termMonths: number,
