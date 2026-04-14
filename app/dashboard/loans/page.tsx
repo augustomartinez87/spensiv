@@ -64,10 +64,8 @@ import { amountClass, loanRateInfo } from '@/components/loans/helpers'
 import { LoansDashboardSummary, OverdueBanner } from '@/components/loans/loans-dashboard-summary'
 import { DebtsDashboardSummary } from '@/components/loans/debts-dashboard-summary'
 import { UpcomingInstallmentsGadget } from '@/components/loans/upcoming-installments-gadget'
-import { PreApprovedLoanCard } from '@/components/loans/pre-approved-loan-card'
 
 import { LoanListHeader } from '@/components/loans/loan-list-header'
-import { LoanListContent } from '@/components/loans/loan-list-content'
 import { LoansTableView } from '@/components/loans/loans-table-view'
 import { InstallmentCalendar } from '@/components/loans/installment-calendar'
 import { RegisterPaymentDialog } from '@/components/loans/register-payment-dialog'
@@ -82,64 +80,45 @@ import { GenerateContractButton } from '@/components/loans/generate-contract-but
 
 export default function LoansPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
-  const [view, setView] = useState<'list' | 'table' | 'calendar' | 'collector'>('table')
+  const [view, setView] = useState<'table' | 'calendar' | 'collector'>('table')
   const [tab, setTab] = useState<'lender' | 'borrower'>('lender')
 
   if (selectedLoanId) {
     return <LoanDetail loanId={selectedLoanId} onBack={() => setSelectedLoanId(null)} />
   }
 
+  if (view === 'collector') {
+    return (
+      <div className="space-y-6">
+        <LoanListHeader view={view} onViewChange={setView} direction={tab} tab={tab} onTabChange={setTab} />
+        <OverdueBanner />
+        <CollectorView onSelect={setSelectedLoanId} />
+      </div>
+    )
+  }
+
+  const mainContent = view === 'calendar'
+    ? <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
+    : <LoansTableView onSelect={setSelectedLoanId} direction={tab} />
+
   return (
     <div className="space-y-6">
       <LoanListHeader view={view} onViewChange={setView} direction={tab} tab={tab} onTabChange={setTab} />
 
-      {view === 'collector' ? (
-        /* ── Collector grouped view ── */
-        <div className="space-y-4">
+      {tab === 'lender' ? (
+        <div className="space-y-6">
           <OverdueBanner />
-          <CollectorView onSelect={setSelectedLoanId} />
-        </div>
-      ) : view === 'table' ? (
-        /* ── Table view: no Tabs wrapper, no expanded KPIs, no sidebar ── */
-        <div className="space-y-4">
-          {tab === 'lender' && <OverdueBanner />}
-          {tab === 'lender' ? (
-            <LoansTableView onSelect={setSelectedLoanId} direction="lender" />
-          ) : (
-            <LoansTableView onSelect={setSelectedLoanId} direction="borrower" />
-          )}
+          <LoansDashboardSummary />
+          <div className="grid gap-6 md:grid-cols-[1fr_280px]">
+            <div className="min-w-0">{mainContent}</div>
+            <UpcomingInstallmentsGadget />
+          </div>
         </div>
       ) : (
-        /* ── List / Calendar views: full Tabs with expanded KPIs + sidebar ── */
-        <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-          <TabsList className="grid w-full max-w-xs grid-cols-2 bg-muted/60">
-            <TabsTrigger value="lender" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Soy prestamista</TabsTrigger>
-            <TabsTrigger value="borrower" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Soy deudor</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="lender" className="space-y-6 mt-6">
-            <LoansDashboardSummary />
-            <div className="grid gap-6 md:grid-cols-[1fr_280px]">
-              <div>
-                {view === 'list' ? (
-                  <LoanListContent onSelect={setSelectedLoanId} direction="lender" />
-                ) : (
-                  <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
-                )}
-              </div>
-              <UpcomingInstallmentsGadget />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="borrower" className="space-y-6 mt-6">
-            <DebtsDashboardSummary />
-            {view === 'list' ? (
-              <LoanListContent onSelect={setSelectedLoanId} direction="borrower" />
-            ) : (
-              <InstallmentCalendar onSelectLoan={setSelectedLoanId} />
-            )}
-          </TabsContent>
-        </Tabs>
+        <div className="space-y-6">
+          <DebtsDashboardSummary />
+          {mainContent}
+        </div>
       )}
     </div>
   )

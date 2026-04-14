@@ -24,11 +24,19 @@ import {
     Wallet,
     Infinity,
     Search,
+    Clock,
 } from 'lucide-react'
 import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
+import {
+    Tooltip as UITooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { calculatePersonScore } from '@/lib/loan-scoring'
 import { loanRateInfo } from './helpers'
+import { PreApprovedLoanCard } from './pre-approved-loan-card'
 import type { LoanListItem } from './types'
 
 type SortColumn = 'person' | 'capital' | 'type' | 'tna' | 'term' | 'progress' | 'nextDue' | 'status'
@@ -95,8 +103,28 @@ function SortIcon({ column, activeColumn, direction }: { column: SortColumn; act
 }
 
 export function LoansTableView({ onSelect, direction }: { onSelect: (id: string) => void; direction: 'lender' | 'borrower' }) {
+    const utils = trpc.useUtils()
     const [statusFilter, setStatusFilter] = useState<'active' | 'completed' | 'refinanced'>('active')
     const { data: loans, isLoading } = trpc.loans.list.useQuery({ direction, status: statusFilter })
+
+    const confirmMutation = trpc.loans.confirmPreApproved.useMutation({
+        onSuccess: () => {
+            utils.loans.list.invalidate()
+            utils.loans.getDashboardMetrics.invalidate()
+        },
+    })
+
+    const deleteMutation = trpc.loans.delete.useMutation({
+        onSuccess: () => {
+            utils.loans.list.invalidate()
+            utils.loans.getDashboardMetrics.invalidate()
+        },
+    })
+
+    const preApproved = useMemo(
+        () => (loans ?? []).filter((l) => l.status === 'pre_approved'),
+        [loans]
+    )
 
     const [sortColumn, setSortColumn] = useState<SortColumn>('nextDue')
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -233,6 +261,33 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                     ))}
                 </div>
             </div>
+
+            {/* Preaprobados */}
+            {preApproved.length > 0 && (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-amber-500" />
+                        <h2 className="text-sm font-semibold text-accent-warning uppercase tracking-wider">
+                            Preaprobados
+                        </h2>
+                        <Badge variant="outline" className="text-accent-warning border-amber-600 text-[10px]">
+                            {preApproved.length}
+                        </Badge>
+                    </div>
+                    <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+                        {preApproved.map((loan) => (
+                            <PreApprovedLoanCard
+                                key={loan.id}
+                                loan={loan}
+                                onConfirm={(loanId, startDate) => confirmMutation.mutate({ loanId, startDate })}
+                                onDelete={(id) => deleteMutation.mutate({ id })}
+                                isConfirming={confirmMutation.isPending}
+                                isDeleting={deleteMutation.isPending}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Search + quick filters */}
             <div className="flex flex-col sm:flex-row gap-3">
@@ -395,16 +450,31 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                                     {subtitle && (
                                                         <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
                                                     )}
+                                                    {loan.collector && (
+                                                        <p className="text-[10px] text-muted-foreground/70 truncate">
+                                                            via {loan.collector.name}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </TableCell>
 
                                         {/* Capital */}
                                         <TableCell className="py-2">
-                                            <span className="text-sm tabular-nums font-medium">{formatCurrency(Number(loan.capital), cur)}</span>
-                                            {cur !== 'ARS' && (
-                                                <Badge variant="outline" className="ml-1.5 text-[9px] px-1 py-0">{cur}</Badge>
-                                            )}
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center">
+                                                    <span className="text-sm tabular-nums font-medium">{formatCurrency(Number(loan.capital), cur)}</span>
+                                                    {cur !== 'ARS' && (
+                                                        <Badge variant="outline" className="ml-1.5 text-[9px] px-1 py-0">{cur}</Badge>
+                                                    )}
+                                                </div>
+                                                {!isZeroRate && Number(loan.installmentAmount) > 0 && (
+                                                    <span className="text-[10px] text-muted-foreground tabular-nums">
+                                                        {isInterestOnly ? 'Int. mensual: ' : 'Cuota: '}
+                                                        {formatCurrency(Number(loan.installmentAmount), cur)}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </TableCell>
 
                                         {/* Tipo */}
@@ -421,9 +491,26 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
 
                                         {/* TNA */}
                                         <TableCell className="py-2 hidden md:table-cell">
-                                            <span className={cn("text-sm tabular-nums font-medium", Number(loan.tna) > 1.5 && "text-red-400")}>
-                                                {isZeroRate ? '0%' : `${(ri.tna * 100).toFixed(1)}%`}
-                                            </span>
+                                            {isZeroRate ? (
+                                                <span className="text-sm tabular-nums font-medium text-muted-foreground">0%</span>
+                                            ) : (
+                                                <TooltipProvider>
+                                                    <UITooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <span className={cn("text-sm tabular-nums font-medium cursor-help", Number(loan.tna) > 1.5 && "text-red-400")}>
+                                                                {(ri.tna * 100).toFixed(1)}%
+                                                            </span>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="top">
+                                                            <div className="text-xs space-y-0.5 tabular-nums">
+                                                                <p>TNA: {(ri.tna * 100).toFixed(2)}%</p>
+                                                                <p>TEM: {(ri.tem * 100).toFixed(2)}%</p>
+                                                                <p>TEA: {(ri.tea * 100).toFixed(2)}%</p>
+                                                            </div>
+                                                        </TooltipContent>
+                                                    </UITooltip>
+                                                </TooltipProvider>
+                                            )}
                                         </TableCell>
 
                                         {/* Plazo */}

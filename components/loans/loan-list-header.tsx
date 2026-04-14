@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Banknote, CalendarDays, LayoutList, Users } from 'lucide-react'
+import { CalendarDays, LayoutList, Users } from 'lucide-react'
 import { CreateLoanDialog } from './create-loan-dialog'
 
 function formatCompact(amount: number) {
@@ -66,8 +66,8 @@ function DynamicSubtitle({ direction }: { direction: 'lender' | 'borrower' }) {
 }
 
 interface LoanListHeaderProps {
-    view: 'list' | 'table' | 'calendar' | 'collector'
-    onViewChange: (v: 'list' | 'table' | 'calendar' | 'collector') => void
+    view: 'table' | 'calendar' | 'collector'
+    onViewChange: (v: 'table' | 'calendar' | 'collector') => void
     direction: 'lender' | 'borrower'
     tab: 'lender' | 'borrower'
     onTabChange: (t: 'lender' | 'borrower') => void
@@ -84,7 +84,7 @@ export function LoanListHeader({ view, onViewChange, direction, tab, onTabChange
                     <h1 className="text-3xl font-bold text-foreground tracking-tight">
                         {direction === 'lender' ? 'Préstamos' : 'Mis Deudas'}
                     </h1>
-                    {view === 'table' || view === 'collector' ? (
+                    {view === 'collector' ? (
                         <DynamicSubtitle direction={direction} />
                     ) : (
                         <p className="text-sm text-muted-foreground mt-0.5">
@@ -94,15 +94,6 @@ export function LoanListHeader({ view, onViewChange, direction, tab, onTabChange
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="flex bg-muted rounded-lg p-0.5">
-                        <Button
-                            variant={view === 'list' ? 'default' : 'ghost'}
-                            size="sm"
-                            className="h-8"
-                            onClick={() => onViewChange('list')}
-                        >
-                            <Banknote className="h-4 w-4 mr-1.5" />
-                            Lista
-                        </Button>
                         <Button
                             variant={view === 'table' ? 'default' : 'ghost'}
                             size="sm"
@@ -135,8 +126,8 @@ export function LoanListHeader({ view, onViewChange, direction, tab, onTabChange
                 </div>
             </div>
 
-            {/* Row 2 (table view only): Lender/borrower toggle inline */}
-            {view === 'table' && (
+            {/* Row 2: Lender/borrower toggle inline (no aplica a cobradores) */}
+            {view !== 'collector' && (
                 <div className="flex bg-muted/60 rounded-lg p-0.5 w-fit">
                     <Button
                         variant={tab === 'lender' ? 'default' : 'ghost'}

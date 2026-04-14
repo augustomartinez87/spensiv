@@ -1,0 +1,947 @@
+<!--
+aesthetic_dna: Premium Financial Terminal, High Data Density, Strictly Dark Mode.
+ui_paradigm: Multi-section unified dashboard with Bento-box data grouping and 40/60 split tool interfaces.
+palette constraints applied: Base hsl(215 30% 6%), Card hsl(214 23% 11%), Accents: Blue, Green, Red, Orange.
+-->
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spensiv - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style type="text/tailwindcss">
+        @layer base {
+            :root {
+                --base-bg-hsl: 215 30% 6%;
+                --card-bg-hsl: 214 23% 11%;
+                --card-hover-hsl: 214 23% 15%;
+                
+                --color-primary: hsl(217, 91%, 60%);
+                --color-positive: hsl(160, 76%, 51%);
+                --color-danger: hsl(359, 100%, 65%);
+                --color-warning: hsl(37, 91%, 55%);
+            }
+            body {
+                font-family: 'Inter', sans-serif;
+                background-color: hsl(var(--base-bg-hsl));
+                color: #e2e8f0;
+            }
+        }
+        
+        @layer utilities {
+            .bg-base { background-color: hsl(var(--base-bg-hsl)); }
+            .bg-card { background-color: hsl(var(--card-bg-hsl)); }
+            .bg-card-hover { background-color: hsl(var(--card-hover-hsl)); }
+            
+            .text-primary { color: var(--color-primary); }
+            .text-positive { color: var(--color-positive); }
+            .text-danger { color: var(--color-danger); }
+            .text-warning { color: var(--color-warning); }
+            
+            .border-subtle { border-color: rgba(255, 255, 255, 0.05); }
+            
+            .glass-panel {
+                background: linear-gradient(180deg, rgba(29,35,42,0.8) 0%, rgba(20,25,31,0.9) 100%);
+                backdrop-filter: blur(12px);
+            }
+
+            .badge-positive { @apply bg-[hsl(160,76%,51%)]/10 text-[hsl(160,76%,51%)] border border-[hsl(160,76%,51%)]/20; }
+            .badge-warning { @apply bg-[hsl(37,91%,55%)]/10 text-[hsl(37,91%,55%)] border border-[hsl(37,91%,55%)]/20; }
+            .badge-danger { @apply bg-[hsl(359,100%,65%)]/10 text-[hsl(359,100%,65%)] border border-[hsl(359,100%,65%)]/20; }
+            .badge-primary { @apply bg-[hsl(217,91%,60%)]/10 text-[hsl(217,91%,60%)] border border-[hsl(217,91%,60%)]/20; }
+            .badge-neutral { @apply bg-white/5 text-gray-300 border border-white/10; }
+        }
+
+        /* Custom Scrollbar for a premium feel */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+        /* Form elements reset aesthetics */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none; margin: 0;
+        }
+
+        .chart-bar-capital { background: linear-gradient(to top, var(--color-primary), hsl(217, 91%, 40%)); }
+        .chart-bar-interest { background: var(--color-positive); opacity: 0.8; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden antialiased selection:bg-[hsl(217,91%,60%)]/30 selection:text-white">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-16 lg:w-64 border-r border-subtle bg-base flex flex-col justify-between flex-shrink-0 z-50">
+        <div>
+            <div class="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-subtle">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg outline outline-1 outline-white/10 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.3)] bg-gradient-to-br from-[hsl(217,91%,60%)] to-blue-800">
+                        <i class="ph-bold ph-trend-up text-white"></i>
+                    </div>
+                    <span class="font-bold text-xl tracking-tight hidden lg:block text-white">Spensiv</span>
+                </div>
+            </div>
+            <nav class="p-3 space-y-1">
+                <a href="#cartera" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[hsl(217,91%,60%)]/10 text-primary font-medium border border-[hsl(217,91%,60%)]/20 transition-colors">
+                    <i class="ph ph-wallet text-xl"></i>
+                    <span class="hidden lg:block">Cartera</span>
+                </a>
+                <a href="#simulador" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                    <i class="ph ph-calculator text-xl"></i>
+                    <span class="hidden lg:block">Simulador</span>
+                </a>
+                <a href="#personas" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                    <i class="ph ph-users text-xl"></i>
+                    <span class="hidden lg:block">Personas</span>
+                </a>
+                <a href="#riesgo" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                    <i class="ph ph-shield-warning text-xl"></i>
+                    <span class="hidden lg:block">Riesgo</span>
+                </a>
+            </nav>
+        </div>
+        <div class="p-4 border-t border-subtle flex items-center justify-center lg:justify-start gap-3">
+            <div class="w-8 h-8 rounded-full bg-gray-700 overflow-hidden outline outline-1 outline-white/20">
+                <img src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=100&q=80" alt="Avatar Usuario" class="w-full h-full object-cover">
+            </div>
+            <div class="hidden lg:block text-sm">
+                <p class="font-medium text-white">Martín S.</p>
+                <p class="text-gray-500 text-xs">Pre prestamista</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto scroll-smooth">
+        
+        <!-- Top bar global -->
+        <header class="h-16 flex items-center justify-between px-8 border-b border-subtle sticky top-0 bg-base/80 backdrop-blur-md z-40">
+            <div class="flex items-center gap-2 text-sm font-medium text-gray-400">
+                <span>AR$ Pesos Argentinos</span>
+                <i class="ph-bold ph-caret-down text-xs"></i>
+            </div>
+            <div class="flex items-center gap-4">
+                <button class="relative text-gray-400 hover:text-white transition-colors">
+                    <i class="ph ph-bell text-xl"></i>
+                    <span class="absolute top-0 right-0 w-2 h-2 bg-[hsl(359,100%,65%)] rounded-full outline outline-2 outline-[hsl(215,30%,6%)]"></span>
+                </button>
+                <button class="bg-white/5 hover:bg-white/10 text-white text-sm font-medium px-4 py-1.5 rounded-md border border-white/10 transition-all shadow-sm">
+                    Exportar
+                </button>
+            </div>
+        </header>
+
+        <div class="p-8 space-y-24 max-w-[1600px] mx-auto pb-32">
+
+            <!-- ==============================================
+                 SECTION 1: CARTERA (PORTFOLIO OVERVIEW)
+            ================================================ -->
+            <section id="cartera" class="space-y-6">
+                
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-white tracking-tight">Visión de Cartera</h1>
+                        <p class="text-gray-400 text-sm mt-1">Resumen general de capital y rendimiento actual.</p>
+                    </div>
+                </div>
+
+                <!-- ALERTS BAR (Prominent) -->
+                <div class="bg-[hsl(37,91%,55%)]/10 border border-[hsl(37,91%,55%)]/30 rounded-[1rem] p-4 flex items-start gap-4 shadow-[0_4px_20px_rgba(234,179,8,0.05)]">
+                    <i class="ph-fill ph-warning-circle text-[hsl(37,91%,55%)] text-2xl mt-0.5"></i>
+                    <div class="flex-1">
+                        <h3 class="text-[hsl(37,91%,55%)] font-semibold text-sm">Atención requerida</h3>
+                        <div class="mt-1 flex flex-col sm:flex-row gap-4 sm:gap-8 text-sm text-gray-200">
+                            <span class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-[hsl(37,91%,55%)]"></div> 3 cuotas vencidas (Total: $180.000)</span>
+                            <span class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-[hsl(359,100%,65%)]"></div> Juan P. supera límite de exposición (140%)</span>
+                        </div>
+                    </div>
+                    <button class="text-gray-400 hover:text-white"><i class="ph ph-x"></i></button>
+                </div>
+
+                <!-- TOP STRIP METRICS -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-card rounded-[1rem] p-5 border border-subtle shadow-[0_8px_30px_rgb(0,0,0,0.25)] relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <p class="text-gray-400 text-sm font-medium mb-1">Capital Vivo Total</p>
+                        <h2 class="text-3xl font-bold tracking-tight text-white">$2.450.000</h2>
+                        <div class="mt-3 flex items-center gap-2 text-xs">
+                            <span class="badge-positive font-semibold flex items-center gap-1"><i class="ph-bold ph-arrow-up-right"></i> +12%</span>
+                            <span class="text-gray-500">vs. mes anterior</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card rounded-[1rem] p-5 border border-subtle shadow-[0_8px_30px_rgb(0,0,0,0.25)]">
+                        <p class="text-gray-400 text-sm font-medium mb-1">Capital en Mora</p>
+                        <h2 class="text-3xl font-bold tracking-tight text-danger">$180.000</h2>
+                        <div class="mt-3 flex items-center gap-2 text-xs">
+                            <span class="text-danger font-medium">Corresponde a 2 préstamos</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-card rounded-[1rem] p-5 border border-subtle shadow-[0_8px_30px_rgb(0,0,0,0.25)]">
+                        <p class="text-gray-400 text-sm font-medium mb-1">Rendimiento TEM Promedio</p>
+                        <h2 class="text-3xl font-bold tracking-tight text-white">3.2%</h2>
+                        <div class="mt-3 flex items-center gap-2 text-xs">
+                            <span class="text-gray-400">TIR Anualizada proyectada:</span>
+                            <span class="text-white font-medium">45.9%</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-card rounded-[1rem] p-5 border border-subtle shadow-[0_8px_30px_rgb(0,0,0,0.25)]">
+                        <p class="text-gray-400 text-sm font-medium mb-1">Tasa de Morosidad</p>
+                        <h2 class="text-3xl font-bold tracking-tight text-warning">7.3%</h2>
+                        <div class="mt-3 w-full bg-[#1e293b] rounded-full h-1.5 overflow-hidden">
+                            <div class="bg-warning h-full" style="width: 7.3%"></div>
+                        </div>
+                        <p class="text-gray-500 text-[10px] mt-2 uppercase tracking-wide">Límite saludable: 5%</p>
+                    </div>
+                </div>
+
+                <!-- BENTO GRID: Charts & Table -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Cash flow chart (Span 2) -->
+                    <div class="lg:col-span-2 bg-card border border-subtle rounded-[1rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.25)] flex flex-col">
+                        <div class="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 class="text-white font-medium">Flujo de Fondos Proyectado</h3>
+                                <p class="text-xs text-gray-400">Capital recuprado + Intereses (Próximos 6 meses)</p>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="flex items-center gap-1"><div class="w-2 h-2 rounded-sm bg-primary"></div> Capital</span>
+                                <span class="flex items-center gap-1"><div class="w-2 h-2 rounded-sm bg-positive"></div> Interés</span>
+                            </div>
+                        </div>
+                        
+                        <!-- CSS Mock Stacked Bar Chart -->
+                        <div class="flex-1 flex items-end gap-2 sm:gap-4 mt-4 min-h-[200px] border-b border-subtle pb-2 relative">
+                            <!-- Y Axis Grid Lines -->
+                            <div class="absolute inset-0 flex flex-col justify-between pointer-events-none pb-2">
+                                <div class="w-full border-t border-white/5"></div>
+                                <div class="w-full border-t border-white/5"></div>
+                                <div class="w-full border-t border-white/5"></div>
+                                <div class="w-full border-t border-white/5"></div>
+                            </div>
+                            
+                            <!-- Bars (Months) -->
+                            <div class="flex-1 flex flex-col justify-end items-center group relative z-10">
+                                <div class="w-full max-w-[40px] flex flex-col-reverse relative">
+                                    <div class="w-full chart-bar-capital rounded-b-sm transition-all group-hover:brightness-110" style="height: 60px;"></div>
+                                    <div class="w-full chart-bar-interest rounded-t-sm transition-all group-hover:brightness-110" style="height: 20px;"></div>
+                                    <!-- Tooltip hover -->
+                                    <div class="absolute opacity-0 group-hover:opacity-100 transition-opacity -top-12 left-1/2 -translate-x-1/2 bg-gray-800 text-xs px-2 py-1 rounded border border-subtle pointer-events-none whitespace-nowrap z-20 shadow-lg">
+                                        <span class="block text-gray-300">Total: $240K</span>
+                                    </div>
+                                </div>
+                                <span class="text-[10px] text-gray-500 mt-2 font-medium">Ago</span>
+                            </div>
+                            <div class="flex-1 flex flex-col justify-end items-center group relative z-10">
+                                <div class="w-full max-w-[40px] flex flex-col-reverse relative">
+                                    <div class="w-full chart-bar-capital rounded-b-sm transition-all group-hover:brightness-110" style="height: 75px;"></div>
+                                    <div class="w-full chart-bar-interest rounded-t-sm transition-all group-hover:brightness-110" style="height: 25px;"></div>
+                                </div>
+                                <span class="text-[10px] text-gray-500 mt-2 font-medium text-white">Sep</span>
+                            </div>
+                            <div class="flex-1 flex flex-col justify-end items-center group relative z-10">
+                                <div class="w-full max-w-[40px] flex flex-col-reverse relative">
+                                    <div class="w-full chart-bar-capital rounded-b-sm transition-all group-hover:brightness-110" style="height: 110px;"></div>
+                                    <div class="w-full chart-bar-interest rounded-t-sm transition-all group-hover:brightness-110" style="height: 40px;"></div>
+                                </div>
+                                <span class="text-[10px] text-gray-500 mt-2 font-medium">Oct</span>
+                            </div>
+                            <div class="flex-1 flex flex-col justify-end items-center group relative z-10">
+                                <div class="w-full max-w-[40px] flex flex-col-reverse relative">
+                                    <div class="w-full chart-bar-capital rounded-b-sm transition-all group-hover:brightness-110" style="height: 50px;"></div>
+                                    <div class="w-full chart-bar-interest rounded-t-sm transition-all group-hover:brightness-110" style="height: 15px;"></div>
+                                </div>
+                                <span class="text-[10px] text-gray-500 mt-2 font-medium">Nov</span>
+                            </div>
+                             <div class="flex-1 flex flex-col justify-end items-center group relative z-10">
+                                <div class="w-full max-w-[40px] flex flex-col-reverse relative">
+                                    <div class="w-full chart-bar-capital rounded-b-sm transition-all group-hover:brightness-110 opacity-50" style="height: 40px;"></div>
+                                    <div class="w-full chart-bar-interest rounded-t-sm transition-all group-hover:brightness-110 opacity-50" style="height: 10px;"></div>
+                                </div>
+                                <span class="text-[10px] text-gray-500 mt-2 font-medium">Dic</span>
+                            </div>
+                            <div class="flex-1 flex flex-col justify-end items-center group relative z-10">
+                                <div class="w-full max-w-[40px] flex flex-col-reverse relative">
+                                    <div class="w-full chart-bar-capital rounded-b-sm transition-all group-hover:brightness-110 opacity-50" style="height: 80px;"></div>
+                                    <div class="w-full chart-bar-interest rounded-t-sm transition-all group-hover:brightness-110 opacity-50" style="height: 20px;"></div>
+                                </div>
+                                <span class="text-[10px] text-gray-500 mt-2 font-medium">Ene</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Concentration Donut & Risk Table (Span 1 vertically stacked) -->
+                    <div class="flex flex-col gap-6">
+                        <!-- Donut -->
+                        <div class="bg-card border border-subtle rounded-[1rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.25)] flex items-center justify-between">
+                            <div>
+                                <h3 class="text-white font-medium text-sm">Concentración</h3>
+                                <p class="text-xs text-gray-400 mt-1 mb-3">Distribución por persona</p>
+                                <div class="space-y-2">
+                                    <div class="flex items-center gap-2 text-xs">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                                        <span class="text-gray-300">Top 1: <span class="text-white font-medium">28%</span></span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-xs">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                                        <span class="text-gray-300">Top 3: <span class="text-white font-medium">65%</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- SVG Donut Mock -->
+                            <div class="relative w-20 h-20">
+                                <svg class="transform -rotate-90 w-full h-full" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" stroke-width="12" fill="transparent" />
+                                    <!-- Segment 1 (Top 1: 28%) -->
+                                    <circle cx="50" cy="50" r="40" stroke="var(--color-primary)" stroke-width="12" fill="transparent" stroke-dasharray="251.2" stroke-dashoffset="180.86" />
+                                    <!-- Segment 2 (Rest of Top 3: 37%) -->
+                                    <circle cx="50" cy="50" r="40" stroke="#60a5fa" stroke-width="12" fill="transparent" stroke-dasharray="251.2" stroke-dashoffset="158.2" class="transform origin-center rotate-[100.8deg]" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Risk Table Mini -->
+                        <div class="bg-card border border-subtle rounded-[1rem] p-0 shadow-[0_8px_30px_rgb(0,0,0,0.25)] overflow-hidden flex-1 flex flex-col">
+                            <div class="p-4 border-b border-subtle">
+                                <h3 class="text-white font-medium text-sm">Desglose por Riesgo</h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="text-xs text-gray-500 uppercase bg-white/[0.02]">
+                                        <tr>
+                                            <th class="px-4 py-2 font-medium">Persona</th>
+                                            <th class="px-4 py-2 font-medium text-right">Capital</th>
+                                            <th class="px-4 py-2 font-medium text-center">Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-white/5">
+                                        <tr class="hover:bg-white/[0.02] transition-colors">
+                                            <td class="px-4 py-3 flex items-center gap-2">
+                                                <div class="w-2 h-2 rounded-full bg-positive"></div>
+                                                <span class="text-gray-300 font-medium">Lucas S.</span>
+                                            </td>
+                                            <td class="px-4 py-3 text-right font-medium">$850k</td>
+                                            <td class="px-4 py-3 text-center"><span class="badge-positive">A</span></td>
+                                        </tr>
+                                        <tr class="hover:bg-white/[0.02] transition-colors">
+                                            <td class="px-4 py-3 flex items-center gap-2">
+                                                <div class="w-2 h-2 rounded-full bg-warning"></div>
+                                                <span class="text-gray-300 font-medium">María G.</span>
+                                            </td>
+                                            <td class="px-4 py-3 text-right font-medium">$420k</td>
+                                            <td class="px-4 py-3 text-center"><span class="badge-warning">B-</span></td>
+                                        </tr>
+                                        <tr class="hover:bg-white/[0.02] transition-colors">
+                                            <td class="px-4 py-3 flex items-center gap-2">
+                                                <div class="w-2 h-2 rounded-full bg-danger animate-pulse"></div>
+                                                <span class="text-white font-medium">Juan P.</span>
+                                            </td>
+                                            <td class="px-4 py-3 text-right font-medium">$600k</td>
+                                            <td class="px-4 py-3 text-center"><span class="badge-danger">D</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-auto p-3 text-center border-t border-subtle">
+                                <a href="#personas" class="text-xs font-medium text-primary hover:text-white transition-colors">Ver todos →</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- ==============================================
+                 SECTION 2: SIMULADOR (LOAN SIMULATOR)
+            ================================================ -->
+            <section id="simulador" class="pt-12 border-t border-subtle">
+                
+                <div class="mb-8">
+                    <h2 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                        <i class="ph-duotone ph-calculator text-primary"></i> Simulador de Préstamos
+                    </h2>
+                    <p class="text-gray-400 text-sm mt-1">Calculá escenarios antes de originar un nuevo préstamo.</p>
+                </div>
+
+                <div class="flex flex-col xl:flex-row gap-8">
+                    
+                    <!-- Left Column: Form (40%) -->
+                    <div class="w-full xl:w-[40%] bg-card border border-subtle rounded-[1rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.25)] relative overflow-hidden">
+                        <!-- Decorative glow -->
+                        <div class="absolute -top-20 -left-20 w-60 h-60 bg-primary/10 rounded-full blur-[80px] pointer-events-none"></div>
+
+                        <form class="space-y-6 relative z-10">
+                            
+                            <!-- Capital Input -->
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wide">Capital a prestar</label>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xl">$</span>
+                                    <input type="text" value="500.000" class="w-full bg-[#0a0f16] border border-subtle rounded-lg py-4 pl-10 pr-4 text-2xl font-bold text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-inner transition-all shadow-black/50" placeholder="0.00">
+                                    
+                                    <div class="absolute right-2 top-1/2 -translate-y-1/2 bg-[#1e293b] p-1 rounded-md flex">
+                                        <button type="button" class="px-2 py-1 text-xs font-bold bg-[#334155] text-white rounded shadow-sm">ARS</button>
+                                        <button type="button" class="px-2 py-1 text-xs font-medium text-gray-400 hover:text-white transition-colors">USD</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="border-white/5">
+
+                            <!-- Parameters -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-400 mb-2">Tasa Nominal Anual (TNA)</label>
+                                    <div class="relative">
+                                        <input type="number" value="85" class="w-full bg-[#0a0f16] border border-subtle rounded-lg py-2.5 px-3 text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
+                                    </div>
+                                    <p class="text-[10px] text-gray-500 mt-1">Sugerida inflación: 85%</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-400 mb-2">Plazo (Meses)</label>
+                                    <input type="number" value="6" class="w-full bg-[#0a0f16] border border-subtle rounded-lg py-2.5 px-3 text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                                </div>
+                            </div>
+
+                            <!-- Tipo de prestamo -->
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-2">Sistema de Amortización</label>
+                                <div class="flex gap-2 p-1 bg-[#0a0f16] rounded-lg border border-subtle">
+                                    <button type="button" class="flex-1 py-2 text-sm font-medium bg-[#1e293b] text-white rounded-md shadow border border-white/5">Amortizado (Francés)</button>
+                                    <button type="button" class="flex-1 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">Solo Interés</button>
+                                </div>
+                            </div>
+
+                            <!-- Opciones avanzadas toggle -->
+                            <button type="button" class="flex items-center gap-2 text-sm text-gray-400 hover:text-white group transition-colors">
+                                <i class="ph ph-caret-right text-xs group-hover:text-primary transition-colors"></i>
+                                Opciones avanzadas (Comisiones, Gracia)
+                            </button>
+
+                            <!-- CTAs -->
+                            <div class="pt-4">
+                                <button type="button" class="w-full bg-primary hover:bg-[hsl(217,91%,65%)] text-white font-bold py-3.5 rounded-lg shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all transform active:scale-[0.98] border border-blue-400/30">
+                                    Simular Escenario
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Right Column: Results Panel (60%) -->
+                    <div class="w-full xl:w-[60%] bg-[#0f141d] border border-subtle rounded-[1rem] shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] flex flex-col relative">
+                        
+                        <!-- Header Metrics -->
+                        <div class="p-6 border-b border-subtle bg-card rounded-t-[1rem] grid grid-cols-3 gap-4">
+                            <div>
+                                <p class="text-xs text-gray-400 font-medium mb-1">Cuota Fija Mensual</p>
+                                <p class="text-2xl font-bold text-white">$105.106<span class="text-sm text-gray-500 font-normal">,23</span></p>
+                            </div>
+                            <div class="pl-4 border-l border-white/5">
+                                <p class="text-xs text-gray-400 font-medium mb-1">TIR Anual</p>
+                                <p class="text-2xl font-bold text-positive">128.4%</p>
+                            </div>
+                            <div class="pl-4 border-l border-white/5">
+                                <p class="text-xs text-gray-400 font-medium mb-1">Total a Devolver</p>
+                                <p class="text-2xl font-bold text-white">$630.637</p>
+                            </div>
+                        </div>
+
+                        <!-- Table Area (Scrollable conceptually, styling fixed height for demo) -->
+                        <div class="flex-1 p-0 overflow-hidden rounded-b-[1rem]">
+                            <div class="h-[300px] overflow-y-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="text-xs text-gray-500 uppercase sticky top-0 bg-[#0f141d] z-10 shadow-[0_2px_10px_rgba(0,0,0,0.3)]">
+                                        <tr>
+                                            <th class="px-6 py-3 font-medium">Mes</th>
+                                            <th class="px-6 py-3 font-medium text-right">Cuota</th>
+                                            <th class="px-6 py-3 font-medium text-right">Interés</th>
+                                            <th class="px-6 py-3 font-medium text-right">Capital</th>
+                                            <th class="px-6 py-3 font-medium text-right">Saldo Restante</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-white/5 font-mono text-gray-300">
+                                        <tr class="hover:bg-white/[0.02]">
+                                            <td class="px-6 py-3 text-white font-sans text-xs">1</td>
+                                            <td class="px-6 py-3 text-right">105.106,23</td>
+                                            <td class="px-6 py-3 text-right text-gray-500">35.416,67</td>
+                                            <td class="px-6 py-3 text-right">69.689,56</td>
+                                            <td class="px-6 py-3 text-right text-white">430.310,44</td>
+                                        </tr>
+                                        <tr class="bg-white/[0.01] hover:bg-white/[0.03]">
+                                            <td class="px-6 py-3 text-white font-sans text-xs">2</td>
+                                            <td class="px-6 py-3 text-right">105.106,23</td>
+                                            <td class="px-6 py-3 text-right text-gray-500">30.480,32</td>
+                                            <td class="px-6 py-3 text-right">74.625,91</td>
+                                            <td class="px-6 py-3 text-right text-white">355.684,53</td>
+                                        </tr>
+                                        <tr class="hover:bg-white/[0.02]">
+                                            <td class="px-6 py-3 text-white font-sans text-xs">3</td>
+                                            <td class="px-6 py-3 text-right">105.106,23</td>
+                                            <td class="px-6 py-3 text-right text-gray-500">25.194,32</td>
+                                            <td class="px-6 py-3 text-right">79.911,91</td>
+                                            <td class="px-6 py-3 text-right text-white">275.772,62</td>
+                                        </tr>
+                                        <tr class="bg-white/[0.01] hover:bg-white/[0.03]">
+                                            <td class="px-6 py-3 text-white font-sans text-xs">4</td>
+                                            <td class="px-6 py-3 text-right">105.106,23</td>
+                                            <td class="px-6 py-3 text-right text-gray-500">19.533,89</td>
+                                            <td class="px-6 py-3 text-right">85.572,34</td>
+                                            <td class="px-6 py-3 text-right text-white">190.200,28</td>
+                                        </tr>
+                                        <tr class="hover:bg-white/[0.02]">
+                                            <td class="px-6 py-3 text-white font-sans text-xs">5</td>
+                                            <td class="px-6 py-3 text-right">105.106,23</td>
+                                            <td class="px-6 py-3 text-right text-gray-500">13.472,52</td>
+                                            <td class="px-6 py-3 text-right">91.633,71</td>
+                                            <td class="px-6 py-3 text-right text-white">98.566,57</td>
+                                        </tr>
+                                        <tr class="bg-white/[0.01] hover:bg-white/[0.03]">
+                                            <td class="px-6 py-3 text-white font-sans text-xs">6</td>
+                                            <td class="px-6 py-3 text-right">105.548,22</td>
+                                            <td class="px-6 py-3 text-right text-gray-500">6.981,65</td>
+                                            <td class="px-6 py-3 text-right">98.566,57</td>
+                                            <td class="px-6 py-3 text-right text-white">0,00</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Floating Action Bottom -->
+                        <div class="absolute bottom-4 right-6">
+                            <button class="bg-white text-[hsl(215,30%,6%)] font-bold px-6 py-2 rounded-full shadow-lg hover:scale-105 transition-transform flex items-center gap-2">
+                                <i class="ph-bold ph-plus"></i> Crear Préstamo con estos datos
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- ==============================================
+                 SECTION 3: PERSONAS (BORROWERS MANAGEMENT)
+            ================================================ -->
+            <section id="personas" class="pt-12 border-t border-subtle">
+                
+                <!-- Heavy duty Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                            <i class="ph-duotone ph-users text-primary"></i> Directorio de Personas
+                        </h2>
+                    </div>
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <div class="relative w-full sm:w-64">
+                            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                            <input type="text" placeholder="Buscar nombre o alias..." class="w-full bg-[#0a0f16] border border-subtle rounded-md py-2 pl-9 pr-3 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                        </div>
+                        <button class="bg-white text-base-bg font-semibold px-4 py-2 rounded-md whitespace-nowrap hover:bg-gray-200 transition-colors flex items-center gap-2 border border-white">
+                            <i class="ph-bold ph-user-plus"></i> <span class="hidden sm:inline">Nueva Persona</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filter Chips -->
+                <div class="flex flex-wrap items-center gap-2 mb-6">
+                    <span class="text-xs text-gray-500 font-medium uppercase tracking-wider mr-2">Filtrar por Riesgo:</span>
+                    <button class="px-3 py-1.5 rounded-full bg-white/10 text-white text-xs font-medium border border-white/20">Todos <span class="text-gray-400 ml-1">12</span></button>
+                    <button class="px-3 py-1.5 rounded-full badge-positive text-xs font-medium hover:bg-positive/20 transition-colors">Riesgo Bajo <span class="opacity-70 ml-1">5</span></button>
+                    <button class="px-3 py-1.5 rounded-full badge-warning text-xs font-medium hover:bg-warning/20 transition-colors">Riesgo Medio <span class="opacity-70 ml-1">4</span></button>
+                    <button class="px-3 py-1.5 rounded-full badge-danger text-xs font-medium hover:bg-danger/20 transition-colors">Riesgo Alto <span class="opacity-70 ml-1">2</span></button>
+                    <button class="px-3 py-1.5 rounded-full bg-[hsl(215,30%,6%)] text-[hsl(359,100%,65%)] border border-[hsl(359,100%,65%)] text-xs font-medium shadow-[0_0_10px_rgba(244,63,94,0.3)]">Crítico <span class="opacity-70 ml-1">1</span></button>
+                </div>
+
+                <!-- List View (Table mimicking list) -->
+                <div class="bg-card border border-subtle rounded-[1rem] shadow-[0_8px_30px_rgb(0,0,0,0.25)] overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="text-xs text-gray-500 uppercase bg-[#0f141d] border-b border-subtle">
+                            <tr>
+                                <th class="px-6 py-4 font-medium w-1/3">Nombre / Alias</th>
+                                <th class="px-6 py-4 font-medium">Relación</th>
+                                <th class="px-6 py-4 font-medium">Score Riesgo</th>
+                                <th class="px-6 py-4 font-medium text-right">Exposición Actual</th>
+                                <th class="px-6 py-4 font-medium text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            
+                            <!-- Standard Row -->
+                            <tr class="hover:bg-white/[0.02] group cursor-pointer transition-colors">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-gray-800 text-white flex items-center justify-center font-bold font-serif shadow-inner">
+                                            MG
+                                        </div>
+                                        <div>
+                                            <p class="text-white font-medium">María Gómez</p>
+                                            <p class="text-gray-500 text-xs text-mono">@mariag_ventas</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4"><span class="badge-neutral">Conocido Comercial</span></td>
+                                <td class="px-6 py-4"><span class="badge-warning font-mono">6.8 Medio</span></td>
+                                <td class="px-6 py-4 text-right">
+                                    <p class="text-white font-medium">$420.000</p>
+                                    <p class="text-gray-500 text-xs">2 préstamos activos</p>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <div class="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button class="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors" title="Detalles"><i class="ph ph-eyes"></i></button>
+                                        <button class="p-2 text-primary hover:text-[hsl(217,91%,70%)] hover:bg-primary/10 rounded-md transition-colors" title="Nuevo Préstamo"><i class="ph ph-hand-coins"></i></button>
+                                        <button class="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"><i class="ph ph-caret-down"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Expanded Row State (Active) -->
+                            <tr class="bg-white/[0.03] border-l-2 border-l-primary group cursor-pointer">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <!-- Avatar with image this time -->
+                                        <div class="w-10 h-10 rounded-full bg-gray-800 overflow-hidden shadow-inner">
+                                            <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80" alt="Avatar Lucas" class="w-full h-full object-cover">
+                                        </div>
+                                        <div>
+                                            <p class="text-white font-bold">Lucas Silva <i class="ph-fill ph-check-circle text-primary text-xs ml-1" title="Identidad Verificada"></i></p>
+                                            <p class="text-gray-500 text-xs text-mono">luqui_dev</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4"><span class="badge-neutral">Amigo Cercano</span></td>
+                                <td class="px-6 py-4"><span class="badge-positive font-mono">8.9 Bajo</span></td>
+                                <td class="px-6 py-4 text-right">
+                                    <p class="text-white font-medium">$850.000</p>
+                                    <p class="text-gray-500 text-xs">1 préstamo activo</p>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <button class="p-2 text-white bg-white/10 rounded-md" title="Contraer"><i class="ph ph-caret-up"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            
+                            <!-- Expander Content (Meso-architecture logic: deep details) -->
+                            <tr class="bg-[#0f141d] border-b border-subtle">
+                                <td colspan="5" class="p-0">
+                                    <!-- Inner GridLayout -->
+                                    <div class="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 relative before:absolute before:left-0 before:top-0 before:bottom-0 before:w-0.5 before:bg-primary shadow-inner">
+                                        
+                                        <!-- Panel 1: Perfil Crediticio -->
+                                        <div class="space-y-4">
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-white/5 pb-2">Perfil Ingresos (Estimado)</h4>
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-500">Ingreso Mensual:</span>
+                                                <span class="text-white font-mono">$1.200.000</span>
+                                            </div>
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-500">Rel. Cuota/Ingreso:</span>
+                                                <span class="text-positive font-mono font-medium">15.4% <span class="text-gray-500 text-xs font-sans">(Sano)</span></span>
+                                            </div>
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-500">Ocupación:</span>
+                                                <span class="text-white">Desarrollador SR</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Panel 2: Comportamiento Histórico -->
+                                        <div class="space-y-4">
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-white/5 pb-2">Comportamiento Histórico</h4>
+                                            <div class="grid grid-cols-2 gap-4">
+                                                <div class="bg-base p-3 rounded-md border border-subtle text-center">
+                                                    <p class="text-[10px] text-gray-500 uppercase mb-1">Préstamos Pagados</p>
+                                                    <p class="text-xl font-bold text-white">4</p>
+                                                </div>
+                                                <div class="bg-base p-3 rounded-md border border-subtle text-center">
+                                                    <p class="text-[10px] text-gray-500 uppercase mb-1">Días Atraso Prom.</p>
+                                                    <p class="text-xl font-bold text-positive">0.5</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Panel 3: Quick Action / Status -->
+                                        <div class="space-y-4 flex flex-col">
+                                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-white/5 pb-2">Préstamo Activo</h4>
+                                            <div class="flex-1 bg-gradient-to-r from-[hsl(217,91%,60%)]/5 to-transparent p-3 rounded-md border border-[hsl(217,91%,60%)]/20">
+                                                <div class="flex justify-between items-center mb-1">
+                                                    <span class="text-sm font-medium text-white">Préstamo "Auto"</span>
+                                                    <span class="text-xs badge-positive">Al día</span>
+                                                </div>
+                                                <p class="text-xs text-gray-400 mb-2">Próx. Vencimiento: <span class="text-white">15 Octubre</span></p>
+                                                <div class="w-full bg-base rounded-full h-1.5 overflow-hidden border border-white/5">
+                                                    <div class="bg-primary h-full" style="width: 45%"></div>
+                                                </div>
+                                                <p class="text-[10px] text-gray-500 text-right mt-1">45% Pagado</p>
+                                            </div>
+                                            <button class="w-full py-2 bg-white/5 hover:bg-white/10 text-white text-xs font-medium rounded-md transition-colors border border-white/10">
+                                                Ver legajo completo →
+                                            </button>
+                                        </div>
+
+                                    </div>
+                                </td>
+                            </tr>
+                            <!-- End Expanded Row -->
+
+                            <!-- Red Risk Row -->
+                            <tr class="hover:bg-white/[0.02] group cursor-pointer transition-colors bg-[hsl(359,100%,65%)]/[0.02]">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-gray-800 text-white flex items-center justify-center font-bold font-serif shadow-inner border border-danger/30">
+                                            JP
+                                        </div>
+                                        <div>
+                                            <p class="text-white font-medium">Juan Perez <i class="ph-fill ph-warning text-danger text-xs ml-1"></i></p>
+                                            <p class="text-gray-500 text-xs text-mono">juancho_99</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4"><span class="badge-neutral">Familiar</span></td>
+                                <td class="px-6 py-4"><span class="badge-danger font-mono shadow-[0_0_10px_rgba(244,63,94,0.3)]">3.2 Crítico</span></td>
+                                <td class="px-6 py-4 text-right">
+                                    <p class="text-white font-medium">$600.000</p>
+                                    <p class="text-danger text-xs font-medium">3 Cuotas Vencidas</p>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <div class="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button class="px-3 py-1 bg-danger/20 text-danger text-xs font-medium rounded hover:bg-danger/30 transition-colors border border-danger/30">Reclamar</button>
+                                    </div>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                    
+                    <div class="p-4 border-t border-subtle text-center text-sm text-gray-500 hover:text-white transition-colors cursor-pointer bg-white/[0.01]">
+                        Cargar más resultados...
+                    </div>
+                </div>
+
+            </section>
+
+
+            <!-- ==============================================
+                 SECTION 4: ANÁLISIS DE RIESGO (RISK ANALYSIS)
+            ================================================ -->
+            <section id="riesgo" class="pt-12 border-t border-subtle">
+                
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                        <i class="ph-duotone ph-shield-warning text-gray-300"></i> Panel de Riesgo y Estrés
+                    </h2>
+                </div>
+
+                <!-- Health Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-card border border-subtle rounded-[1rem] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.25)] flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center text-warning border border-warning/20">
+                            <i class="ph-bold ph-user-minus text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm font-medium mb-0.5">Personas con Exceso</p>
+                            <h3 class="text-2xl font-bold text-white">1 <span class="text-sm font-normal text-gray-500">/ 12 activos</span></h3>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card border border-subtle rounded-[1rem] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.25)] flex items-center gap-4">
+                         <div class="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center text-danger border border-danger/20">
+                            <i class="ph-bold ph-trend-down text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm font-medium mb-0.5">Peor Escenario (Pérdida max)</p>
+                            <h3 class="text-2xl font-bold text-danger">-22.5% <span class="text-sm font-normal text-gray-500">del portfolio</span></h3>
+                        </div>
+                    </div>
+
+                    <div class="bg-card border border-subtle rounded-[1rem] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.25)] flex items-center gap-4">
+                         <div class="w-12 h-12 rounded-full bg-positive/10 flex items-center justify-center text-positive border border-positive/20">
+                            <i class="ph-bold ph-shield-check text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm font-medium mb-0.5">Capital Asegurado</p>
+                            <h3 class="text-2xl font-bold text-white">72% <span class="text-sm font-normal text-gray-500">con colateral</span></h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 40/60 Split for Risk Tables vs Scenarios -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-6">
+                    
+                    <!-- Límite de Exposición Table (Span 3/5) -->
+                    <div class="xl:col-span-3 bg-card border border-subtle rounded-[1rem] shadow-[0_8px_30px_rgb(0,0,0,0.25)] overflow-hidden flex flex-col">
+                        <div class="p-5 border-b border-subtle flex justify-between items-center bg-[#0f141d]">
+                            <h3 class="text-white font-medium">Control de Límites de Exposición</h3>
+                            <button class="text-xs text-primary hover:underline">Ajustar políticas legales</button>
+                        </div>
+                        <div class="overflow-x-auto flex-1">
+                            <table class="w-full text-sm text-left whitespace-nowrap">
+                                <thead class="text-xs text-gray-500 uppercase bg-[#0a0f16]">
+                                    <tr>
+                                        <th class="px-5 py-3 font-medium flex items-center gap-1 cursor-pointer hover:text-white">Persona <i class="ph ph-caret-up text-[10px]"></i></th>
+                                        <th class="px-5 py-3 font-medium">Categoría</th>
+                                        <th class="px-5 py-3 font-medium text-right">Exposición / Límite</th>
+                                        <th class="px-5 py-3 font-medium w-1/3">Uso del Límite</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    <tr class="hover:bg-white/[0.02]">
+                                        <td class="px-5 py-4 font-medium text-white">Juan Perez</td>
+                                        <td class="px-5 py-4"><span class="badge-danger">Alto Riesgo</span></td>
+                                        <td class="px-5 py-4 text-right">
+                                            <span class="text-danger font-medium">$600k</span> <span class="text-gray-500">/ $400k</span>
+                                        </td>
+                                        <td class="px-5 py-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-1 bg-base rounded-full h-2 overflow-hidden border border-white/5 relative">
+                                                    <!-- Gradient bar exceeding limit visually -->
+                                                    <div class="absolute left-0 top-0 h-full bg-gradient-to-r from-warning to-danger" style="width: 100%;"></div>
+                                                </div>
+                                                <span class="text-xs font-bold text-danger w-8 text-right">150%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="hover:bg-white/[0.02]">
+                                        <td class="px-5 py-4 font-medium text-white">Lucas Silva</td>
+                                        <td class="px-5 py-4"><span class="badge-positive">Premium</span></td>
+                                        <td class="px-5 py-4 text-right">
+                                            <span class="text-white font-medium">$850k</span> <span class="text-gray-500">/ $1.5M</span>
+                                        </td>
+                                        <td class="px-5 py-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-1 bg-base rounded-full h-2 overflow-hidden border border-white/5">
+                                                    <div class="bg-positive h-full rounded-full" style="width: 56.6%;"></div>
+                                                </div>
+                                                <span class="text-xs font-medium text-gray-400 w-8 text-right">56%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                     <tr class="hover:bg-white/[0.02]">
+                                        <td class="px-5 py-4 font-medium text-white">María Gómez</td>
+                                        <td class="px-5 py-4"><span class="badge-warning">Estándar</span></td>
+                                        <td class="px-5 py-4 text-right">
+                                            <span class="text-white font-medium">$420k</span> <span class="text-gray-500">/ $500k</span>
+                                        </td>
+                                        <td class="px-5 py-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-1 bg-base rounded-full h-2 overflow-hidden border border-white/5">
+                                                    <div class="bg-warning h-full rounded-full" style="width: 84%;"></div>
+                                                </div>
+                                                <span class="text-xs font-medium text-gray-400 w-8 text-right">84%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                     <tr class="hover:bg-white/[0.02]">
+                                        <td class="px-5 py-4 font-medium text-white">Sofía R.</td>
+                                        <td class="px-5 py-4"><span class="badge-positive">Premium</span></td>
+                                        <td class="px-5 py-4 text-right">
+                                            <span class="text-white font-medium">$200k</span> <span class="text-gray-500">/ $1.5M</span>
+                                        </td>
+                                        <td class="px-5 py-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-1 bg-base rounded-full h-2 overflow-hidden border border-white/5">
+                                                    <div class="bg-positive h-full rounded-full" style="width: 13%;"></div>
+                                                </div>
+                                                <span class="text-xs font-medium text-gray-400 w-8 text-right">13%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Stress Test Scenarios (Span 2/5) -->
+                    <div class="xl:col-span-2 space-y-4">
+                        <h3 class="text-white font-medium px-1 flex items-center gap-2 relative">
+                            Escenarios de Estrés (Simulados)
+                            <div class="group relative inline-block cursor-help">
+                                <i class="ph ph-info text-gray-500 text-sm"></i>
+                                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-xs text-gray-300 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">Impacto en el capital si ocurren eventos sistémicos.</div>
+                            </div>
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Scenario 1 -->
+                            <div class="bg-[#0f141d] border border-subtle rounded-lg p-4 hover:border-danger/30 transition-colors group cursor-default shadow-sm relative overflow-hidden">
+                                <div class="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-20 transition-opacity">
+                                    <i class="ph-fill ph-trend-down text-7xl text-danger"></i>
+                                </div>
+                                <div class="flex items-start gap-3 mb-3 relative z-10">
+                                    <div class="p-1.5 rounded bg-danger/10 text-danger mt-1">
+                                        <i class="ph ph-briefcase"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-bold text-white leading-tight">Default Conocidos</h4>
+                                        <p class="text-[10px] text-gray-400 mt-0.5">Pérdida de personas sin lazo familiar.</p>
+                                    </div>
+                                </div>
+                                <div class="relative z-10">
+                                    <p class="text-2xl font-black text-danger tracking-tight">-$420K</p>
+                                    <div class="mt-3 flex items-center gap-1 border-t border-white/5 pt-3">
+                                        <span class="text-[10px] text-gray-500 uppercase mr-1">Expuestos:</span>
+                                        <div class="flex -space-x-2">
+                                            <div class="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-[8px] border border-[#0f141d]">MG</div>
+                                            <div class="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center text-[8px] border border-[#0f141d]">+2</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Scenario 2 -->
+                            <div class="bg-[#0f141d] border border-subtle rounded-lg p-4 hover:border-warning/30 transition-colors group cursor-default shadow-sm relative overflow-hidden">
+                                 <div class="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-20 transition-opacity">
+                                    <i class="ph-fill ph-clock-counter-clockwise text-7xl text-warning"></i>
+                                </div>
+                                <div class="flex items-start gap-3 mb-3 relative z-10">
+                                    <div class="p-1.5 rounded bg-warning/10 text-warning mt-1">
+                                        <i class="ph ph-calendar-x"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-bold text-white leading-tight">Atraso General <br>(+60 días)</h4>
+                                    </div>
+                                </div>
+                                <div class="relative z-10">
+                                    <p class="text-xl font-bold text-warning tracking-tight mt-1">Liquidez: 0%</p>
+                                    <p class="text-[10px] text-gray-400 mt-1">Flujo de caja cortado por 2 meses.</p>
+                                     <div class="mt-2 flex items-center gap-1 border-t border-white/5 pt-2">
+                                        <span class="text-[10px] text-gray-500">Riesgo Alto</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Scenario 3 (Spans 2 cols for variety) -->
+                            <div class="sm:col-span-2 bg-gradient-to-r from-[hsl(217,91%,60%)]/10 to-transparent border border-[hsl(217,91%,60%)]/20 rounded-lg p-4 relative overflow-hidden group">
+                                <div class="flex items-center justify-between relative z-10">
+                                    <div>
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <i class="ph-fill ph-currency-circle-dollar text-primary"></i>
+                                            <h4 class="text-sm font-bold text-white">Devaluación Shock</h4>
+                                        </div>
+                                        <p class="text-xs text-gray-400">Salto cambiario 50% vs cartera en ARS.</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-xl font-bold text-white italic">-33%</p>
+                                        <p class="text-[10px] text-gray-500 uppercase">Poder adq. real</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+    </main>
+
+</body>
+</html>
