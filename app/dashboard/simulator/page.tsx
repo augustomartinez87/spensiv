@@ -173,6 +173,7 @@ export default function SimulatorPage() {
         setTnaTarget(tnaPercent)
       } else {
         setImpliedTna(null)
+        setTnaTarget('')
       }
     },
   })
@@ -221,6 +222,10 @@ export default function SimulatorPage() {
           startDate,
           firstInstallmentMonth: firstInstallmentMonth || undefined,
         })
+      } else if (installment > 0 && cap > 0 && term > 0) {
+        // Cuota insuficiente para amortizar: limpiar TNA stale y dejar el
+        // botón Simular deshabilitado intencionalmente.
+        setTnaTarget('')
       }
     }, 300)
   }
@@ -517,7 +522,9 @@ export default function SimulatorPage() {
                 {!reverseMutation.isPending && impliedTna === null && customInstallment !== '' &&
                   parseFloat(customInstallment) > 0 && parseFloat(capital) > 0 && parseInt(termMonths) > 0 &&
                   parseFloat(customInstallment) <= parseFloat(capital) / parseInt(termMonths) && (
-                  <p className="text-xs text-red-500">Cuota insuficiente para amortizar</p>
+                  <p className="text-xs text-red-500">
+                    Cuota insuficiente para amortizar. Mínimo para este capital y plazo: {formatCurrency(parseFloat(capital) / parseInt(termMonths), currency)} (TNA 0%).
+                  </p>
                 )}
               </div>
             )}

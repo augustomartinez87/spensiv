@@ -94,6 +94,7 @@ export function CreateLoanDialog({
                 setTna(tnaPercent)
             } else {
                 setImpliedTna(null)
+                setTna('')
             }
         },
     })
@@ -115,6 +116,8 @@ export function CreateLoanDialog({
                 startDate,
                 firstInstallmentMonth: firstInstallmentMonth || undefined,
             })
+        } else if (installment > 0 && cap > 0 && term > 0) {
+            setTna('')
         }
     }
 
@@ -144,6 +147,8 @@ export function CreateLoanDialog({
                 startDate,
                 firstInstallmentMonth: firstInstallmentMonth || undefined,
             })
+        } else if (i > 0 && c > 0 && t > 0) {
+            setTna('')
         }
     }
 
@@ -583,7 +588,9 @@ export function CreateLoanDialog({
                                 {!reverseMutation.isPending && impliedTna === null && customInstallment !== '' &&
                                     parseFloat(customInstallment) > 0 && parseFloat(capital) > 0 && parseInt(termMonths) > 0 &&
                                     parseFloat(customInstallment) <= parseFloat(capital) / parseInt(termMonths) && (
-                                        <p className="text-xs text-red-500">Cuota insuficiente para amortizar</p>
+                                        <p className="text-xs text-red-500">
+                                            Cuota insuficiente para amortizar. Mínimo para este capital y plazo: {formatCurrency(parseFloat(capital) / parseInt(termMonths), currency)} (TNA 0%).
+                                        </p>
                                     )}
                             </div>
                         </div>
