@@ -230,6 +230,36 @@ export default function SimulatorPage() {
     }, 300)
   }
 
+  function retriggerReverseFromInstallment(nextCapital: string, nextTerm: string) {
+    if (!customInstallment) return
+    const installment = parseFloat(customInstallment)
+    const cap = parseFloat(nextCapital)
+    const term = parseInt(nextTerm)
+    setImpliedTna(null)
+    if (installment > 0 && cap > 0 && term > 0 && installment > cap / term) {
+      reverseMutation.mutate({
+        capital: cap,
+        termMonths: term,
+        desiredInstallment: installment,
+        smartDueDate,
+        startDate,
+        firstInstallmentMonth: firstInstallmentMonth || undefined,
+      })
+    } else if (installment > 0 && cap > 0 && term > 0) {
+      setTnaTarget('')
+    }
+  }
+
+  function handleCapitalChange(value: string) {
+    setCapital(value)
+    retriggerReverseFromInstallment(value, termMonths)
+  }
+
+  function handleTermChange(value: string) {
+    setTermMonths(value)
+    retriggerReverseFromInstallment(capital, value)
+  }
+
   function addCompareTerm() {
     const term = parseInt(compareTermsInput)
     if (term > 0 && term <= 360 && !compareTerms.includes(term) && compareTerms.length < 4) {
@@ -425,7 +455,7 @@ export default function SimulatorPage() {
               max={currency === 'USD' ? 50000 : 20000000}
               step={currency === 'USD' ? 100 : 50000}
               value={capital}
-              onChange={(e) => setCapital(e.target.value)}
+              onChange={(e) => handleCapitalChange(e.target.value)}
               className="w-full h-2 rounded-full appearance-none cursor-pointer bg-muted accent-primary"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
@@ -436,7 +466,7 @@ export default function SimulatorPage() {
             <Input
               type="number"
               value={capital}
-              onChange={(e) => setCapital(e.target.value)}
+              onChange={(e) => handleCapitalChange(e.target.value)}
               onFocus={(e) => e.target.select()}
               placeholder="Monto exacto"
               className="h-8 text-sm text-center"
@@ -451,7 +481,7 @@ export default function SimulatorPage() {
                   id="termMonths"
                   type="number"
                   value={termMonths}
-                  onChange={(e) => setTermMonths(e.target.value)}
+                  onChange={(e) => handleTermChange(e.target.value)}
                   onFocus={(e) => e.target.select()}
                   placeholder="12"
                   min="1"
