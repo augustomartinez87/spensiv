@@ -537,6 +537,48 @@ export const loanCrudRouter = router({
       if (!input.termMonths) throw new TRPCError({ code: 'BAD_REQUEST', message: 'El plazo es requerido para préstamos amortizados' })
       if (input.tna === undefined || input.tna === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La TNA es requerida para préstamos amortizados' })
 
+      // Use the same smart-schedule path as 'create' when smartDueDate/firstInstallmentMonth is set
+      if (input.smartDueDate || input.firstInstallmentMonth) {
+        const smart = generateSmartAmortizationTable(
+          input.capital,
+          input.tna,
+          input.startDate,
+          input.termMonths,
+          input.roundingMultiple ?? 0,
+          input.firstInstallmentMonth,
+        )
+
+        const effectiveTna = smart.effectiveTna
+        const effectiveMonthlyRate = effectiveTna / 12
+
+        const loan = await ctx.prisma.loan.create({
+          data: {
+            userId: ctx.user.id,
+            borrowerName: input.borrowerName,
+            capital: input.capital,
+            currency: input.currency,
+            loanType: 'amortized',
+            tna: effectiveTna,
+            rateIsNominal: true,
+            termMonths: input.termMonths,
+            monthlyRate: effectiveMonthlyRate,
+            installmentAmount: smart.installmentAmount,
+            totalAmount: smart.totalPaid,
+            startDate,
+            status: 'pre_approved',
+            principalOutstanding: input.capital,
+            overdueInterestOutstanding: 0,
+            personId: input.personId ?? null,
+            direction: input.direction,
+            creditorName: input.creditorName ?? null,
+            collectorId: input.collectorId ?? null,
+          },
+        })
+
+        return loan
+      }
+
+      // Standard French amortization path (no smart dates)
       let monthlyRate = tnaToMonthlyRate(input.tna)
       const exactInstallment = frenchInstallment(input.capital, monthlyRate, input.termMonths)
       const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
@@ -574,7 +616,7 @@ export const loanCrudRouter = router({
           personId: input.personId ?? null,
           direction: input.direction,
           creditorName: input.creditorName ?? null,
-            collectorId: input.collectorId ?? null,
+          collectorId: input.collectorId ?? null,
         },
       })
 
@@ -585,6 +627,8 @@ export const loanCrudRouter = router({
     .input(z.object({
       loanId: z.string(),
       startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      smartDueDate: z.boolean().optional(),
+      firstInstallmentMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const loan = await ctx.prisma.loan.findFirst({
@@ -615,27 +659,65 @@ export const loanCrudRouter = router({
         // Zero-rate loans have no installment schedule
         if (monthlyRate > 0) {
           const termMonths = loan.termMonths!
-          const installmentAmount = Number(loan.installmentAmount)
+          const capital = Number(loan.capital)
 
-          const table = generateAmortizationTable(
-            Number(loan.capital),
-            monthlyRate,
-            termMonths,
-            installmentAmount,
-            input.startDate,
-          )
+          if (input.smartDueDate || input.firstInstallmentMonth) {
+            // Smart schedule: recalculate from the new startDate using actual-day interest
+            const smart = generateSmartAmortizationTable(
+              capital,
+              Number(loan.tna),
+              input.startDate,
+              termMonths,
+              0, // rounding already applied during pre-approval
+              input.firstInstallmentMonth,
+            )
 
-          await ctx.prisma.loanInstallment.createMany({
-            data: table.map((row) => ({
-              loanId: loan.id,
-              number: row.month,
-              dueDate: addMonths(startDate, row.month),
-              amount: row.installment,
-              interest: row.interest,
-              principal: row.principal,
-              balance: row.balance,
-            })),
-          })
+            await ctx.prisma.loanInstallment.createMany({
+              data: smart.rows.map((row) => ({
+                loanId: loan.id,
+                number: row.month,
+                dueDate: new Date(row.date + 'T12:00:00'),
+                amount: row.installment,
+                interest: row.interest,
+                principal: row.principal,
+                balance: row.balance,
+              })),
+            })
+
+            // Update loan fields to match the recalculated schedule
+            await ctx.prisma.loan.update({
+              where: { id: loan.id },
+              data: {
+                installmentAmount: smart.installmentAmount,
+                totalAmount: smart.totalPaid,
+                tna: smart.effectiveTna,
+                monthlyRate: smart.effectiveTna / 12,
+              },
+            })
+          } else {
+            // Standard French amortization
+            const installmentAmount = Number(loan.installmentAmount)
+
+            const table = generateAmortizationTable(
+              capital,
+              monthlyRate,
+              termMonths,
+              installmentAmount,
+              input.startDate,
+            )
+
+            await ctx.prisma.loanInstallment.createMany({
+              data: table.map((row) => ({
+                loanId: loan.id,
+                number: row.month,
+                dueDate: addMonths(startDate, row.month),
+                amount: row.installment,
+                interest: row.interest,
+                principal: row.principal,
+                balance: row.balance,
+              })),
+            })
+          }
         }
       }
 

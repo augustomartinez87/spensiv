@@ -279,7 +279,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                             <PreApprovedLoanCard
                                 key={loan.id}
                                 loan={loan}
-                                onConfirm={(loanId, startDate) => confirmMutation.mutate({ loanId, startDate })}
+                                onConfirm={(loanId, startDate) => confirmMutation.mutate({ loanId, startDate, smartDueDate: true })}
                                 onDelete={(id) => deleteMutation.mutate({ id })}
                                 isConfirming={confirmMutation.isPending}
                                 isDeleting={deleteMutation.isPending}
