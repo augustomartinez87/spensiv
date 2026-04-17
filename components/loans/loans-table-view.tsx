@@ -6,7 +6,6 @@ import { formatCurrency, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
     Table,
@@ -26,6 +25,7 @@ import {
     Search,
     Clock,
 } from 'lucide-react'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -41,7 +41,6 @@ import type { LoanListItem } from './types'
 
 type SortColumn = 'person' | 'capital' | 'type' | 'tna' | 'term' | 'progress' | 'nextDue' | 'status'
 type SortDirection = 'asc' | 'desc'
-type StatusFilter = 'all' | 'current' | 'overdue' | 'interestOnly'
 type CurrencyFilter = 'all' | 'ARS' | 'USD' | 'EUR'
 
 /** A zero-rate loan has no installment schedule — never "overdue" */
@@ -128,11 +127,8 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
 
     const [sortColumn, setSortColumn] = useState<SortColumn>('nextDue')
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-    const [quickFilter, setQuickFilter] = useState<StatusFilter>('all')
     const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>('all')
     const [searchQuery, setSearchQuery] = useState('')
-    const [collectorFilter, setCollectorFilter] = useState<string>('all')
-    const { data: persons } = trpc.persons.list.useQuery()
 
     function handleSort(column: SortColumn) {
         if (sortColumn === column) {
@@ -147,25 +143,9 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
         if (!loans) return []
         let result = loans.filter(l => l.status !== 'pre_approved')
 
-        // Quick filter
-        if (quickFilter === 'current') {
-            result = result.filter(l => getLoanStatus(l) === 'current')
-        } else if (quickFilter === 'overdue') {
-            result = result.filter(l => getLoanStatus(l) === 'overdue')
-        } else if (quickFilter === 'interestOnly') {
-            result = result.filter(l => l.loanType === 'interest_only')
-        }
-
         // Currency filter
         if (currencyFilter !== 'all') {
             result = result.filter(l => l.currency === currencyFilter)
-        }
-
-        // Collector filter
-        if (collectorFilter === '__none__') {
-            result = result.filter(l => !l.collector)
-        } else if (collectorFilter !== 'all') {
-            result = result.filter(l => l.collector?.id === collectorFilter)
         }
 
         // Search
@@ -178,7 +158,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
         }
 
         return result
-    }, [loans, quickFilter, currencyFilter, collectorFilter, searchQuery])
+    }, [loans, currencyFilter, searchQuery])
 
     const sorted = useMemo(() => {
         const arr = [...filtered]
@@ -245,23 +225,6 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
 
     return (
         <div className="space-y-4">
-            {/* Status filter toggle (same as card view) */}
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex bg-muted rounded-lg p-0.5 w-fit">
-                    {(['active', 'completed', 'refinanced'] as const).map((s) => (
-                        <Button
-                            key={s}
-                            variant={statusFilter === s ? 'default' : 'ghost'}
-                            size="sm"
-                            className="h-8 text-xs"
-                            onClick={() => setStatusFilter(s)}
-                        >
-                            {s === 'active' ? 'Activos' : s === 'completed' ? 'Finalizados' : 'Refinanciados'}
-                        </Button>
-                    ))}
-                </div>
-            </div>
-
             {/* Preaprobados */}
             {preApproved.length > 0 && (
                 <div className="space-y-3">
@@ -289,67 +252,37 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                 </div>
             )}
 
-            {/* Search + quick filters */}
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1 max-w-md">
+            {/* Unified filter bar: [estado] · [moneda] · [búsqueda] */}
+            <div className="flex flex-wrap items-center gap-2">
+                <SegmentedControl
+                    value={statusFilter}
+                    onValueChange={setStatusFilter}
+                    options={[
+                        { value: 'active', label: 'Activos' },
+                        { value: 'completed', label: 'Finalizados' },
+                        { value: 'refinanced', label: 'Refinanciados' },
+                    ]}
+                    size="sm"
+                />
+                <SegmentedControl
+                    value={currencyFilter}
+                    onValueChange={setCurrencyFilter}
+                    options={[
+                        { value: 'all', label: 'Todas' },
+                        { value: 'ARS', label: 'ARS' },
+                        { value: 'USD', label: 'USD' },
+                        { value: 'EUR', label: 'EUR' },
+                    ]}
+                    size="sm"
+                />
+                <div className="relative flex-1 min-w-[200px] max-w-md">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                        placeholder="Buscar por persona o concepto..."
+                        placeholder="Buscar persona o concepto..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 h-9"
+                        className="pl-9 h-8 text-xs"
                     />
-                </div>
-                <div className="flex gap-1.5 flex-wrap items-center">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Estado:</span>
-                    {([
-                        { value: 'all', label: 'Todos' },
-                        { value: 'current', label: 'Al día' },
-                        { value: 'overdue', label: 'Vencidos' },
-                        { value: 'interestOnly', label: 'Solo interés' },
-                    ] as const).map((f) => (
-                        <Button
-                            key={f.value}
-                            variant={quickFilter === f.value ? 'secondary' : 'ghost'}
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => setQuickFilter(f.value)}
-                        >
-                            {f.label}
-                        </Button>
-                    ))}
-                    <div className="w-px bg-border mx-1" />
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Moneda:</span>
-                    {(['all', 'ARS', 'USD', 'EUR'] as const).map((c) => (
-                        <Button
-                            key={c}
-                            variant={currencyFilter === c ? 'secondary' : 'ghost'}
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => setCurrencyFilter(c)}
-                        >
-                            {c === 'all' ? 'Todas' : c}
-                        </Button>
-                    ))}
-                    {persons && persons.length > 0 && (
-                        <>
-                            <div className="w-px bg-border mx-1" />
-                            <Select value={collectorFilter} onValueChange={setCollectorFilter}>
-                                <SelectTrigger className="h-7 w-[140px] text-xs">
-                                    <SelectValue placeholder="Cobrador" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todos</SelectItem>
-                                    <SelectItem value="__none__">Sin cobrador</SelectItem>
-                                    {persons.map((p) => (
-                                        <SelectItem key={p.id} value={p.id}>
-                                            {p.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </>
-                    )}
                 </div>
             </div>
 

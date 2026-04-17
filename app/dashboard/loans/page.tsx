@@ -63,7 +63,6 @@ import { useToast } from '@/hooks/use-toast'
 import { amountClass, loanRateInfo } from '@/components/loans/helpers'
 import { LoansDashboardSummary, OverdueBanner } from '@/components/loans/loans-dashboard-summary'
 import { DebtsDashboardSummary } from '@/components/loans/debts-dashboard-summary'
-import { UpcomingInstallmentsGadget } from '@/components/loans/upcoming-installments-gadget'
 
 import { LoanListHeader } from '@/components/loans/loan-list-header'
 import { LoansTableView } from '@/components/loans/loans-table-view'
@@ -108,10 +107,7 @@ export default function LoansPage() {
       {tab === 'lender' ? (
         <div className="space-y-6">
           <LoansDashboardSummary />
-          <div className="grid gap-6 md:grid-cols-[1fr_280px]">
-            <div className="min-w-0">{mainContent}</div>
-            <UpcomingInstallmentsGadget />
-          </div>
+          {mainContent}
         </div>
       ) : (
         <div className="space-y-6">

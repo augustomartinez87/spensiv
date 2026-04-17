@@ -1,97 +1,34 @@
 'use client'
 
-import { useState } from 'react'
 import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { SegmentedControl } from '@/components/ui/segmented-control'
 import { PrivateAmount } from '@/lib/contexts/privacy-context'
-import type { BalanceViewMode } from '@/lib/balance'
 
 function HealthChip({ overdueCount, overdueAmount }: { overdueCount: number; overdueAmount?: number }) {
     if (overdueCount === 0) {
         return (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-positive/15 px-2.5 py-0.5 text-xs font-medium text-accent-positive">
                 <span className="h-1.5 w-1.5 rounded-full bg-accent-positive" />
-                Tu cartera va bien
+                Al día
             </span>
         )
     }
     const level = overdueCount >= 3 ? 'danger' : 'warning'
     const colorClass = level === 'danger' ? 'bg-accent-danger/15 text-accent-danger' : 'bg-yellow-500/15 text-yellow-500'
     const dotClass = level === 'danger' ? 'bg-accent-danger' : 'bg-yellow-500'
-    const prefix = level === 'danger' ? 'Alerta' : 'Atención'
 
     return (
         <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", colorClass)}>
             <span className={cn("h-1.5 w-1.5 rounded-full", dotClass)} />
-            {prefix}: {overdueCount} cuota{overdueCount !== 1 ? 's' : ''} vencida{overdueCount !== 1 ? 's' : ''}
+            {overdueCount} vencida{overdueCount !== 1 ? 's' : ''}
             {overdueAmount != null && overdueAmount > 0 && (
                 <PrivateAmount>
-                    <span className="font-bold"> — {formatCurrency(overdueAmount)}</span>
+                    <span className="font-bold"> · {formatCurrency(overdueAmount)}</span>
                 </PrivateAmount>
             )}
         </span>
-    )
-}
-
-function ProgressRing({ percentage, color }: { percentage: number; color: string }) {
-    const size = 80
-    const strokeWidth = 7
-    const radius = (size - strokeWidth) / 2
-    const circumference = 2 * Math.PI * radius
-    const clampedPct = Math.max(0, Math.min(percentage, 100))
-    const offset = circumference - (clampedPct / 100) * circumference
-
-    return (
-        <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-            <svg width={size} height={size} className="-rotate-90">
-                <circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    fill="none"
-                    stroke="hsl(var(--muted))"
-                    strokeWidth={strokeWidth}
-                />
-                <circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    fill="none"
-                    stroke={color}
-                    strokeWidth={strokeWidth}
-                    strokeDasharray={circumference}
-                    strokeDashoffset={offset}
-                    strokeLinecap="round"
-                    className="transition-all duration-700 ease-out"
-                />
-            </svg>
-            <span className="absolute text-sm font-bold tabular-nums text-foreground">
-                {Math.round(clampedPct)}%
-            </span>
-        </div>
-    )
-}
-
-function MorosityBadge({ percentage }: { percentage: number }) {
-    const color =
-        percentage < 5 ? 'text-accent-positive' :
-        percentage < 15 ? 'text-yellow-500' :
-        'text-accent-danger'
-    const bgColor =
-        percentage < 5 ? 'bg-accent-positive/10' :
-        percentage < 15 ? 'bg-yellow-500/10' :
-        'bg-accent-danger/10'
-
-    return (
-        <div className={cn('flex flex-col items-center gap-1 rounded-lg px-4 py-2.5', bgColor)}>
-            <span className={cn('text-2xl font-bold tabular-nums', color)}>
-                {percentage.toFixed(1)}%
-            </span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Mora</span>
-        </div>
     )
 }
 
@@ -100,22 +37,15 @@ function daysUntilText(date: Date) {
     const diff = Math.ceil((new Date(date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     if (diff === 0) return 'hoy'
     if (diff === 1) return 'mañana'
-    if (diff < 0) return `hace ${Math.abs(diff)} día${Math.abs(diff) !== 1 ? 's' : ''}`
-    return `en ${diff} día${diff !== 1 ? 's' : ''}`
-}
-
-function formatRentByCurrency(rent: Record<string, number>, zeroLabel = '$0') {
-    const entries = Object.entries(rent).filter(([, v]) => v > 0)
-    if (entries.length === 0) return zeroLabel
-    return entries.map(([currency, amount]) => formatCurrency(amount, currency)).join(' + ')
+    if (diff < 0) return `hace ${Math.abs(diff)}d`
+    return `en ${diff}d`
 }
 
 export function LoansDashboardSummary() {
     const { data: metrics, isLoading } = trpc.loans.getDashboardMetrics.useQuery()
-    const [interestView, setInterestView] = useState<BalanceViewMode>('economic')
 
     if (isLoading) {
-        return <Skeleton className="h-[160px] w-full rounded-xl" />
+        return <Skeleton className="h-[120px] w-full rounded-xl" />
     }
 
     if (!metrics || metrics.activeLoansCount === 0) return null
@@ -124,162 +54,84 @@ export function LoansDashboardSummary() {
         (i) => new Date(i.dueDate) >= new Date()
     )
 
-    const hasInterestOnlyRent = Object.values(metrics.interestOnlyRent).some(v => v > 0)
-    const hasInterestMovement =
-        metrics.interestAccruedThisMonth > 0 || metrics.interestCollectedThisMonth > 0
+    const morosityColor =
+        metrics.morosityPct < 5 ? 'text-accent-positive' :
+        metrics.morosityPct < 15 ? 'text-yellow-500' :
+        'text-accent-danger'
 
     return (
-        <div className="flex flex-col gap-3">
-            <Card className="overflow-hidden bg-gradient-to-r from-card to-[hsl(217,30%,13%)] border-border/50">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 p-6 md:min-h-[160px]">
-                    {/* Left: Pending amount + health */}
-                    <div className="flex flex-col justify-center gap-2 min-w-0">
-                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
-                            Pendiente de cobro (capital + interés)
+        <Card className="overflow-hidden bg-gradient-to-r from-card to-[hsl(217,30%,13%)] border-border/50">
+            <div className="flex flex-col gap-3 px-5 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
+                {/* Left: Pending amount + chips under it */}
+                <div className="flex flex-col gap-2 min-w-0">
+                    <div className="flex items-baseline gap-3 flex-wrap">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                            Pendiente de cobro
                         </p>
-                        <PrivateAmount>
-                            <p className="text-[28px] font-bold text-foreground leading-tight tabular-nums tracking-tight">
-                                {formatCurrency(metrics.totalPending)}
-                            </p>
-                        </PrivateAmount>
                         <HealthChip overdueCount={metrics.overdueCount} overdueAmount={metrics.overdueAmount} />
                     </div>
-
-                    {/* Center: Cobranza del mes + Mora */}
-                    <div className="flex items-center gap-6 shrink-0">
-                        <div className="flex flex-col items-center gap-1.5">
-                            {metrics.collectionPct !== null ? (
-                                <ProgressRing
-                                    percentage={metrics.collectionPct}
-                                    color="hsl(var(--accent-positive))"
-                                />
-                            ) : (
-                                <div className="flex items-center justify-center w-[80px] h-[80px] rounded-full border-[7px] border-muted">
-                                    <span className="text-xs text-muted-foreground">N/A</span>
-                                </div>
-                            )}
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                                {metrics.collectionPct !== null ? 'Cobranza del mes' : 'Sin vencimientos'}
-                            </p>
-                        </div>
-                        <MorosityBadge percentage={metrics.morosityPct} />
-                    </div>
-
-                    {/* Right: Mini stats */}
-                    <div className="flex flex-col gap-3 min-w-[180px]">
-                        <MiniStat
-                            label="Esta semana"
-                            value={
-                                metrics.thisWeekCount > 0
-                                    ? formatCurrency(metrics.thisWeekAmount)
-                                    : 'Sin cobros'
-                            }
-                            highlight={metrics.thisWeekCount > 0}
-                        />
-                        <MiniStat
-                            label="Próximo cobro"
-                            value={nextInstallment ? daysUntilText(nextInstallment.dueDate) : 'Sin pendientes'}
-                            highlight={false}
-                            isText
-                        />
-                        <MiniStat
-                            label="Capital activo"
-                            value={formatCurrency(metrics.totalCapitalActive)}
-                        />
-                    </div>
+                    <PrivateAmount>
+                        <p className="text-[26px] font-bold text-foreground leading-tight tabular-nums tracking-tight">
+                            {formatCurrency(metrics.totalPending)}
+                        </p>
+                    </PrivateAmount>
                 </div>
-            </Card>
 
-            {/* Intereses del mes: devengado (económico) vs cobrado (financiero) */}
-            {hasInterestMovement && (
-                <Card className="border-border/50 bg-card/80">
-                    <div className="flex flex-col gap-4 px-6 py-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                            <div className="flex flex-col gap-0.5">
-                                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
-                                    {interestView === 'economic'
-                                        ? 'Intereses devengados este mes'
-                                        : 'Intereses cobrados este mes'}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground/70">
-                                    {interestView === 'economic'
-                                        ? 'Lo que ya te corresponde por calendario'
-                                        : 'Lo que efectivamente entró a caja'}
-                                </p>
-                            </div>
-                            <SegmentedControl<BalanceViewMode>
-                                value={interestView}
-                                onValueChange={setInterestView}
-                                options={[
-                                    { value: 'economic', label: 'Devengado' },
-                                    { value: 'financial', label: 'Cobrado' },
-                                ]}
-                                className="self-start sm:self-auto"
-                            />
-                        </div>
-                        <div className="flex flex-col sm:flex-row sm:items-baseline gap-4 sm:gap-8">
-                            <PrivateAmount>
-                                <p className={cn(
-                                    'text-2xl font-bold tabular-nums',
-                                    interestView === 'economic' ? 'text-accent-blue' : 'text-accent-positive'
-                                )}>
-                                    {formatCurrency(
-                                        interestView === 'economic'
-                                            ? metrics.interestAccruedThisMonth
-                                            : metrics.interestCollectedThisMonth
-                                    )}
-                                </p>
-                            </PrivateAmount>
-                            {metrics.interestGap > 0.01 && (
-                                <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-500/15 px-2.5 py-0.5 text-xs font-medium text-yellow-500">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
-                                    <PrivateAmount>
-                                        <span>Brecha: {formatCurrency(metrics.interestGap)} sin cobrar</span>
-                                    </PrivateAmount>
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </Card>
-            )}
+                {/* Right: compact horizontal chips */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs shrink-0">
+                    {metrics.collectionPct !== null && (
+                        <Chip
+                            label="Cobrado"
+                            value={`${Math.round(metrics.collectionPct)}%`}
+                            valueClass="text-accent-positive"
+                        />
+                    )}
+                    <Chip
+                        label="Mora"
+                        value={`${metrics.morosityPct.toFixed(1)}%`}
+                        valueClass={morosityColor}
+                    />
+                    {metrics.thisWeekCount > 0 && (
+                        <Chip
+                            label="Esta semana"
+                            value={formatCurrency(metrics.thisWeekAmount)}
+                            privateAmount
+                        />
+                    )}
+                    {nextInstallment && (
+                        <Chip label="Próximo" value={daysUntilText(nextInstallment.dueDate)} />
+                    )}
+                    <Chip
+                        label="Capital activo"
+                        value={formatCurrency(metrics.totalCapitalActive)}
+                        privateAmount
+                    />
+                </div>
+            </div>
+        </Card>
+    )
+}
 
-            {/* Renta mensual section for interest-only loans */}
-            {hasInterestOnlyRent && (
-                <Card className="border-border/50 bg-card/80">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4">
-                        <div className="flex flex-col gap-1">
-                            <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
-                                Renta mensual esperada
-                            </p>
-                            <PrivateAmount>
-                                <p className="text-lg font-bold text-foreground tabular-nums">
-                                    {formatRentByCurrency(metrics.interestOnlyRent)}
-                                </p>
-                            </PrivateAmount>
-                        </div>
-                        <div className="flex flex-col gap-1 sm:items-end">
-                            <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
-                                Renta cobrada este mes
-                            </p>
-                            <PrivateAmount>
-                                <p className="text-lg font-bold text-foreground tabular-nums">
-                                    {formatRentByCurrency(metrics.interestOnlyCollected)}
-                                </p>
-                            </PrivateAmount>
-                        </div>
-                        <div className="flex flex-col gap-1 sm:items-end">
-                            <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
-                                Capital en renta
-                            </p>
-                            <PrivateAmount>
-                                <p className="text-sm font-semibold text-muted-foreground tabular-nums">
-                                    {formatRentByCurrency(metrics.interestOnlyCapital)}
-                                </p>
-                            </PrivateAmount>
-                        </div>
-                    </div>
-                </Card>
-            )}
+function Chip({
+    label,
+    value,
+    valueClass,
+    privateAmount,
+}: {
+    label: string
+    value: string
+    valueClass?: string
+    privateAmount?: boolean
+}) {
+    const valueNode = (
+        <span className={cn('font-semibold tabular-nums', valueClass ?? 'text-foreground')}>
+            {value}
+        </span>
+    )
+    return (
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <span className="text-muted-foreground">{label}</span>
+            {privateAmount ? <PrivateAmount>{valueNode}</PrivateAmount> : valueNode}
         </div>
     )
 }
@@ -302,41 +154,6 @@ export function OverdueBanner() {
                 {metrics.overdueCount} cuota{metrics.overdueCount !== 1 ? 's' : ''} vencida{metrics.overdueCount !== 1 ? 's' : ''} —{' '}
                 <PrivateAmount><span className="font-bold">{formatCurrency(metrics.overdueAmount)}</span></PrivateAmount> pendiente{metrics.overdueCount !== 1 ? 's' : ''} de cobro
             </span>
-        </div>
-    )
-}
-
-function MiniStat({
-    label,
-    value,
-    highlight,
-    isText,
-}: {
-    label: string
-    value: string
-    highlight?: boolean
-    isText?: boolean
-}) {
-    return (
-        <div className="flex items-center justify-between gap-4">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">{label}</span>
-            {isText ? (
-                <span className={cn(
-                    'text-sm font-semibold whitespace-nowrap',
-                    highlight ? 'text-accent-blue' : 'text-foreground'
-                )}>
-                    {value}
-                </span>
-            ) : (
-                <PrivateAmount>
-                    <span className={cn(
-                        'text-sm font-semibold tabular-nums whitespace-nowrap',
-                        highlight ? 'text-accent-blue' : 'text-foreground'
-                    )}>
-                        {value}
-                    </span>
-                </PrivateAmount>
-            )}
         </div>
     )
 }
