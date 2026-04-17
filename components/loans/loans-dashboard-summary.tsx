@@ -9,7 +9,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control'
 import { PrivateAmount } from '@/lib/contexts/privacy-context'
 import type { BalanceViewMode } from '@/lib/balance'
 
-function HealthChip({ overdueCount }: { overdueCount: number }) {
+function HealthChip({ overdueCount, overdueAmount }: { overdueCount: number; overdueAmount?: number }) {
     if (overdueCount === 0) {
         return (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-positive/15 px-2.5 py-0.5 text-xs font-medium text-accent-positive">
@@ -18,18 +18,20 @@ function HealthChip({ overdueCount }: { overdueCount: number }) {
             </span>
         )
     }
-    if (overdueCount <= 2) {
-        return (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-500/15 px-2.5 py-0.5 text-xs font-medium text-yellow-500">
-                <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
-                Atención: {overdueCount} cuota{overdueCount !== 1 ? 's' : ''} vencida{overdueCount !== 1 ? 's' : ''}
-            </span>
-        )
-    }
+    const level = overdueCount >= 3 ? 'danger' : 'warning'
+    const colorClass = level === 'danger' ? 'bg-accent-danger/15 text-accent-danger' : 'bg-yellow-500/15 text-yellow-500'
+    const dotClass = level === 'danger' ? 'bg-accent-danger' : 'bg-yellow-500'
+    const prefix = level === 'danger' ? 'Alerta' : 'Atención'
+
     return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-danger/15 px-2.5 py-0.5 text-xs font-medium text-accent-danger">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />
-            Alerta: {overdueCount} cuotas vencidas
+        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", colorClass)}>
+            <span className={cn("h-1.5 w-1.5 rounded-full", dotClass)} />
+            {prefix}: {overdueCount} cuota{overdueCount !== 1 ? 's' : ''} vencida{overdueCount !== 1 ? 's' : ''}
+            {overdueAmount != null && overdueAmount > 0 && (
+                <PrivateAmount>
+                    <span className="font-bold"> — {formatCurrency(overdueAmount)}</span>
+                </PrivateAmount>
+            )}
         </span>
     )
 }
@@ -128,21 +130,6 @@ export function LoansDashboardSummary() {
 
     return (
         <div className="flex flex-col gap-3">
-            {metrics.overdueCount > 0 && (
-                <div className={cn(
-                    'flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium',
-                    metrics.overdueCount >= 3
-                        ? 'bg-red-500/15 text-red-400 border border-red-500/20'
-                        : 'bg-yellow-500/15 text-yellow-500 border border-yellow-500/20'
-                )}>
-                    <span className="h-2 w-2 rounded-full bg-current shrink-0 animate-pulse" />
-                    <span>
-                        {metrics.overdueCount >= 3 ? 'Alerta' : 'Atención'}:{' '}
-                        {metrics.overdueCount} cuota{metrics.overdueCount !== 1 ? 's' : ''} vencida{metrics.overdueCount !== 1 ? 's' : ''} —{' '}
-                        <PrivateAmount><span className="font-bold">{formatCurrency(metrics.overdueAmount)}</span></PrivateAmount> pendiente{metrics.overdueCount !== 1 ? 's' : ''} de cobro
-                    </span>
-                </div>
-            )}
             <Card className="overflow-hidden bg-gradient-to-r from-card to-[hsl(217,30%,13%)] border-border/50">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 p-6 md:min-h-[160px]">
                     {/* Left: Pending amount + health */}
@@ -155,7 +142,7 @@ export function LoansDashboardSummary() {
                                 {formatCurrency(metrics.totalPending)}
                             </p>
                         </PrivateAmount>
-                        <HealthChip overdueCount={metrics.overdueCount} />
+                        <HealthChip overdueCount={metrics.overdueCount} overdueAmount={metrics.overdueAmount} />
                     </div>
 
                     {/* Center: Cobranza del mes + Mora */}

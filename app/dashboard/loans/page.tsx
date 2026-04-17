@@ -107,7 +107,6 @@ export default function LoansPage() {
 
       {tab === 'lender' ? (
         <div className="space-y-6">
-          <OverdueBanner />
           <LoansDashboardSummary />
           <div className="grid gap-6 md:grid-cols-[1fr_280px]">
             <div className="min-w-0">{mainContent}</div>

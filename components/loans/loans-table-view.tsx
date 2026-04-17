@@ -291,16 +291,17 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
 
             {/* Search + quick filters */}
             <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1 max-w-sm">
+                <div className="relative flex-1 max-w-md">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                        placeholder="Buscar por nombre o descripción..."
+                        placeholder="Buscar por persona o concepto..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-9 h-9"
                     />
                 </div>
-                <div className="flex gap-1.5 flex-wrap">
+                <div className="flex gap-1.5 flex-wrap items-center">
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Estado:</span>
                     {([
                         { value: 'all', label: 'Todos' },
                         { value: 'current', label: 'Al día' },
@@ -318,6 +319,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                         </Button>
                     ))}
                     <div className="w-px bg-border mx-1" />
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Moneda:</span>
                     {(['all', 'ARS', 'USD', 'EUR'] as const).map((c) => (
                         <Button
                             key={c}
