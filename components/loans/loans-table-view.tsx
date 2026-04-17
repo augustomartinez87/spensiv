@@ -19,7 +19,6 @@ import {
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
-    ChevronRight,
     Wallet,
     Infinity,
     Search,
@@ -383,10 +382,10 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                                 <div className="min-w-0">
                                                     <p className="font-semibold text-sm text-foreground truncate">{title}</p>
                                                     {subtitle && (
-                                                        <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+                                                        <p className="text-xs text-foreground/70 truncate">{subtitle}</p>
                                                     )}
                                                     {loan.collector && (
-                                                        <p className="text-[10px] text-muted-foreground/70 truncate">
+                                                        <p className="text-[10px] text-foreground/60 truncate">
                                                             via {loan.collector.name}
                                                         </p>
                                                     )}
@@ -432,7 +431,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                                 <TooltipProvider>
                                                     <UITooltip>
                                                         <TooltipTrigger asChild>
-                                                            <span className={cn("text-sm tabular-nums font-medium cursor-help", Number(loan.tna) > 1.5 && "text-red-400")}>
+                                                            <span className={cn("text-sm tabular-nums font-medium cursor-help", Number(loan.tna) > 1.5 && "text-amber-400")}>
                                                                 {(ri.tna * 100).toFixed(1)}%
                                                             </span>
                                                         </TooltipTrigger>
@@ -491,9 +490,6 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                                     <p className={cn("text-xs tabular-nums", isOverdue ? "text-red-400/80" : "text-muted-foreground")}>
                                                         {formatCurrency(loan.nextAmount, cur)}
                                                     </p>
-                                                    {isOverdue && (
-                                                        <Badge variant="destructive" className="text-[8px] px-1 py-0 mt-0.5">VENCIDA</Badge>
-                                                    )}
                                                 </div>
                                             ) : (
                                                 <span className="text-xs text-muted-foreground">
@@ -527,18 +523,6 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                                                         <Wallet className="h-3.5 w-3.5" />
                                                     </Button>
                                                 )}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        onSelect(loan.id)
-                                                    }}
-                                                    title="Ver detalle"
-                                                >
-                                                    <ChevronRight className="h-3.5 w-3.5" />
-                                                </Button>
                                             </div>
                                         </TableCell>
                                     </TableRow>

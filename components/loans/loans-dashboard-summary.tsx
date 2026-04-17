@@ -5,32 +5,7 @@ import { formatCurrency, cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PrivateAmount } from '@/lib/contexts/privacy-context'
-
-function HealthChip({ overdueCount, overdueAmount }: { overdueCount: number; overdueAmount?: number }) {
-    if (overdueCount === 0) {
-        return (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-positive/15 px-2.5 py-0.5 text-xs font-medium text-accent-positive">
-                <span className="h-1.5 w-1.5 rounded-full bg-accent-positive" />
-                Al día
-            </span>
-        )
-    }
-    const level = overdueCount >= 3 ? 'danger' : 'warning'
-    const colorClass = level === 'danger' ? 'bg-accent-danger/15 text-accent-danger' : 'bg-yellow-500/15 text-yellow-500'
-    const dotClass = level === 'danger' ? 'bg-accent-danger' : 'bg-yellow-500'
-
-    return (
-        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", colorClass)}>
-            <span className={cn("h-1.5 w-1.5 rounded-full", dotClass)} />
-            {overdueCount} vencida{overdueCount !== 1 ? 's' : ''}
-            {overdueAmount != null && overdueAmount > 0 && (
-                <PrivateAmount>
-                    <span className="font-bold"> · {formatCurrency(overdueAmount)}</span>
-                </PrivateAmount>
-            )}
-        </span>
-    )
-}
+import { AlertCircle } from 'lucide-react'
 
 function daysUntilText(date: Date) {
     const now = new Date()
@@ -59,54 +34,83 @@ export function LoansDashboardSummary() {
         metrics.morosityPct < 15 ? 'text-yellow-500' :
         'text-accent-danger'
 
+    const collectionPct = metrics.collectionPct !== null ? Math.round(metrics.collectionPct) : null
+    const overdueLevel = metrics.overdueCount >= 3 ? 'danger' : 'warning'
+
     return (
         <Card className="overflow-hidden bg-gradient-to-r from-card to-[hsl(217,30%,13%)] border-border/50">
-            <div className="flex flex-col gap-3 px-5 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
-                {/* Left: Pending amount + chips under it */}
-                <div className="flex flex-col gap-2 min-w-0">
-                    <div className="flex items-baseline gap-3 flex-wrap">
+            <div className="flex flex-col gap-3 px-5 py-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-6">
+                    {/* Left: Pending amount + progress */}
+                    <div className="flex flex-col gap-2 min-w-0 flex-1">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
                             Pendiente de cobro
                         </p>
-                        <HealthChip overdueCount={metrics.overdueCount} overdueAmount={metrics.overdueAmount} />
+                        <PrivateAmount>
+                            <p className="text-[26px] font-bold text-foreground leading-tight tabular-nums tracking-tight">
+                                {formatCurrency(metrics.totalPending)}
+                            </p>
+                        </PrivateAmount>
+                        {collectionPct !== null && (
+                            <div className="flex items-center gap-2 max-w-md">
+                                <div className="h-1 flex-1 bg-muted/40 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-accent-positive rounded-full transition-all"
+                                        style={{ width: `${Math.min(collectionPct, 100)}%` }}
+                                    />
+                                </div>
+                                <span className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
+                                    {collectionPct}% cobrado del mes
+                                </span>
+                            </div>
+                        )}
                     </div>
-                    <PrivateAmount>
-                        <p className="text-[26px] font-bold text-foreground leading-tight tabular-nums tracking-tight">
-                            {formatCurrency(metrics.totalPending)}
-                        </p>
-                    </PrivateAmount>
-                </div>
 
-                {/* Right: compact horizontal chips */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs shrink-0">
-                    {metrics.collectionPct !== null && (
+                    {/* Right: compact horizontal chips */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs shrink-0">
                         <Chip
-                            label="Cobrado"
-                            value={`${Math.round(metrics.collectionPct)}%`}
-                            valueClass="text-accent-positive"
+                            label="Mora"
+                            value={`${metrics.morosityPct.toFixed(1)}%`}
+                            valueClass={morosityColor}
                         />
-                    )}
-                    <Chip
-                        label="Mora"
-                        value={`${metrics.morosityPct.toFixed(1)}%`}
-                        valueClass={morosityColor}
-                    />
-                    {metrics.thisWeekCount > 0 && (
+                        {metrics.thisWeekCount > 0 && (
+                            <Chip
+                                label="Esta semana"
+                                value={formatCurrency(metrics.thisWeekAmount)}
+                                privateAmount
+                            />
+                        )}
+                        {nextInstallment && (
+                            <Chip label="Próximo" value={daysUntilText(nextInstallment.dueDate)} />
+                        )}
                         <Chip
-                            label="Esta semana"
-                            value={formatCurrency(metrics.thisWeekAmount)}
+                            label="Capital activo"
+                            value={formatCurrency(metrics.totalCapitalActive)}
                             privateAmount
                         />
-                    )}
-                    {nextInstallment && (
-                        <Chip label="Próximo" value={daysUntilText(nextInstallment.dueDate)} />
-                    )}
-                    <Chip
-                        label="Capital activo"
-                        value={formatCurrency(metrics.totalCapitalActive)}
-                        privateAmount
-                    />
+                    </div>
                 </div>
+
+                {metrics.overdueCount > 0 && (
+                    <div
+                        className={cn(
+                            'flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium',
+                            overdueLevel === 'danger'
+                                ? 'bg-accent-danger/10 border-accent-danger/30 text-accent-danger'
+                                : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500',
+                        )}
+                    >
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>
+                            {metrics.overdueCount} cuota{metrics.overdueCount !== 1 ? 's' : ''} vencida{metrics.overdueCount !== 1 ? 's' : ''}
+                        </span>
+                        {metrics.overdueAmount != null && metrics.overdueAmount > 0 && (
+                            <PrivateAmount>
+                                <span className="tabular-nums font-bold">· {formatCurrency(metrics.overdueAmount)}</span>
+                            </PrivateAmount>
+                        )}
+                    </div>
+                )}
             </div>
         </Card>
     )
