@@ -1,21 +1,36 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { CreditCard, TrendingUp, PieChart } from 'lucide-react'
 
+function SpensivoLogo({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 7v10M9 9.5h4.5a2 2 0 010 4H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 5l2-2M18 7l2-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-teal-400" />
+    </svg>
+  )
+}
+
 export default function LandingPage() {
+  const currentYear = new Date().getFullYear()
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b bg-card">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">💳</span>
+          <div className="flex items-center gap-2 text-foreground">
+            <SpensivoLogo size={28} />
             <span className="font-bold text-xl">Spensiv</span>
           </div>
           <div className="flex gap-2">
-            <Link href="/dashboard">
-              <Button>Ingresar al Dashboard</Button>
+            <Link href="/sign-in">
+              <Button variant="ghost">Iniciar sesión</Button>
+            </Link>
+            <Link href="/sign-up">
+              <Button>Crear cuenta</Button>
             </Link>
           </div>
         </div>
@@ -29,14 +44,17 @@ export default function LandingPage() {
               Tu motor de <span className="text-primary">cashflow personal</span>
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Control inteligente de tarjetas de crédito, seguimiento de gastos e ingresos, 
+              Control inteligente de tarjetas de crédito, seguimiento de gastos e ingresos,
               y proyección de deuda para tomar mejores decisiones financieras.
             </p>
-            <Link href="/dashboard">
-              <Button size="lg" className="text-lg px-8">
-                Comenzar Ahora
-              </Button>
-            </Link>
+            <div className="flex gap-3 justify-center">
+              <Link href="/sign-up">
+                <Button size="lg" className="text-lg px-8">Comenzar gratis</Button>
+              </Link>
+              <Link href="/sign-in">
+                <Button size="lg" variant="outline" className="text-lg px-8">Ingresar</Button>
+              </Link>
+            </div>
           </div>
         </section>
 
@@ -54,7 +72,6 @@ export default function LandingPage() {
                   </CardDescription>
                 </CardHeader>
               </Card>
-
               <Card>
                 <CardHeader>
                   <PieChart className="h-10 w-10 text-primary mb-2" />
@@ -64,7 +81,6 @@ export default function LandingPage() {
                   </CardDescription>
                 </CardHeader>
               </Card>
-
               <Card>
                 <CardHeader>
                   <TrendingUp className="h-10 w-10 text-primary mb-2" />
@@ -82,7 +98,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t py-6 px-4 bg-card">
         <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground">
-          © 2026 Spensiv - Tu motor de cashflow personal
+          © {currentYear} Spensiv — Tu motor de cashflow personal
         </div>
       </footer>
     </div>

@@ -40,7 +40,7 @@ export default function ProjectionsPage() {
             name: format(date, 'MMM yyyy', { locale: es }),
             period: p.period,
             Total: p.totalExpense,
-            Cuotas: p.installments.length,
+            Cuotas: p.installmentCount,
             Incomes: p.totalIncomeWithProjection,
             Neto: p.balanceWithProjection
         }
@@ -81,7 +81,7 @@ export default function ProjectionsPage() {
                                 <div className="flex items-center justify-between">
                                     <p className="font-bold text-foreground">{format(date, 'MMMM yyyy', { locale: es })}</p>
                                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-secondary rounded text-muted-foreground">
-                                        {p.installments.length} CUOTAS
+                                        {p.installmentCount} CUOTAS
                                     </span>
                                 </div>
                             </CardHeader>

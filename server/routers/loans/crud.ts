@@ -25,164 +25,93 @@ const createLoanInput = z.object({
   collectorId: z.string().optional(),
 })
 
+type InstallmentRow = {
+  number: number
+  dueDate: Date
+  amount: number
+  interest: number
+  principal: number
+  balance: number
+}
+
+type LoanPlan = {
+  loanType: 'interest_only' | 'amortized'
+  tna: number
+  monthlyRate: number
+  installmentAmount: number
+  totalAmount: number | null
+  termMonths: number | null
+  installmentRows: InstallmentRow[]
+}
+
+function computeLoanPlan(input: z.infer<typeof createLoanInput>): LoanPlan {
+  const startDate = new Date(input.startDate + 'T12:00:00')
+
+  if (input.loanType === 'interest_only') {
+    const rate = input.monthlyInterestRate
+    if (rate === undefined || rate === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La tasa mensual es requerida para préstamos interest-only' })
+    const monthlyInterest = input.capital * rate
+    const tna = rate * 12
+    const installmentRows: InstallmentRow[] = rate > 0
+      ? (input.smartDueDate
+          ? getSmartDueDates(startDate, 12)
+          : Array.from({ length: 12 }, (_, i) => addMonths(startDate, i + 1))
+        ).map((dueDate, i) => ({ number: i + 1, dueDate, amount: monthlyInterest, interest: monthlyInterest, principal: 0, balance: input.capital }))
+      : []
+    return { loanType: 'interest_only', tna, monthlyRate: rate, installmentAmount: monthlyInterest, totalAmount: null, termMonths: null, installmentRows }
+  }
+
+  // Amortized
+  if (!input.termMonths) throw new TRPCError({ code: 'BAD_REQUEST', message: 'El plazo es requerido para préstamos amortizados' })
+  if (input.tna === undefined || input.tna === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La TNA es requerida para préstamos amortizados' })
+
+  if (input.smartDueDate || input.firstInstallmentMonth) {
+    const smart = generateSmartAmortizationTable(input.capital, input.tna, input.startDate, input.termMonths, input.roundingMultiple ?? 0, input.firstInstallmentMonth)
+    const installmentRows: InstallmentRow[] = input.tna > 0
+      ? smart.rows.map(row => ({ number: row.month, dueDate: new Date(row.date + 'T12:00:00'), amount: row.installment, interest: row.interest, principal: row.principal, balance: row.balance }))
+      : []
+    return { loanType: 'amortized', tna: smart.effectiveTna, monthlyRate: smart.effectiveTna / 12, installmentAmount: smart.installmentAmount, totalAmount: smart.totalPaid, termMonths: input.termMonths, installmentRows }
+  }
+
+  // Standard French
+  const monthlyRate = tnaToMonthlyRate(input.tna)
+  const exactInstallment = frenchInstallment(input.capital, monthlyRate, input.termMonths)
+  const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
+    ? strategicRoundInstallment(input.capital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
+    : exactInstallment
+  let tna = input.tna
+  let effectiveMonthlyRate = monthlyRate
+  if (installmentAmount !== exactInstallment) {
+    const real = reverseFromInstallment(input.capital, input.termMonths, installmentAmount)
+    if (real) { tna = real.tna; effectiveMonthlyRate = real.monthlyRate }
+  }
+  const totalAmount = installmentAmount * input.termMonths
+  const table = generateAmortizationTable(input.capital, effectiveMonthlyRate, input.termMonths, installmentAmount, input.startDate)
+  const installmentRows: InstallmentRow[] = input.tna > 0
+    ? table.map(row => ({ number: row.month, dueDate: new Date(row.date + 'T12:00:00'), amount: row.installment, interest: row.interest, principal: row.principal, balance: row.balance }))
+    : []
+  return { loanType: 'amortized', tna, monthlyRate: effectiveMonthlyRate, installmentAmount, totalAmount, termMonths: input.termMonths, installmentRows }
+}
+
 export const loanCrudRouter = router({
   create: protectedProcedure
     .input(createLoanInput)
     .mutation(async ({ ctx, input }) => {
+      const plan = computeLoanPlan(input)
       const startDate = new Date(input.startDate + 'T12:00:00')
-
-      if (input.loanType === 'interest_only') {
-        const rate = input.monthlyInterestRate
-        if (rate === undefined || rate === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La tasa mensual es requerida para préstamos interest-only' })
-
-        const monthlyInterest = input.capital * rate
-        const tna = rate * 12
-
-        let installments: { number: number; dueDate: Date; amount: number; interest: number; principal: number; balance: number }[] = []
-        if (rate > 0) {
-          const dueDates = input.smartDueDate
-            ? getSmartDueDates(startDate, 12)
-            : Array.from({ length: 12 }, (_, i) => addMonths(startDate, i + 1))
-
-          installments = dueDates.map((dueDate, i) => ({
-            number: i + 1,
-            dueDate,
-            amount: monthlyInterest,
-            interest: monthlyInterest,
-            principal: 0,
-            balance: input.capital,
-          }))
-        }
-
-        const loan = await ctx.prisma.loan.create({
-          data: {
-            userId: ctx.user.id,
-            borrowerName: input.borrowerName,
-            capital: input.capital,
-            currency: input.currency,
-            loanType: 'interest_only',
-            tna,
-            rateIsNominal: true,
-            termMonths: null,
-            monthlyRate: rate,
-            installmentAmount: monthlyInterest,
-            totalAmount: null,
-            startDate,
-            status: 'active',
-            principalOutstanding: input.capital,
-            overdueInterestOutstanding: 0,
-            personId: input.personId ?? null,
-            direction: input.direction,
-            creditorName: input.creditorName ?? null,
-            collectorId: input.collectorId ?? null,
-            ...(installments.length > 0 ? { loanInstallments: { create: installments } } : {})
-          },
-          include: {
-            loanInstallments: { orderBy: { number: 'asc' } },
-          },
-        })
-
-        return loan
-      }
-
-      // Amortized loan
-      if (!input.termMonths) throw new TRPCError({ code: 'BAD_REQUEST', message: 'El plazo es requerido para préstamos amortizados' })
-      if (input.tna === undefined || input.tna === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La TNA es requerida para préstamos amortizados' })
-
-      const monthlyRate = tnaToMonthlyRate(input.tna)
-
-      if (input.smartDueDate || input.firstInstallmentMonth) {
-        const smart = generateSmartAmortizationTable(
-          input.capital,
-          input.tna,
-          input.startDate,
-          input.termMonths,
-          input.roundingMultiple ?? 0,
-          input.firstInstallmentMonth,
-        )
-
-        const effectiveTna = smart.effectiveTna
-        const effectiveMonthlyRate = effectiveTna / 12
-
-        const loan = await ctx.prisma.loan.create({
-          data: {
-            userId: ctx.user.id,
-            borrowerName: input.borrowerName,
-            capital: input.capital,
-            currency: input.currency,
-            loanType: 'amortized',
-            tna: effectiveTna,
-            rateIsNominal: true,
-            termMonths: input.termMonths,
-            monthlyRate: effectiveMonthlyRate,
-            installmentAmount: smart.installmentAmount,
-            totalAmount: smart.totalPaid,
-            startDate,
-            status: 'active',
-            principalOutstanding: input.capital,
-            overdueInterestOutstanding: 0,
-            personId: input.personId ?? null,
-            direction: input.direction,
-            creditorName: input.creditorName ?? null,
-            collectorId: input.collectorId ?? null,
-            // Zero-rate loans have no installment schedule
-            ...(input.tna > 0 ? {
-              loanInstallments: {
-                create: smart.rows.map((row) => ({
-                  number: row.month,
-                  dueDate: new Date(row.date + 'T12:00:00'),
-                  amount: row.installment,
-                  interest: row.interest,
-                  principal: row.principal,
-                  balance: row.balance,
-                })),
-              },
-            } : {}),
-          },
-          include: { loanInstallments: { orderBy: { number: 'asc' } } },
-        })
-        return loan
-      }
-
-      // Standard French amortization path
-      const exactInstallment = frenchInstallment(input.capital, monthlyRate, input.termMonths)
-      const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
-        ? strategicRoundInstallment(input.capital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
-        : exactInstallment
-
-      let tna = input.tna
-      let effectiveMonthlyRate = monthlyRate
-      if (installmentAmount !== exactInstallment) {
-        const real = reverseFromInstallment(input.capital, input.termMonths, installmentAmount)
-        if (real) {
-          tna = real.tna
-          effectiveMonthlyRate = real.monthlyRate
-        }
-      }
-
-      const totalAmount = installmentAmount * input.termMonths
-
-      const table = generateAmortizationTable(
-        input.capital,
-        effectiveMonthlyRate,
-        input.termMonths,
-        installmentAmount,
-        input.startDate,
-      )
-
       const loan = await ctx.prisma.loan.create({
         data: {
           userId: ctx.user.id,
           borrowerName: input.borrowerName,
           capital: input.capital,
           currency: input.currency,
-          loanType: 'amortized',
-          tna,
+          loanType: plan.loanType,
+          tna: plan.tna,
           rateIsNominal: true,
-          termMonths: input.termMonths,
-          monthlyRate: effectiveMonthlyRate,
-          installmentAmount,
-          totalAmount,
+          termMonths: plan.termMonths,
+          monthlyRate: plan.monthlyRate,
+          installmentAmount: plan.installmentAmount,
+          totalAmount: plan.totalAmount,
           startDate,
           status: 'active',
           principalOutstanding: input.capital,
@@ -190,24 +119,13 @@ export const loanCrudRouter = router({
           personId: input.personId ?? null,
           direction: input.direction,
           creditorName: input.creditorName ?? null,
-            collectorId: input.collectorId ?? null,
-          // Zero-rate loans have no installment schedule
-          ...(input.tna > 0 ? {
-            loanInstallments: {
-              create: table.map((row) => ({
-                number: row.month,
-                dueDate: new Date(row.date + 'T12:00:00'),
-                amount: row.installment,
-                interest: row.interest,
-                principal: row.principal,
-                balance: row.balance,
-              })),
-            },
+          collectorId: input.collectorId ?? null,
+          ...(plan.installmentRows.length > 0 ? {
+            loanInstallments: { create: plan.installmentRows },
           } : {}),
         },
         include: { loanInstallments: { orderBy: { number: 'asc' } } },
       })
-
       return loan
     }),
 
@@ -497,118 +415,21 @@ export const loanCrudRouter = router({
   createPreApproved: protectedProcedure
     .input(createLoanInput)
     .mutation(async ({ ctx, input }) => {
+      const plan = computeLoanPlan(input)
       const startDate = new Date(input.startDate + 'T12:00:00')
-
-      if (input.loanType === 'interest_only') {
-        const rate = input.monthlyInterestRate
-        if (rate === undefined || rate === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La tasa mensual es requerida para préstamos interest-only' })
-
-        const monthlyInterest = input.capital * rate
-        const tna = rate * 12
-
-        const loan = await ctx.prisma.loan.create({
-          data: {
-            userId: ctx.user.id,
-            borrowerName: input.borrowerName,
-            capital: input.capital,
-            currency: input.currency,
-            loanType: 'interest_only',
-            tna,
-            rateIsNominal: true,
-            termMonths: null,
-            monthlyRate: rate,
-            installmentAmount: monthlyInterest,
-            totalAmount: null,
-            startDate,
-            status: 'pre_approved',
-            principalOutstanding: input.capital,
-            overdueInterestOutstanding: 0,
-            personId: input.personId ?? null,
-            direction: input.direction,
-            creditorName: input.creditorName ?? null,
-            collectorId: input.collectorId ?? null,
-          },
-        })
-
-        return loan
-      }
-
-      // Amortized
-      if (!input.termMonths) throw new TRPCError({ code: 'BAD_REQUEST', message: 'El plazo es requerido para préstamos amortizados' })
-      if (input.tna === undefined || input.tna === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'La TNA es requerida para préstamos amortizados' })
-
-      // Use the same smart-schedule path as 'create' when smartDueDate/firstInstallmentMonth is set
-      if (input.smartDueDate || input.firstInstallmentMonth) {
-        const smart = generateSmartAmortizationTable(
-          input.capital,
-          input.tna,
-          input.startDate,
-          input.termMonths,
-          input.roundingMultiple ?? 0,
-          input.firstInstallmentMonth,
-        )
-
-        const effectiveTna = smart.effectiveTna
-        const effectiveMonthlyRate = effectiveTna / 12
-
-        const loan = await ctx.prisma.loan.create({
-          data: {
-            userId: ctx.user.id,
-            borrowerName: input.borrowerName,
-            capital: input.capital,
-            currency: input.currency,
-            loanType: 'amortized',
-            tna: effectiveTna,
-            rateIsNominal: true,
-            termMonths: input.termMonths,
-            monthlyRate: effectiveMonthlyRate,
-            installmentAmount: smart.installmentAmount,
-            totalAmount: smart.totalPaid,
-            startDate,
-            status: 'pre_approved',
-            principalOutstanding: input.capital,
-            overdueInterestOutstanding: 0,
-            personId: input.personId ?? null,
-            direction: input.direction,
-            creditorName: input.creditorName ?? null,
-            collectorId: input.collectorId ?? null,
-          },
-        })
-
-        return loan
-      }
-
-      // Standard French amortization path (no smart dates)
-      let monthlyRate = tnaToMonthlyRate(input.tna)
-      const exactInstallment = frenchInstallment(input.capital, monthlyRate, input.termMonths)
-      const installmentAmount = input.roundingMultiple && input.roundingMultiple > 0
-        ? strategicRoundInstallment(input.capital, input.termMonths, exactInstallment, input.tna, input.roundingMultiple)
-        : exactInstallment
-
-      let tna = input.tna
-      if (installmentAmount !== exactInstallment) {
-        const real = reverseFromInstallment(input.capital, input.termMonths, installmentAmount)
-        if (real) {
-          tna = real.tna
-          monthlyRate = real.monthlyRate
-        }
-      }
-
-      const totalAmount = installmentAmount * input.termMonths
-
       const loan = await ctx.prisma.loan.create({
         data: {
           userId: ctx.user.id,
           borrowerName: input.borrowerName,
           capital: input.capital,
           currency: input.currency,
-          loanType: 'amortized',
-          tna,
+          loanType: plan.loanType,
+          tna: plan.tna,
           rateIsNominal: true,
-          termMonths: input.termMonths,
-          monthlyRate,
-          installmentAmount,
-          totalAmount,
+          termMonths: plan.termMonths,
+          monthlyRate: plan.monthlyRate,
+          installmentAmount: plan.installmentAmount,
+          totalAmount: plan.totalAmount,
           startDate,
           status: 'pre_approved',
           principalOutstanding: input.capital,
@@ -617,9 +438,9 @@ export const loanCrudRouter = router({
           direction: input.direction,
           creditorName: input.creditorName ?? null,
           collectorId: input.collectorId ?? null,
+          // Pre-approved loans don't get installments until confirmed
         },
       })
-
       return loan
     }),
 

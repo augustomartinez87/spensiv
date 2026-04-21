@@ -1,5 +1,4 @@
-import test from 'node:test'
-import assert from 'node:assert/strict'
+import { test, expect } from 'vitest'
 import {
   isValidPeriod,
   getPeriodDateRange,
@@ -8,39 +7,38 @@ import {
 import { getNonCreditPaymentMethodLabel } from '../lib/transaction-utils'
 
 test('isValidPeriod valida formato y rango de mes', () => {
-  assert.equal(isValidPeriod('2026-01'), true)
-  assert.equal(isValidPeriod('2026-12'), true)
-  assert.equal(isValidPeriod('2026-00'), false)
-  assert.equal(isValidPeriod('2026-13'), false)
-  assert.equal(isValidPeriod('26-01'), false)
-  assert.equal(isValidPeriod('2026-1'), false)
+  expect(isValidPeriod('2026-01')).toBe(true)
+  expect(isValidPeriod('2026-12')).toBe(true)
+  expect(isValidPeriod('2026-00')).toBe(false)
+  expect(isValidPeriod('2026-13')).toBe(false)
+  expect(isValidPeriod('26-01')).toBe(false)
+  expect(isValidPeriod('2026-1')).toBe(false)
 })
 
 test('getPeriodDateRange devuelve primer dia de mes y primer dia del mes siguiente', () => {
   const jan = getPeriodDateRange('2026-01')
-  assert.equal(jan.startDate.toISOString().slice(0, 10), '2026-01-01')
-  assert.equal(jan.endDate.toISOString().slice(0, 10), '2026-02-01')
+  expect(jan.startDate.toISOString().slice(0, 10)).toBe('2026-01-01')
+  expect(jan.endDate.toISOString().slice(0, 10)).toBe('2026-02-01')
 
   const leap = getPeriodDateRange('2024-02')
-  assert.equal(leap.startDate.toISOString().slice(0, 10), '2024-02-01')
-  assert.equal(leap.endDate.toISOString().slice(0, 10), '2024-03-01')
+  expect(leap.startDate.toISOString().slice(0, 10)).toBe('2024-02-01')
+  expect(leap.endDate.toISOString().slice(0, 10)).toBe('2024-03-01')
 })
 
 test('getPeriodDateRange lanza error en periodos invalidos', () => {
-  assert.throws(() => getPeriodDateRange('2026-13'))
-  assert.throws(() => getPeriodDateRange('2026-00'))
+  expect(() => getPeriodDateRange('2026-13')).toThrow()
+  expect(() => getPeriodDateRange('2026-00')).toThrow()
 })
 
 test('calculateBudgetPercentage calcula porcentaje y protege limite no positivo', () => {
-  assert.equal(calculateBudgetPercentage(0, 1000), 0)
-  assert.equal(calculateBudgetPercentage(500, 1000), 50)
-  assert.equal(calculateBudgetPercentage(1500, 1000), 150)
-  assert.equal(calculateBudgetPercentage(100, 0), 0)
+  expect(calculateBudgetPercentage(0, 1000)).toBe(0)
+  expect(calculateBudgetPercentage(500, 1000)).toBe(50)
+  expect(calculateBudgetPercentage(1500, 1000)).toBe(150)
+  expect(calculateBudgetPercentage(100, 0)).toBe(0)
 })
 
 test('getNonCreditPaymentMethodLabel devuelve etiquetas correctas', () => {
-  assert.equal(getNonCreditPaymentMethodLabel('cash'), 'Efectivo')
-  assert.equal(getNonCreditPaymentMethodLabel('transfer'), 'Transferencia')
-  assert.equal(getNonCreditPaymentMethodLabel('debit_card'), 'Tarjeta de débito')
+  expect(getNonCreditPaymentMethodLabel('cash')).toBe('Efectivo')
+  expect(getNonCreditPaymentMethodLabel('transfer')).toBe('Transferencia')
+  expect(getNonCreditPaymentMethodLabel('debit_card')).toBe('Tarjeta de débito')
 })
-

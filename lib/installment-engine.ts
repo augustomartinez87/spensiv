@@ -181,9 +181,9 @@ function generateTransactionId(
   const dateStr = purchaseDate.toISOString().slice(0, 10).replace(/-/g, '')
   const amountStr = Math.round(totalAmount).toString()
   const installmentsStr = installments.toString().padStart(2, '0')
-  const timestamp = Date.now().toString().slice(-6)
+  const uniqueSuffix = crypto.randomUUID().replace(/-/g, '').slice(0, 8)
 
-  return `${dateStr}${amountStr}${installmentsStr}${timestamp}`
+  return `${dateStr}${amountStr}${installmentsStr}${uniqueSuffix}`
 }
 
 /**
@@ -257,33 +257,11 @@ export async function createTransactionWithInstallments(
     closingDay
   )
 
-  // 3. Crear transacción
-  const transaction = await prisma.transaction.create({
-    data: {
-      id: transactionId,
-      userId: input.userId,
-      paymentMethod: 'credit_card',
-      cardId: input.cardId,
-      description: input.description,
-      totalAmount: new Decimal(input.totalAmount),
-      purchaseDate: input.purchaseDate,
-      installments: input.installments,
-      categoryId: input.categoryId,
-      subcategoryId: input.subcategoryId,
-      expenseType: input.expenseType,
-      isForThirdParty: input.isForThirdParty || false,
-      thirdPartyId: input.thirdPartyId,
-      notes: input.notes,
-    },
-  })
-
-  // 4. Generar cuotas (Decimal division para evitar errores de precision flotante)
+  // 4. Generar fechas de impacto y billing cycles antes de la transacción atómica
   const totalDecimal = new Decimal(input.totalAmount)
   const baseInstallment = totalDecimal.div(input.installments).toDecimalPlaces(2, Decimal.ROUND_DOWN)
-  // La última cuota absorbe el residuo para que sumen exactamente el total
   const lastInstallment = totalDecimal.minus(baseInstallment.times(input.installments - 1))
 
-  // Pre-resolve all billing cycles (batch instead of N+1)
   const impactDates: Date[] = []
   for (let i = 0; i < input.installments; i++) {
     const impactDate = new Date(firstImpactDate)
@@ -295,15 +273,38 @@ export async function createTransactionWithInstallments(
     impactDates.map((d) => getOrCreateBillingCycle(input.cardId!, d))
   )
 
-  // Batch create all installments
-  await prisma.installment.createMany({
-    data: impactDates.map((impactDate, i) => ({
-      transactionId: transaction.id,
-      billingCycleId: billingCycles[i].id,
-      installmentNumber: i + 1,
-      amount: i === input.installments - 1 ? lastInstallment : baseInstallment,
-      impactDate,
-    })),
+  // 3+4. Crear transacción e instalar cuotas de forma atómica
+  const transaction = await prisma.$transaction(async (tx) => {
+    const created = await tx.transaction.create({
+      data: {
+        id: transactionId,
+        userId: input.userId,
+        paymentMethod: 'credit_card',
+        cardId: input.cardId,
+        description: input.description,
+        totalAmount: new Decimal(input.totalAmount),
+        purchaseDate: input.purchaseDate,
+        installments: input.installments,
+        categoryId: input.categoryId,
+        subcategoryId: input.subcategoryId,
+        expenseType: input.expenseType,
+        isForThirdParty: input.isForThirdParty || false,
+        thirdPartyId: input.thirdPartyId,
+        notes: input.notes,
+      },
+    })
+
+    await tx.installment.createMany({
+      data: impactDates.map((impactDate, i) => ({
+        transactionId: created.id,
+        billingCycleId: billingCycles[i].id,
+        installmentNumber: i + 1,
+        amount: i === input.installments - 1 ? lastInstallment : baseInstallment,
+        impactDate,
+      })),
+    })
+
+    return created
   })
 
   // 5. Recalcular totales de billing cycles afectados
@@ -322,25 +323,21 @@ export async function recalculateBillingCycleTotals(cardId: string) {
       installments: {
         where: {
           isPaid: false,
-          transaction: {
-            isVoided: false,
-          },
+          transaction: { isVoided: false },
         },
       },
     },
   })
 
-  for (const cycle of cycles) {
-    const total = cycle.installments.reduce(
-      (sum, inst) => sum + Number(inst.amount),
-      0
-    )
-
-    await prisma.billingCycle.update({
-      where: { id: cycle.id },
-      data: { totalAmount: new Decimal(total) },
+  await Promise.all(
+    cycles.map((cycle) => {
+      const total = cycle.installments.reduce((sum, inst) => sum + Number(inst.amount), 0)
+      return prisma.billingCycle.update({
+        where: { id: cycle.id },
+        data: { totalAmount: new Decimal(total) },
+      })
     })
-  }
+  )
 }
 
 /**
@@ -376,27 +373,28 @@ export async function recalculateBillingCycleDates(userId: string): Promise<numb
 
   let updatedCount = 0
 
-  for (const card of cards) {
-    const cycles = await prisma.billingCycle.findMany({
-      where: { cardId: card.id },
+  await Promise.all(
+    cards.map(async (card) => {
+      const cycles = await prisma.billingCycle.findMany({ where: { cardId: card.id } })
+
+      await Promise.all(
+        cycles.map(async (cycle) => {
+          const [yearStr, monthStr] = cycle.period.split('-')
+          const year = parseInt(yearStr)
+          const month = parseInt(monthStr)
+
+          const { closingDay, dueDay } = await getClosingDaysForMonth(card.id, year, month)
+          const { closeDate, dueDate } = computeBillingCycleDates(year, month, closingDay, dueDay)
+
+          await prisma.billingCycle.update({
+            where: { id: cycle.id },
+            data: { closeDate, dueDate },
+          })
+          updatedCount++
+        })
+      )
     })
-
-    for (const cycle of cycles) {
-      // period es "YYYY-MM"
-      const [yearStr, monthStr] = cycle.period.split('-')
-      const year = parseInt(yearStr)
-      const month = parseInt(monthStr)
-
-      const { closingDay, dueDay } = await getClosingDaysForMonth(card.id, year, month)
-      const { closeDate, dueDate } = computeBillingCycleDates(year, month, closingDay, dueDay)
-
-      await prisma.billingCycle.update({
-        where: { id: cycle.id },
-        data: { closeDate, dueDate },
-      })
-      updatedCount++
-    }
-  }
+  )
 
   return updatedCount
 }

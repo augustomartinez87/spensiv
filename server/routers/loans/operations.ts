@@ -149,11 +149,14 @@ export const loanOperationsRouter = router({
         data: { isPaid: false, paidAt: null, paidAmount: 0 },
       })
 
-      // Reactivate loan if it was completed
-      await ctx.prisma.loan.update({
-        where: { id: installment.loanId },
-        data: { status: 'active' },
-      })
+      // Reactivate loan only if it was completed (not if cancelled/refinanced)
+      const loan = await ctx.prisma.loan.findUnique({ where: { id: installment.loanId }, select: { status: true } })
+      if (loan?.status === 'completed') {
+        await ctx.prisma.loan.update({
+          where: { id: installment.loanId },
+          data: { status: 'active' },
+        })
+      }
 
       return updated
     }),

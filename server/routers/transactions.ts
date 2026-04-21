@@ -235,16 +235,16 @@ export const transactionsRouter = router({
         })
       }
 
-      // Primero eliminar las cuotas asociadas
-      if (transaction.installmentsList.length > 0) {
-        await ctx.prisma.installment.deleteMany({
-          where: { transactionId: input },
+      // Eliminar cuotas y transacción de forma atómica
+      const deleted = await ctx.prisma.$transaction(async (tx) => {
+        if (transaction.installmentsList.length > 0) {
+          await tx.installment.deleteMany({
+            where: { transactionId: input },
+          })
+        }
+        return tx.transaction.delete({
+          where: { id: input },
         })
-      }
-
-      // Luego eliminar la transacción
-      const deleted = await ctx.prisma.transaction.delete({
-        where: { id: input },
       })
 
       if (transaction.cardId) {

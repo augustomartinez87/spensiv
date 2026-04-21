@@ -12,6 +12,7 @@ import { adminRouter } from './routers/admin'
 import { shareRouter } from './routers/share'
 import { rateRulesRouter } from './routers/rate-rules'
 import { publicSimulatorRouter } from './routers/public-simulator'
+import { alertsRouter } from './routers/alerts'
 
 export const appRouter = router({
   cards: cardsRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   share: shareRouter,
   rateRules: rateRulesRouter,
   publicSimulator: publicSimulatorRouter,
+  alerts: alertsRouter,
 })
 
 export type AppRouter = typeof appRouter

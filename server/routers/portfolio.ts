@@ -46,7 +46,7 @@ async function loadPortfolioData(prisma: PrismaClient, userId: string) {
     getDolarMep(),
   ])
 
-  return { loans, persons, mepRate }
+  return { loans, persons, mepRate: mepRate ?? 0 }
 }
 
 type PortfolioLoans = Awaited<ReturnType<typeof loadPortfolioData>>['loans']
@@ -55,7 +55,7 @@ type PortfolioPersons = Awaited<ReturnType<typeof loadPortfolioData>>['persons']
 // ── Shared helpers ───────────────────────────────────────────────────
 
 /** Pesified capital per loan, computed once and cached by loan index */
-function buildCapitalCache(loans: PortfolioLoans, mepRate: number) {
+function buildCapitalCache(loans: PortfolioLoans, mepRate: number | null) {
   return loans.map((l) => pesify(Number(l.capital), l.currency, mepRate))
 }
 

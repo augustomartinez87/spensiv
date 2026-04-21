@@ -1,5 +1,4 @@
-import test from 'node:test'
-import assert from 'node:assert/strict'
+import { test, expect } from 'vitest'
 import { applyPaymentWaterfall } from '../server/services/loan-accounting.service'
 
 // ── Orden del waterfall ──────────────────────────────────────────────────────
@@ -12,10 +11,10 @@ test('waterfall applies overdue then current then principal', () => {
     principalPending: 10000,
   })
 
-  assert.equal(result.interestOverdueApplied, 120)
-  assert.equal(result.interestCurrentApplied, 220)
-  assert.equal(result.principalApplied, 60)
-  assert.equal(result.totalApplied, 400)
+  expect(result.interestOverdueApplied).toBe(120)
+  expect(result.interestCurrentApplied).toBe(220)
+  expect(result.principalApplied).toBe(60)
+  expect(result.totalApplied).toBe(400)
 })
 
 test('pago exacto cubre solo mora — no toca interés corriente ni capital', () => {
@@ -26,10 +25,10 @@ test('pago exacto cubre solo mora — no toca interés corriente ni capital', ()
     principalPending: 5000,
   })
 
-  assert.equal(result.interestOverdueApplied, 150)
-  assert.equal(result.interestCurrentApplied, 0)
-  assert.equal(result.principalApplied, 0)
-  assert.equal(result.totalApplied, 150)
+  expect(result.interestOverdueApplied).toBe(150)
+  expect(result.interestCurrentApplied).toBe(0)
+  expect(result.principalApplied).toBe(0)
+  expect(result.totalApplied).toBe(150)
 })
 
 test('pago exacto cubre mora + interés corriente — no toca capital', () => {
@@ -40,10 +39,10 @@ test('pago exacto cubre mora + interés corriente — no toca capital', () => {
     principalPending: 5000,
   })
 
-  assert.equal(result.interestOverdueApplied, 150)
-  assert.equal(result.interestCurrentApplied, 300)
-  assert.equal(result.principalApplied, 0)
-  assert.equal(result.totalApplied, 450)
+  expect(result.interestOverdueApplied).toBe(150)
+  expect(result.interestCurrentApplied).toBe(300)
+  expect(result.principalApplied).toBe(0)
+  expect(result.totalApplied).toBe(450)
 })
 
 test('pago solo capital — sin mora ni interés corriente (préstamo 0%)', () => {
@@ -54,10 +53,10 @@ test('pago solo capital — sin mora ni interés corriente (préstamo 0%)', () =
     principalPending: 500000,
   })
 
-  assert.equal(result.interestOverdueApplied, 0)
-  assert.equal(result.interestCurrentApplied, 0)
-  assert.equal(result.principalApplied, 500000)
-  assert.equal(result.totalApplied, 500000)
+  expect(result.interestOverdueApplied).toBe(0)
+  expect(result.interestCurrentApplied).toBe(0)
+  expect(result.principalApplied).toBe(500000)
+  expect(result.totalApplied).toBe(500000)
 })
 
 test('pago parcial de capital — sin mora ni interés corriente', () => {
@@ -68,9 +67,9 @@ test('pago parcial de capital — sin mora ni interés corriente', () => {
     principalPending: 1000000,
   })
 
-  assert.equal(result.principalApplied, 200000)
-  assert.equal(result.totalApplied, 200000)
-  assert.equal(result.totalPending, 1000000)
+  expect(result.principalApplied).toBe(200000)
+  expect(result.totalApplied).toBe(200000)
+  expect(result.totalPending).toBe(1000000)
 })
 
 test('pago exactamente igual al total pendiente', () => {
@@ -81,22 +80,22 @@ test('pago exactamente igual al total pendiente', () => {
     principalPending: 50,
   })
 
-  assert.equal(result.totalApplied, 100)
-  assert.equal(result.interestOverdueApplied, 30)
-  assert.equal(result.interestCurrentApplied, 20)
-  assert.equal(result.principalApplied, 50)
+  expect(result.totalApplied).toBe(100)
+  expect(result.interestOverdueApplied).toBe(30)
+  expect(result.interestCurrentApplied).toBe(20)
+  expect(result.principalApplied).toBe(50)
 })
 
 test('pago dentro de tolerancia de centavo es aceptado', () => {
   // totalPending = 100, pago = 100.005 — dentro de CENT_TOLERANCE (0.01)
-  assert.doesNotThrow(() => {
+  expect(() => {
     applyPaymentWaterfall({
       paymentAmount: 100.005,
       overdueInterestPending: 30,
       currentInterestPending: 20,
       principalPending: 50,
     })
-  })
+  }).not.toThrow()
 })
 
 test('pago con decimales típicos de cuota francesa', () => {
@@ -108,53 +107,53 @@ test('pago con decimales típicos de cuota francesa', () => {
     principalPending: 187.5,
   })
 
-  assert.equal(result.interestCurrentApplied, 125)
-  assert.equal(result.principalApplied, 187.5)
-  assert.equal(result.totalApplied, 312.5)
+  expect(result.interestCurrentApplied).toBe(125)
+  expect(result.principalApplied).toBe(187.5)
+  expect(result.totalApplied).toBe(312.5)
 })
 
 // ── Validaciones de entrada ──────────────────────────────────────────────────
 
 test('waterfall rechaza pago que excede la deuda total', () => {
-  assert.throws(() => {
+  expect(() => {
     applyPaymentWaterfall({
       paymentAmount: 100.02,
       overdueInterestPending: 30,
       currentInterestPending: 20,
       principalPending: 50,
     })
-  })
+  }).toThrow()
 })
 
 test('waterfall rechaza pago de 0 o negativo', () => {
-  assert.throws(() => {
+  expect(() => {
     applyPaymentWaterfall({
       paymentAmount: 0,
       overdueInterestPending: 0,
       currentInterestPending: 100,
       principalPending: 1000,
     })
-  })
+  }).toThrow()
 
-  assert.throws(() => {
+  expect(() => {
     applyPaymentWaterfall({
       paymentAmount: -50,
       overdueInterestPending: 0,
       currentInterestPending: 100,
       principalPending: 1000,
     })
-  })
+  }).toThrow()
 })
 
 test('waterfall rechaza buckets negativos', () => {
-  assert.throws(() => {
+  expect(() => {
     applyPaymentWaterfall({
       paymentAmount: 100,
       overdueInterestPending: -10,
       currentInterestPending: 110,
       principalPending: 0,
     })
-  })
+  }).toThrow()
 })
 
 // ── Consistencia del resultado ───────────────────────────────────────────────
@@ -169,10 +168,7 @@ test('totalApplied siempre es suma de los tres buckets', () => {
   for (const input of cases) {
     const r = applyPaymentWaterfall(input)
     const bucketSum = r.interestOverdueApplied + r.interestCurrentApplied + r.principalApplied
-    assert.ok(
-      Math.abs(bucketSum - r.totalApplied) < 0.01,
-      `bucketSum (${bucketSum}) !== totalApplied (${r.totalApplied}) for input ${JSON.stringify(input)}`
-    )
+    expect(Math.abs(bucketSum - r.totalApplied) < 0.01).toBeTruthy()
   }
 })
 
@@ -184,5 +180,5 @@ test('totalPending refleja la deuda completa independiente del pago', () => {
     principalPending: 5000,
   })
 
-  assert.equal(result.totalPending, 5300)
+  expect(result.totalPending).toBe(5300)
 })

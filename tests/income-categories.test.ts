@@ -1,5 +1,4 @@
-import test from 'node:test'
-import assert from 'node:assert/strict'
+import { test, expect } from 'vitest'
 import {
   getCanonicalIncomeCategoryName,
   getCanonicalIncomeSubcategoryName,
@@ -9,28 +8,26 @@ import {
 } from '../lib/categories/income-categories'
 
 test('getIncomeCategoryMappingByName mapea categorias legacy', () => {
-  assert.deepEqual(getIncomeCategoryMappingByName('active_income'), {
+  expect(getIncomeCategoryMappingByName('active_income')).toEqual({
     category: 'Ingresos Activos',
   })
-  assert.deepEqual(getIncomeCategoryMappingByName('Ingresos Pasivos'), {
+  expect(getIncomeCategoryMappingByName('Ingresos Pasivos')).toEqual({
     category: 'Ingresos Pasivos',
   })
-  assert.deepEqual(getIncomeCategoryMappingByName('sueldo'), {
+  expect(getIncomeCategoryMappingByName('sueldo')).toEqual({
     category: 'Ingresos Activos',
     subcategory: 'Sueldo',
   })
 })
 
 test('canonicaliza categoria y subcategoria de ingresos', () => {
-  assert.equal(getCanonicalIncomeCategoryName(' ingresos activos '), 'Ingresos Activos')
-  assert.equal(
-    getCanonicalIncomeSubcategoryName('Ingresos Activos', 'comisiones/bonos'),
-    'Comisiones/Bonos'
-  )
-  assert.equal(
-    getCanonicalIncomeSubcategoryName('Otros Ingresos', 'Transferencia de terceros'),
-    'Transferencia de terceros'
-  )
+  expect(getCanonicalIncomeCategoryName(' ingresos activos ')).toBe('Ingresos Activos')
+  expect(
+    getCanonicalIncomeSubcategoryName('Ingresos Activos', 'comisiones/bonos')
+  ).toBe('Comisiones/Bonos')
+  expect(
+    getCanonicalIncomeSubcategoryName('Otros Ingresos', 'Transferencia de terceros')
+  ).toBe('Transferencia de terceros')
 })
 
 test('ordena categorias y subcategorias segun taxonomia', () => {
@@ -41,7 +38,7 @@ test('ordena categorias y subcategorias segun taxonomia', () => {
     { name: 'Categoria Custom' },
   ])
 
-  assert.deepEqual(categories.map((category) => category.name), [
+  expect(categories.map((category) => category.name)).toEqual([
     'Ingresos Activos',
     'Ingresos Pasivos',
     'Otros Ingresos',
@@ -55,7 +52,7 @@ test('ordena categorias y subcategorias segun taxonomia', () => {
     { name: 'Custom' },
   ])
 
-  assert.deepEqual(subcategories.map((subcategory) => subcategory.name), [
+  expect(subcategories.map((subcategory) => subcategory.name)).toEqual([
     'Sueldo',
     'Freelance',
     'Aguinaldo',

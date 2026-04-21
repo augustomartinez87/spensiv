@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { PrivacyProvider, usePrivacy } from '@/lib/contexts/privacy-context'
 import { CurrencyProvider } from '@/lib/contexts/currency-context'
+import { trpc } from '@/lib/contexts/trpc-client'
 
 const TransactionForm = dynamic(
   () => import('@/components/transactions/transaction-form').then((m) => m.TransactionForm),
@@ -116,6 +117,7 @@ function DashboardLayoutInner({
 
   const displayName = user?.fullName || user?.firstName || 'Usuario'
   const userIsAdmin = user?.publicMetadata?.role === 'admin'
+  const { data: cards } = trpc.cards.list.useQuery()
 
   // Ctrl+B keyboard shortcut to toggle sidebar
   useEffect(() => {
@@ -236,7 +238,7 @@ function DashboardLayoutInner({
             size="icon"
             className="h-9 w-9 text-muted-foreground hover:text-foreground"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            title={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+            aria-label={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
           >
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
@@ -246,11 +248,11 @@ function DashboardLayoutInner({
               size="icon"
               className={cn("h-9 w-9", isPrivate ? "text-primary" : "text-muted-foreground hover:text-foreground")}
               onClick={togglePrivacy}
-              title={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
+              aria-label={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
             >
               {isPrivate ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground" aria-label="Notificaciones">
               <Bell className="h-4 w-4" />
             </Button>
           </div>
@@ -273,11 +275,11 @@ function DashboardLayoutInner({
               size="icon"
               className={cn("h-9 w-9", isPrivate ? "text-primary" : "text-muted-foreground")}
               onClick={togglePrivacy}
-              title={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
+              aria-label={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
             >
               {isPrivate ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground">
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" aria-label="Notificaciones">
               <Bell className="h-4 w-4" />
             </Button>
             <UserButton afterSignOutUrl="/" />
@@ -291,14 +293,16 @@ function DashboardLayoutInner({
         </main>
       </div>
 
-      {/* Mobile FAB — Nuevo Gasto */}
-      <div className="md:hidden fixed bottom-20 right-4 z-50">
-        <TransactionForm
-          size="icon"
-          triggerText=""
-          className="h-14 w-14 rounded-full shadow-xl bg-rose-500 hover:bg-rose-600 text-white border-0 [&>svg]:mr-0"
-        />
-      </div>
+      {/* Mobile FAB — Nuevo Gasto (solo visible si hay tarjetas) */}
+      {cards && cards.length > 0 && (
+        <div className="md:hidden fixed bottom-20 right-4 z-50">
+          <TransactionForm
+            size="icon"
+            triggerText=""
+            className="h-14 w-14 rounded-full shadow-xl bg-rose-500 hover:bg-rose-600 text-white border-0 [&>svg]:mr-0"
+          />
+        </div>
+      )}
 
       {/* Mobile Bottom Tab Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[hsl(var(--sidebar))] border-t border-white/[0.06] h-16 flex items-center justify-around px-2">

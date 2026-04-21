@@ -7,14 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npm run test:unit",
-    "test:unit": "npx tsc lib/financial-engine.ts lib/budget-analytics.ts lib/transaction-utils.ts lib/categories/income-categories.ts lib/constants/thresholds.ts tests/financial-engine.test.ts tests/budget-utils.test.ts tests/income-categories.test.ts --module commonjs --target ES2020 --esModuleInterop --skipLibCheck --outDir .financial-test-dist && node --test .financial-test-dist/tests/financial-engine.test.js .financial-test-dist/tests/budget-utils.test.js .financial-test-dist/tests/income-categories.test.js",
-    "test:financial": "npx tsc lib/financial-engine.ts tests/financial-engine.test.ts --module commonjs --target ES2020 --esModuleInterop --skipLibCheck --outDir .financial-test-dist && node --test .financial-test-dist/tests/financial-engine.test.js",
-    "test:loans-phase1": "npx tsc lib/financial-engine.ts server/services/loan-accounting.service.ts tests/financial-engine.test.ts tests/loan-accounting.test.ts --module commonjs --target ES2020 --esModuleInterop --skipLibCheck --outDir .financial-test-dist && node --test .financial-test-dist/tests/financial-engine.test.js .financial-test-dist/tests/loan-accounting.test.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/financial-engine.test.ts tests/budget-utils.test.ts tests/income-categories.test.ts",
+    "test:financial": "vitest run tests/financial-engine.test.ts",
+    "test:loans-phase1": "vitest run tests/financial-engine.test.ts tests/loan-accounting.test.ts",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate || true"
   },
   "dependencies": {
     "@clerk/nextjs": "^5.0.0",
@@ -67,6 +68,7 @@
     "postcss": "^8",
     "prisma": "^5.9.1",
     "tailwindcss": "^3.3.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.4"
   }
 }

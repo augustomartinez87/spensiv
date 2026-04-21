@@ -23,13 +23,12 @@ const CurrencyContext = createContext<CurrencyContextType>({
 })
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<CurrencyMode>('ARS')
-  const [mepRate, setMepRate] = useState<number | null>(null)
-
-  useEffect(() => {
+  const [mode, setModeState] = useState<CurrencyMode>(() => {
+    if (typeof window === 'undefined') return 'ARS'
     const stored = localStorage.getItem('spensiv-currency-mode') as CurrencyMode | null
-    if (stored === 'USD' || stored === 'ARS') setModeState(stored)
-  }, [])
+    return stored === 'USD' || stored === 'ARS' ? stored : 'ARS'
+  })
+  const [mepRate, setMepRate] = useState<number | null>(null)
 
   const setMode = (m: CurrencyMode) => {
     setModeState(m)

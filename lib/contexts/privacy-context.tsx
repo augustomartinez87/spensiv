@@ -13,12 +13,10 @@ const PrivacyContext = createContext<PrivacyContextType>({
 })
 
 export function PrivacyProvider({ children }: { children: ReactNode }) {
-  const [isPrivate, setIsPrivate] = useState(false)
-
-  useEffect(() => {
-    const stored = localStorage.getItem('spensiv-privacy-mode')
-    if (stored === 'true') setIsPrivate(true)
-  }, [])
+  const [isPrivate, setIsPrivate] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('spensiv-privacy-mode') === 'true'
+  })
 
   const togglePrivacy = () => {
     setIsPrivate((prev) => {
