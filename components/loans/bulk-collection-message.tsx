@@ -58,28 +58,29 @@ export function BulkCollectionMessage({ collectorName, loans }: BulkCollectionMe
         const upcoming: LoanLine[] = []
 
         for (const loan of loans) {
-            const next = loan.loanInstallments.find((i) => !i.isPaid)
-            if (!next) continue
-            const remaining = Math.max(Number(next.amount) - Number(next.paidAmount ?? 0), 0)
-            if (remaining <= 0) continue
+            for (const inst of loan.loanInstallments) {
+                if (inst.isPaid) continue
+                const remaining = Math.max(Number(inst.amount) - Number(inst.paidAmount ?? 0), 0)
+                if (remaining <= 0) continue
 
-            const dueDate = new Date(next.dueDate)
-            const daysUntil = differenceInCalendarDays(dueDate, now)
+                const dueDate = new Date(inst.dueDate)
+                const daysUntil = differenceInCalendarDays(dueDate, now)
 
-            if (daysUntil > days) continue
+                if (daysUntil > days) continue
 
-            const line: LoanLine = {
-                borrower: loan.borrowerName.split(' - ')[0],
-                number: next.number,
-                totalInstallments: loan.loanInstallments.length,
-                date: format(dueDate, "d/MM", { locale: es }),
-                dateRaw: dueDate,
-                amount: remaining,
-                currency: loan.currency,
+                const line: LoanLine = {
+                    borrower: loan.borrowerName.split(' - ')[0],
+                    number: inst.number,
+                    totalInstallments: loan.loanInstallments.length,
+                    date: format(dueDate, "d/MM", { locale: es }),
+                    dateRaw: dueDate,
+                    amount: remaining,
+                    currency: loan.currency,
+                }
+
+                if (daysUntil < 0) overdue.push(line)
+                else upcoming.push(line)
             }
-
-            if (daysUntil < 0) overdue.push(line)
-            else upcoming.push(line)
         }
 
         overdue.sort((a, b) => a.dateRaw.getTime() - b.dateRaw.getTime())
