@@ -1,5 +1,70 @@
+// Feriados nacionales AR. Actualizar cada diciembre con el decreto oficial
+// del año entrante (incluye inamovibles + trasladables anunciados).
+// Si querés evitar programar cuotas en "días no laborables con fines
+// turísticos" (puentes), agregalos acá también.
+export const AR_HOLIDAYS = new Set<string>([
+  // 2025
+  '2025-01-01', // Año Nuevo
+  '2025-03-03', // Carnaval
+  '2025-03-04', // Carnaval
+  '2025-03-24', // Memoria, Verdad y Justicia
+  '2025-04-02', // Malvinas
+  '2025-04-18', // Viernes Santo
+  '2025-05-01', // Día del Trabajador
+  '2025-05-25', // Revolución de Mayo
+  '2025-06-16', // Güemes (trasladado)
+  '2025-06-20', // Bandera
+  '2025-07-09', // Independencia
+  '2025-08-17', // San Martín
+  '2025-10-12', // Diversidad Cultural
+  '2025-11-24', // Soberanía (trasladado)
+  '2025-12-08', // Inmaculada
+  '2025-12-25', // Navidad
+
+  // 2026
+  '2026-01-01', // Año Nuevo
+  '2026-02-16', // Carnaval
+  '2026-02-17', // Carnaval
+  '2026-03-24', // Memoria, Verdad y Justicia
+  '2026-04-02', // Malvinas
+  '2026-04-03', // Viernes Santo
+  '2026-05-01', // Día del Trabajador
+  '2026-05-25', // Revolución de Mayo
+  '2026-06-15', // Güemes (trasladado del miércoles 17)
+  '2026-06-20', // Bandera (sábado, inamovible)
+  '2026-07-09', // Independencia
+  '2026-08-17', // San Martín
+  '2026-10-12', // Diversidad Cultural
+  '2026-11-20', // Soberanía (viernes, sin traslado)
+  '2026-12-08', // Inmaculada
+  '2026-12-25', // Navidad
+
+  // 2027 — inamovibles. Completar con trasladables cuando salga el decreto oficial.
+  '2027-01-01', // Año Nuevo
+  '2027-03-24', // Memoria, Verdad y Justicia
+  '2027-03-26', // Viernes Santo
+  '2027-04-02', // Malvinas
+  '2027-05-01', // Día del Trabajador
+  '2027-05-25', // Revolución de Mayo
+  '2027-06-20', // Bandera
+  '2027-07-09', // Independencia
+  '2027-12-08', // Inmaculada
+  '2027-12-25', // Navidad
+])
+
+function toIsoLocal(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+export function isArHoliday(date: Date): boolean {
+  return AR_HOLIDAYS.has(toIsoLocal(date))
+}
+
 /**
- * Returns the Nth business day (Mon–Fri) of a given month.
+ * Returns the Nth business day of a given month, skipping weekends and AR holidays.
  * @param year  Full year (e.g. 2026)
  * @param month 1-indexed month (1 = January, 12 = December)
  * @param n     Which business day to return (e.g. 5 = fifth)
@@ -11,10 +76,10 @@ export function getNthBusinessDay(year: number, month: number, n: number): Date 
   for (let day = 1; day <= totalDays; day++) {
     const date = new Date(year, month - 1, day)
     const dow = date.getDay() // 0 = Sunday, 6 = Saturday
-    if (dow !== 0 && dow !== 6) {
-      count++
-      if (count === n) return date
-    }
+    if (dow === 0 || dow === 6) continue
+    if (isArHoliday(date)) continue
+    count++
+    if (count === n) return date
   }
 
   throw new Error(`Month ${year}-${String(month).padStart(2, '0')} has fewer than ${n} business days`)

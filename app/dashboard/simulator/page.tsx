@@ -43,24 +43,12 @@ import {
 } from 'lucide-react'
 import { Shield } from 'lucide-react'
 import type { SimulationResult } from '@/lib/loan-calculator'
-import { getSmartFirstDueDate } from '@/lib/business-days'
 import { getNextMonths } from '@/lib/periods'
 
 function formatFirstDueDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number)
   const date = new Date(y, m - 1, d)
   return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-function computeFirstDueDate(startDateStr: string, smartDueDate: boolean): string {
-  const [y, m, d] = startDateStr.split('-').map(Number)
-  const start = new Date(y, m - 1, d)
-  if (smartDueDate) {
-    const due = getSmartFirstDueDate(start)
-    return due.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
-  }
-  const due = new Date(y, m, d) // same day next month
-  return due.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 const AccrualChart = dynamic(
@@ -165,8 +153,16 @@ export default function SimulatorPage() {
     onSuccess: (data) => setCompareResults(data),
   })
 
+  // Ref con el valor vigente de customInstallment para hacer stale-guard
+  // en reverseMutation.onSuccess: si el usuario cambió o vació el input entre
+  // el dispatch y la respuesta, descartamos el resultado.
+  const customInstallmentRef = useRef(customInstallment)
+  useEffect(() => { customInstallmentRef.current = customInstallment }, [customInstallment])
+
   const reverseMutation = trpc.loans.reverseFromInstallment.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
+      const current = parseFloat(customInstallmentRef.current)
+      if (!Number.isFinite(current) || current !== variables.desiredInstallment) return
       if (data.success) {
         const tnaPercent = (data.tna * 100).toFixed(2)
         setImpliedTna(data.tna)
@@ -230,8 +226,20 @@ export default function SimulatorPage() {
     }, 300)
   }
 
-  function retriggerReverseFromInstallment(nextCapital: string, nextTerm: string) {
+  function retriggerReverseFromInstallment(overrides: {
+    capital?: string
+    termMonths?: string
+    smartDueDate?: boolean
+    firstInstallmentMonth?: string
+    startDate?: string
+  } = {}) {
     if (!customInstallment) return
+    const nextCapital = overrides.capital ?? capital
+    const nextTerm = overrides.termMonths ?? termMonths
+    const nextSmart = overrides.smartDueDate ?? smartDueDate
+    const nextFim = overrides.firstInstallmentMonth ?? firstInstallmentMonth
+    const nextStart = overrides.startDate ?? startDate
+
     const installment = parseFloat(customInstallment)
     const cap = parseFloat(nextCapital)
     const term = parseInt(nextTerm)
@@ -241,9 +249,9 @@ export default function SimulatorPage() {
         capital: cap,
         termMonths: term,
         desiredInstallment: installment,
-        smartDueDate,
-        startDate,
-        firstInstallmentMonth: firstInstallmentMonth || undefined,
+        smartDueDate: nextSmart,
+        startDate: nextStart,
+        firstInstallmentMonth: nextFim || undefined,
       })
     } else if (installment > 0 && cap > 0 && term > 0) {
       setTnaTarget('')
@@ -252,12 +260,28 @@ export default function SimulatorPage() {
 
   function handleCapitalChange(value: string) {
     setCapital(value)
-    retriggerReverseFromInstallment(value, termMonths)
+    retriggerReverseFromInstallment({ capital: value })
   }
 
   function handleTermChange(value: string) {
     setTermMonths(value)
-    retriggerReverseFromInstallment(capital, value)
+    retriggerReverseFromInstallment({ termMonths: value })
+  }
+
+  function handleStartDateChange(value: string) {
+    setStartDate(value)
+    retriggerReverseFromInstallment({ startDate: value })
+  }
+
+  function handleSmartDueDateChange(next: boolean) {
+    setSmartDueDate(next)
+    retriggerReverseFromInstallment({ smartDueDate: next })
+  }
+
+  function handleFirstInstallmentMonthChange(value: string) {
+    const next = value === '__auto__' ? '' : value
+    setFirstInstallmentMonth(next)
+    retriggerReverseFromInstallment({ firstInstallmentMonth: next })
   }
 
   function addCompareTerm() {
@@ -275,7 +299,7 @@ export default function SimulatorPage() {
   // Create Loan dialog state
   const [createLoanOpen, setCreateLoanOpen] = useState(false)
   const [createLoanDefaults, setCreateLoanDefaults] = useState<{
-    capital: string; tna: string; termMonths: string; startDate: string; currency: 'ARS' | 'USD'; roundingMultiple: number; smartDueDate: boolean; firstInstallmentMonth?: string
+    capital: string; tna: string; termMonths: string; startDate: string; currency: 'ARS' | 'USD'; roundingMultiple: number; smartDueDate: boolean; firstInstallmentMonth?: string; firstDueDate?: string
   } | null>(null)
   const [borrowerName, setBorrowerName] = useState('')
 
@@ -307,6 +331,7 @@ export default function SimulatorPage() {
       roundingMultiple: roundEnabled ? roundingMultiple : 0,
       smartDueDate,
       firstInstallmentMonth: firstInstallmentMonth || undefined,
+      firstDueDate: result.amortizationTable?.[0]?.date,
     })
     setCreateLoanOpen(true)
   }
@@ -322,6 +347,7 @@ export default function SimulatorPage() {
       roundingMultiple: roundEnabled ? roundingMultiple : 0,
       smartDueDate,
       firstInstallmentMonth: firstInstallmentMonth || undefined,
+      firstDueDate: result.amortizationTable?.[0]?.date,
     })
     setCreateLoanOpen(true)
   }
@@ -526,7 +552,7 @@ export default function SimulatorPage() {
                 id="startDate"
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => handleStartDateChange(e.target.value)}
               />
             </div>
 
@@ -625,29 +651,35 @@ export default function SimulatorPage() {
           </div>
 
           {/* Smart due date toggle */}
-          <div className="space-y-1.5">
+          <div className={cn("space-y-1.5", firstInstallmentMonth && "opacity-60")}>
             <div className="flex items-center gap-2">
               <Switch
                 id="smart-due-date"
                 checked={smartDueDate}
-                onCheckedChange={setSmartDueDate}
+                onCheckedChange={handleSmartDueDateChange}
+                disabled={!!firstInstallmentMonth}
               />
               <Label htmlFor="smart-due-date" className="text-sm cursor-pointer">
                 Primer vencimiento inteligente
               </Label>
             </div>
-            {smartDueDate && (
+            {firstInstallmentMonth ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1 pl-0.5">
+                <Info className="h-3 w-3 shrink-0" />
+                Ignorado porque fijaste el mes de primera cuota abajo
+              </p>
+            ) : smartDueDate ? (
               <p className="text-xs text-muted-foreground flex items-center gap-1 pl-0.5">
                 <Info className="h-3 w-3 shrink-0" />
                 Las cuotas vencen el 2° día hábil de cada mes
               </p>
-            )}
+            ) : null}
           </div>
 
           {/* First installment month selector */}
           <div className="space-y-2">
             <Label>Mes de primera cuota (opcional)</Label>
-            <Select value={firstInstallmentMonth || '__auto__'} onValueChange={(v) => setFirstInstallmentMonth(v === '__auto__' ? '' : v)}>
+            <Select value={firstInstallmentMonth || '__auto__'} onValueChange={handleFirstInstallmentMonthChange}>
               <SelectTrigger className="w-[220px]">
                 <SelectValue />
               </SelectTrigger>
@@ -684,7 +716,7 @@ export default function SimulatorPage() {
                           : "bg-muted text-muted-foreground hover:bg-muted/80"
                       )}
                     >
-                      {term} meses
+                      {term} {pluralize(term, 'mes', 'meses')}
                     </button>
                   )
                 })}
@@ -838,7 +870,9 @@ export default function SimulatorPage() {
                 <Clock className="h-3.5 w-3.5 shrink-0" />
                 <span>
                   {createLoanDefaults.termMonths} {pluralize(Number(createLoanDefaults.termMonths), 'cuota')} — 1er vencimiento:{' '}
-                  <span className="font-semibold">{computeFirstDueDate(createLoanDefaults.startDate, createLoanDefaults.smartDueDate)}</span>
+                  <span className="font-semibold">
+                    {createLoanDefaults.firstDueDate ? formatFirstDueDate(createLoanDefaults.firstDueDate) : '—'}
+                  </span>
                 </span>
               </div>
             )}
