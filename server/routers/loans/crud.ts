@@ -132,14 +132,15 @@ export const loanCrudRouter = router({
   list: protectedProcedure
     .input(z.object({
       direction: z.enum(['lender', 'borrower']).optional(),
-      status: z.enum(['active', 'completed', 'refinanced']).optional(),
+      status: z.enum(['active', 'completed', 'refinanced', 'defaulted']).optional(),
       collectorId: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
       const statusFilter: Prisma.LoanWhereInput =
         input?.status === 'completed' ? { status: 'completed' } :
         input?.status === 'refinanced' ? { status: 'refinanced' } :
-        { status: { in: ['active', 'pre_approved'] } }
+        input?.status === 'defaulted' ? { status: 'defaulted' } :
+        { status: { in: ['active', 'pre_approved', 'defaulted'] } }
 
       const loans = await ctx.prisma.loan.findMany({
         where: {

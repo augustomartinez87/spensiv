@@ -474,4 +474,64 @@ export const loanOperationsRouter = router({
       await service.recalculateIrrCache(input.loanId)
       return { success: true }
     }),
+
+  markUncollectible: protectedProcedure
+    .input(z.object({ loanId: z.string(), note: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.loanId, userId: ctx.user.id },
+        select: { id: true, status: true },
+      })
+      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
+      if (loan.status !== 'active') {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Solo se pueden marcar como incobrables préstamos activos' })
+      }
+
+      await ctx.prisma.$transaction([
+        ctx.prisma.loan.update({
+          where: { id: loan.id },
+          data: { status: 'defaulted' },
+        }),
+        ctx.prisma.loanActivityLog.create({
+          data: {
+            loanId: loan.id,
+            userId: ctx.user.id,
+            tag: 'acuerdo',
+            note: input.note?.trim() || 'Préstamo marcado como incobrable',
+          },
+        }),
+      ])
+
+      return { success: true }
+    }),
+
+  unmarkUncollectible: protectedProcedure
+    .input(z.object({ loanId: z.string(), note: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const loan = await ctx.prisma.loan.findFirst({
+        where: { id: input.loanId, userId: ctx.user.id },
+        select: { id: true, status: true },
+      })
+      if (!loan) throw new TRPCError({ code: 'NOT_FOUND', message: 'Préstamo no encontrado' })
+      if (loan.status !== 'defaulted') {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'El préstamo no está marcado como incobrable' })
+      }
+
+      await ctx.prisma.$transaction([
+        ctx.prisma.loan.update({
+          where: { id: loan.id },
+          data: { status: 'active' },
+        }),
+        ctx.prisma.loanActivityLog.create({
+          data: {
+            loanId: loan.id,
+            userId: ctx.user.id,
+            tag: 'acuerdo',
+            note: input.note?.trim() || 'Préstamo reactivado (deshace incobrable)',
+          },
+        }),
+      ])
+
+      return { success: true }
+    }),
 })

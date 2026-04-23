@@ -33,6 +33,7 @@ import {
   Clock,
   Percent,
   Zap,
+  XCircle,
 } from 'lucide-react'
 
 const PIE_COLORS = [
@@ -190,15 +191,27 @@ export default function PortfolioPage() {
               iconBg="bg-accent-positive/10"
               iconColor="text-accent-positive"
             />
-            <PortfolioStatCard
-              label="Eficiencia de Capital"
-              value={`${yieldMetrics.weightedDuration.toFixed(1)} meses`}
-              subtitle={`${yieldMetrics.activeLoansCount} préstamos activos`}
-              icon={Clock}
-              color="text-foreground"
-              iconBg="bg-purple-500/10"
-              iconColor="text-purple-400"
-            />
+            {metrics.defaultedCapital > 0 ? (
+              <PortfolioStatCard
+                label="Capital Incobrable"
+                value={formatCurrency(metrics.defaultedCapital)}
+                subtitle={`${metrics.defaultedLoansCount} ${metrics.defaultedLoansCount === 1 ? 'préstamo' : 'préstamos'} · ${metrics.defaultedPercentage.toFixed(1)}% del total`}
+                icon={XCircle}
+                color="text-accent-danger"
+                iconBg="bg-accent-danger/10"
+                iconColor="text-accent-danger"
+              />
+            ) : (
+              <PortfolioStatCard
+                label="Eficiencia de Capital"
+                value={`${yieldMetrics.weightedDuration.toFixed(1)} meses`}
+                subtitle={`${yieldMetrics.activeLoansCount} préstamos activos`}
+                icon={Clock}
+                color="text-foreground"
+                iconBg="bg-purple-500/10"
+                iconColor="text-purple-400"
+              />
+            )}
           </div>
         </div>
       ) : null}

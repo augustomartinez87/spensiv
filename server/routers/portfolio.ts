@@ -17,7 +17,7 @@ import type { PrismaClient } from '@prisma/client'
 async function loadPortfolioData(prisma: PrismaClient, userId: string) {
   const [loans, persons, mepRate] = await Promise.all([
     prisma.loan.findMany({
-      where: { userId, status: 'active' },
+      where: { userId, status: { in: ['active', 'defaulted'] } },
       include: {
         person: true,
         loanInstallments: {
@@ -38,7 +38,7 @@ async function loadPortfolioData(prisma: PrismaClient, userId: string) {
       where: { userId },
       include: {
         loans: {
-          where: { status: 'active', direction: 'lender' },
+          where: { status: { in: ['active', 'defaulted'] }, direction: 'lender' },
           select: { capital: true, currency: true },
         },
       },
@@ -87,6 +87,15 @@ function computeMetrics(
 ) {
   const totalCapital = capitalCache.reduce((s, c) => s + c, 0)
   const capitalByPerson = buildCapitalByPerson(lenderLoans, capitalCache)
+
+  let defaultedCapital = 0
+  let defaultedLoansCount = 0
+  for (let i = 0; i < lenderLoans.length; i++) {
+    if (lenderLoans[i].status === 'defaulted') {
+      defaultedCapital += capitalCache[i]
+      defaultedLoansCount++
+    }
+  }
 
   const exposures = [...capitalByPerson.values()]
     .map((e) => ({
@@ -141,6 +150,9 @@ function computeMetrics(
     top3Percentage,
     highRiskCapital,
     highRiskPercentage: totalCapital > 0 ? (highRiskCapital / totalCapital) * 100 : 0,
+    defaultedCapital,
+    defaultedLoansCount,
+    defaultedPercentage: totalCapital > 0 ? (defaultedCapital / totalCapital) * 100 : 0,
     mepRate,
   }
 }
@@ -202,13 +214,30 @@ function computeYieldMetrics(
 
     // TIR solo para préstamos amortizados con cuotas definidas
     if (loan.loanType === 'amortized' && installments.length > 0) {
+      const isDefaulted = loan.status === 'defaulted'
+
+      // Para préstamos incobrables: TIR realizada (solo flujos efectivamente cobrados).
+      // Para préstamos activos: TIR contractual (todas las cuotas como si fueran a pagarse).
       const cashFlows = [-capital]
-      for (const inst of installments) {
-        const payment = pesify(Number(inst.amount), loan.currency, mepRate)
-        if (Number.isFinite(payment)) cashFlows.push(payment)
+      if (isDefaulted) {
+        for (const inst of installments) {
+          const collected = pesify(Number(inst.paidAmount ?? 0), loan.currency, mepRate)
+          if (Number.isFinite(collected) && collected > 0) cashFlows.push(collected)
+        }
+      } else {
+        for (const inst of installments) {
+          const payment = pesify(Number(inst.amount), loan.currency, mepRate)
+          if (Number.isFinite(payment)) cashFlows.push(payment)
+        }
       }
 
-      if (cashFlows.length > 1) {
+      // Caso especial: préstamo incobrable sin un solo cobro → pérdida total = -100%.
+      // No es resoluble por el IRR (faltan flujos positivos), lo registramos directo.
+      if (isDefaulted && cashFlows.length === 1) {
+        totalWeightedIRR += -1 * capital
+        totalWeightForIRR += capital
+        amortizedLoansCount++
+      } else if (cashFlows.length > 1) {
         const hasPositive = cashFlows.some((v) => v > 0)
         const hasNegative = cashFlows.some((v) => v < 0)
         if (hasPositive && hasNegative) {

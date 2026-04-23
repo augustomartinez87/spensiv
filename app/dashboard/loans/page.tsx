@@ -45,6 +45,8 @@ import {
   Ban,
   MoreHorizontal,
   Users,
+  XCircle,
+  Undo2,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -179,6 +181,39 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
     },
     onError: (err) => {
       toast({ title: 'Error al completar', description: err.message, variant: 'destructive' })
+    },
+  })
+
+  const [confirmUncollectible, setConfirmUncollectible] = useState(false)
+
+  const markUncollectibleMutation = trpc.loans.markUncollectible.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.list.invalidate()
+      utils.loans.getDashboardMetrics.invalidate()
+      utils.portfolio.getFullPortfolio.invalidate()
+      utils.portfolio.getYieldMetrics.invalidate()
+      utils.portfolio.getMetrics.invalidate()
+      setConfirmUncollectible(false)
+      toast({ title: 'Préstamo marcado como incobrable', description: 'La TIR de tu cartera se recalculó incluyendo este préstamo como pérdida.' })
+    },
+    onError: (err) => {
+      toast({ title: 'No se pudo marcar como incobrable', description: err.message, variant: 'destructive' })
+    },
+  })
+
+  const unmarkUncollectibleMutation = trpc.loans.unmarkUncollectible.useMutation({
+    onSuccess: () => {
+      utils.loans.getById.invalidate({ id: loanId })
+      utils.loans.list.invalidate()
+      utils.loans.getDashboardMetrics.invalidate()
+      utils.portfolio.getFullPortfolio.invalidate()
+      utils.portfolio.getYieldMetrics.invalidate()
+      utils.portfolio.getMetrics.invalidate()
+      toast({ title: 'Préstamo reactivado', description: 'Vuelve a contar como préstamo activo en tu cartera.' })
+    },
+    onError: (err) => {
+      toast({ title: 'No se pudo reactivar', description: err.message, variant: 'destructive' })
     },
   })
 
@@ -630,6 +665,29 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
         </div>
       )}
 
+      {/* Defaulted (incobrable) banner — reversible */}
+      {loan.status === 'defaulted' && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-accent-danger/5 border border-accent-danger/30 border-l-4 border-l-accent-danger">
+          <XCircle className="h-5 w-5 text-accent-danger shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-accent-danger">Préstamo marcado como incobrable</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              En la cartera, su TIR se calcula con los flujos realmente cobrados. Si no se cobró nada, contribuye con -100% al rendimiento ponderado.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => unmarkUncollectibleMutation.mutate({ loanId })}
+            disabled={unmarkUncollectibleMutation.isPending}
+            className="shrink-0"
+          >
+            <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+            {unmarkUncollectibleMutation.isPending ? 'Reactivando...' : 'Reactivar'}
+          </Button>
+        </div>
+      )}
+
       {/* Refinance banner for refinanced loans */}
       {loan.status === 'refinanced' && loan.refinancedByLoanId && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted text-sm">
@@ -675,6 +733,32 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
             <RefreshCw className={cn("h-4 w-4 mr-2", recalculateMutation.isPending && "animate-spin")} />
             Recalcular
           </Button>
+          {confirmUncollectible ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-accent-danger font-medium">Marcar como incobrable?</span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => markUncollectibleMutation.mutate({ loanId })}
+                disabled={markUncollectibleMutation.isPending}
+              >
+                {markUncollectibleMutation.isPending ? 'Marcando...' : 'Si, incobrable'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConfirmUncollectible(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmUncollectible(true)}
+              className="text-muted-foreground hover:text-accent-danger ml-auto"
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Marcar como incobrable
+            </Button>
+          )}
         </div>
       )}
 
@@ -741,6 +825,32 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
             <Button variant="outline" onClick={() => setConfirmComplete(true)}>
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Completar préstamo
+            </Button>
+          )}
+          {confirmUncollectible ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-accent-danger font-medium">Marcar como incobrable?</span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => markUncollectibleMutation.mutate({ loanId })}
+                disabled={markUncollectibleMutation.isPending}
+              >
+                {markUncollectibleMutation.isPending ? 'Marcando...' : 'Si, incobrable'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConfirmUncollectible(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmUncollectible(true)}
+              className="text-muted-foreground hover:text-accent-danger ml-auto"
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Marcar como incobrable
             </Button>
           )}
         </div>

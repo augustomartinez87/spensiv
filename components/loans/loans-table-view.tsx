@@ -50,6 +50,7 @@ function isZeroRateOpenLoan(loan: LoanListItem) {
 function getLoanStatus(loan: LoanListItem) {
     const now = new Date()
     const nextDue = loan.nextDueDate ? new Date(loan.nextDueDate) : null
+    if (loan.status === 'defaulted') return 'defaulted' as const
     if (loan.status === 'completed') return 'completed' as const
     if (isZeroRateOpenLoan(loan)) return 'open' as const
     if (nextDue && nextDue < now) return 'overdue' as const
@@ -59,6 +60,7 @@ function getLoanStatus(loan: LoanListItem) {
 
 function getStatusDisplay(status: ReturnType<typeof getLoanStatus>) {
     switch (status) {
+        case 'defaulted': return { label: 'Incobrable', color: 'bg-accent-danger', textColor: 'text-accent-danger' }
         case 'overdue': return { label: 'Vencido', color: 'bg-red-500', textColor: 'text-red-400' }
         case 'current': return { label: 'Al día', color: 'bg-green-500', textColor: 'text-green-400' }
         case 'new': return { label: 'Nuevo', color: 'bg-blue-500', textColor: 'text-blue-400' }
@@ -195,7 +197,7 @@ export function LoansTableView({ onSelect, direction }: { onSelect: (id: string)
                     break
                 }
                 case 'status': {
-                    const order = { overdue: 0, current: 1, open: 2, new: 3, completed: 4 }
+                    const order = { defaulted: 0, overdue: 1, current: 2, open: 3, new: 4, completed: 5 }
                     cmp = order[getLoanStatus(a)] - order[getLoanStatus(b)]
                     break
                 }
