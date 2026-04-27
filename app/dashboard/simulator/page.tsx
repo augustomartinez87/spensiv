@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
+import { useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/contexts/trpc-client'
 import { formatCurrency, formatDateToInput, cn, pluralize } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -70,6 +71,16 @@ export default function SimulatorPage() {
   const { data: persons } = trpc.persons.list.useQuery()
   const [selectedBorrowerTypeId, setSelectedBorrowerTypeId] = useState<string>('')
   const [selectedPersonId, setSelectedPersonId] = useState<string>('')
+
+  // Prefill desde query param ?personId=X (ej: viene de Consulta 360°)
+  const searchParams = useSearchParams()
+  const prefillPersonId = searchParams?.get('personId') ?? ''
+  useEffect(() => {
+    if (!prefillPersonId || !persons) return
+    if (persons.some((p) => p.id === prefillPersonId)) {
+      setSelectedPersonId(prefillPersonId)
+    }
+  }, [prefillPersonId, persons])
 
   function getSuggestedTnaForTerm(term: number): number | null {
     if (!selectedBorrowerTypeId || !borrowerTypes || !durationAdjustments) return null

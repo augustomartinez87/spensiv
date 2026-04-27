@@ -13,6 +13,7 @@ import { shareRouter } from './routers/share'
 import { rateRulesRouter } from './routers/rate-rules'
 import { publicSimulatorRouter } from './routers/public-simulator'
 import { alertsRouter } from './routers/alerts'
+import { consulta360Router } from './routers/consulta-360'
 
 export const appRouter = router({
   cards: cardsRouter,
@@ -29,6 +30,7 @@ export const appRouter = router({
   rateRules: rateRulesRouter,
   publicSimulator: publicSimulatorRouter,
   alerts: alertsRouter,
+  consulta360: consulta360Router,
 })
 
 export type AppRouter = typeof appRouter

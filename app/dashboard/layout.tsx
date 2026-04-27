@@ -66,6 +66,7 @@ const navigation: NavSection[] = [
     items: [
       { name: 'Cartera', href: '/dashboard/portfolio', icon: PieChart },
       { name: 'Riesgo', href: '/dashboard/risk', icon: ShieldAlert },
+      { name: 'Consulta 360°', href: '/dashboard/consulta-360', icon: ShieldCheck },
       { name: 'Préstamos', href: '/dashboard/loans', icon: Banknote },
       { name: 'Personas', href: '/dashboard/persons', icon: Users },
       { name: 'Simulador', href: '/dashboard/simulator', icon: Calculator },
