@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { FileDown, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { saveAs } from 'file-saver'
 import type { ReportPdfProps } from './report-pdf'
 
 export function ExportPdfButton(props: ReportPdfProps) {
@@ -17,7 +18,6 @@ export function ExportPdfButton(props: ReportPdfProps) {
         import('@react-pdf/renderer'),
         import('./report-pdf'),
       ])
-      const { saveAs } = await import('file-saver').then((m) => m.default ? m : { saveAs: m.saveAs })
       const blob = await pdf(<ReportPdf {...props} />).toBlob()
       const filename = `consulta-360_${props.consulta.cuit}_${new Date(props.consulta.consultadoEn)
         .toISOString()
