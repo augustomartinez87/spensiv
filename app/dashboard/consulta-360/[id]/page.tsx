@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast'
 import { ScoreGauge } from '@/components/consulta-360/score-gauge'
 import { ScoreBreakdown } from '@/components/consulta-360/score-breakdown'
 import { EntidadesTable } from '@/components/consulta-360/entidades-table'
-import { Heatmap24 } from '@/components/consulta-360/heatmap-24'
+import { BarChart24 } from '@/components/consulta-360/barchart-24'
 import { ChequesSection } from '@/components/consulta-360/cheques-section'
 import { AfipSection } from '@/components/consulta-360/afip-section'
 import { ExportPdfButton } from '@/components/consulta-360/pdf/export-button'
@@ -131,6 +131,20 @@ export default function ConsultaDetallePage() {
   const periodos = bcraHist?.results?.periodos ?? []
   const banda = consulta.riesgo as RiesgoBanda
 
+  // Helper para mostrar mes
+  const periodoLabel = latestPeriodo?.periodo
+    ? `${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][parseInt(latestPeriodo.periodo.slice(4, 6), 10) - 1] ?? '?'} ${latestPeriodo.periodo.slice(2, 4)}`
+    : null
+
+  // Helper para alertas críticas
+  const criticalFlags = new Set<string>()
+  latestPeriodo?.entidades.forEach((e) => {
+    if (e.situacionJuridica) criticalFlags.add('Situación Jurídica')
+    if (e.irrecDisposicionTecnica) criticalFlags.add('Irrecuperable por Disp. Técnica')
+    if (e.procesoJud) criticalFlags.add('Proceso Judicial')
+    if (e.enRevision) criticalFlags.add('En Revisión')
+  })
+
   const onPersonaChange = (value: string) => {
     linkPersona.mutate({ id: consulta.id, personaId: value === 'none' ? null : value })
   }
@@ -201,8 +215,22 @@ export default function ConsultaDetallePage() {
                 </p>
               </div>
 
+              {criticalFlags.size > 0 && (
+                <div className="rounded-md bg-red-500/10 border border-red-500/20 p-3 flex items-start gap-3 mt-2">
+                  <ShieldCheck className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-medium text-red-400 uppercase tracking-wide">
+                      Atención: Banderas Críticas en BCRA
+                    </p>
+                    <p className="text-sm text-red-200 mt-0.5">
+                      {Array.from(criticalFlags).join(' · ')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Stat label="Total deuda" value={formatCurrency(Number(consulta.totalDeudaArs) * 1000)} />
+                <Stat label={`Total deuda${periodoLabel ? ` (${periodoLabel})` : ''}`} value={formatCurrency(Number(consulta.totalDeudaArs) * 1000)} />
                 <Stat label="Entidades" value={String(consulta.cantEntidades)} />
                 <Stat
                   label="Peor situación"
@@ -251,13 +279,16 @@ export default function ConsultaDetallePage() {
         </CardContent>
       </Card>
 
-      {/* Bloque C — Heatmap 24 meses */}
+      {/* Bloque C — Histórico 24 meses */}
       <Card>
         <CardHeader>
           <CardTitle>Histórico (24 meses)</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Evolución del monto total de deuda reportada al BCRA.
+          </p>
         </CardHeader>
         <CardContent>
-          <Heatmap24 periodos={periodos} />
+          <BarChart24 periodos={periodos} />
         </CardContent>
       </Card>
 

@@ -13,16 +13,16 @@ export function ExportPdfButton(props: ReportPdfProps) {
   const onClick = async () => {
     setBusy(true)
     try {
-      const [{ pdf }, { ReportPdf }, fileSaver] = await Promise.all([
+      const [{ pdf }, { ReportPdf }] = await Promise.all([
         import('@react-pdf/renderer'),
         import('./report-pdf'),
-        import('file-saver'),
       ])
+      const { saveAs } = await import('file-saver').then((m) => m.default ? m : { saveAs: m.saveAs })
       const blob = await pdf(<ReportPdf {...props} />).toBlob()
       const filename = `consulta-360_${props.consulta.cuit}_${new Date(props.consulta.consultadoEn)
         .toISOString()
         .slice(0, 10)}.pdf`
-      fileSaver.saveAs(blob, filename)
+      saveAs(blob, filename)
     } catch (e) {
       toast({
         variant: 'destructive',
