@@ -47,11 +47,21 @@ export default function Consulta360IndexPage() {
 
   const consultar = trpc.consulta360.consultar.useMutation({
     onSuccess: (res) => {
-      toast({ title: 'Consulta lista', description: `Score ${res.summary.score.score} · ${res.summary.score.bandaLabel}` })
+      toast({
+        title: 'Consulta lista',
+        description: `Score ${res.summary.score.score} · ${res.summary.score.bandaLabel}`,
+      })
       router.push(`/dashboard/consulta-360/${res.id}`)
     },
     onError: (err) => {
-      toast({ variant: 'destructive', title: 'No se pudo consultar', description: err.message })
+      const isMantenimiento =
+        err.data?.code === 'SERVICE_UNAVAILABLE' ||
+        err.message.toLowerCase().includes('mantenimiento')
+      toast({
+        variant: 'destructive',
+        title: isMantenimiento ? 'BCRA en mantenimiento' : 'No se pudo consultar',
+        description: err.message,
+      })
     },
   })
 
@@ -147,6 +157,8 @@ export default function Consulta360IndexPage() {
               </ul>
               <p className="mt-2 text-[11px] text-muted-foreground/70">
                 Las consultas se cachean 24h (BCRA) / 7d (AFIP). Límite: 30 consultas por hora.
+                BCRA suele entrar en mantenimiento por la noche (00–06 AR); si pasa eso, vamos
+                a avisarte y podés reintentar más tarde.
               </p>
             </div>
           </form>

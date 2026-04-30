@@ -11,7 +11,7 @@ const FETCH_TIMEOUT_MS = 12_000
 
 export type FetchOutcome<T> = {
   data: T | null
-  status: 'ok' | 'not_found' | 'error'
+  status: 'ok' | 'not_found' | 'error' | 'mantenimiento'
   fromCache: boolean
   fetchedAt: Date
   httpStatus: number
@@ -76,9 +76,12 @@ async function fetchAndCache<T>(
   }
 
   if (!res.ok) {
+    // 503 = BCRA en mantenimiento (caso típico de su API).
+    // No cacheamos para que el siguiente intento del usuario lo reintente.
+    const isMantenimiento = res.status === 503
     return {
       data: null,
-      status: 'error',
+      status: isMantenimiento ? 'mantenimiento' : 'error',
       fromCache: false,
       fetchedAt: new Date(),
       httpStatus: res.status,
@@ -142,9 +145,19 @@ export async function fetchAllBcra(prisma: PrismaClient, cuit: string) {
     getChequesRechazados(prisma, cuit),
   ])
 
-  // bcraStatus consolidado: ok si deudas ok, not_found si todas devuelven 404, error si todas fallan.
-  let bcraStatus: 'ok' | 'not_found' | 'error'
+  // bcraStatus consolidado:
+  // - 'ok'           → deudas tiene datos
+  // - 'not_found'    → deudas dio 404 (sin antecedentes) y los demás no fallaron
+  // - 'mantenimiento'→ alguno de los 3 dio 503 (BCRA caído)
+  // - 'error'        → cualquier otro fallo de comunicación / 5xx
+  let bcraStatus: 'ok' | 'not_found' | 'error' | 'mantenimiento'
   if (deudas.status === 'ok') bcraStatus = 'ok'
+  else if (
+    deudas.status === 'mantenimiento' ||
+    historicas.status === 'mantenimiento' ||
+    cheques.status === 'mantenimiento'
+  )
+    bcraStatus = 'mantenimiento'
   else if (
     deudas.status === 'not_found' &&
     historicas.status !== 'error' &&

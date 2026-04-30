@@ -143,5 +143,5 @@ export type ConsultaSummary = {
   chequesRechazados: number
   mesesConDatos: number
   score: ScoreResult
-  bcraStatus: 'ok' | 'not_found' | 'error'
+  bcraStatus: 'ok' | 'not_found' | 'error' | 'mantenimiento'
 }

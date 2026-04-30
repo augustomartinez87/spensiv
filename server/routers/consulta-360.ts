@@ -57,6 +57,25 @@ export const consulta360Router = router({
         ctx.prisma,
         input.cuit
       )
+
+      // Si BCRA está en mantenimiento, abortar antes de crear una consulta vacía
+      // (sin BCRA no podemos calcular un score creíble).
+      if (bcraStatus === 'mantenimiento') {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message:
+            'BCRA está en mantenimiento. Esto suele durar unos minutos — probá de nuevo en un rato.',
+        })
+      }
+      // Si BCRA dio error genérico (timeout, 500), también abortar.
+      if (bcraStatus === 'error') {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message:
+            'No pudimos comunicarnos con BCRA. Probá de nuevo; si persiste, BCRA puede estar caído.',
+        })
+      }
+
       const afip = await getAfipPadron(ctx.prisma, input.cuit)
 
       const summary = buildSummary({
@@ -247,6 +266,21 @@ export const consulta360Router = router({
         ctx.prisma,
         original.cuit
       )
+
+      if (bcraStatus === 'mantenimiento') {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message:
+            'BCRA está en mantenimiento. Probá de nuevo en unos minutos — la consulta original sigue disponible.',
+        })
+      }
+      if (bcraStatus === 'error') {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'No pudimos comunicarnos con BCRA. Intentá de nuevo.',
+        })
+      }
+
       const afip = await getAfipPadron(ctx.prisma, original.cuit)
 
       const summary = buildSummary({
@@ -535,6 +569,23 @@ export const consulta360Router = router({
             ctx.prisma,
             item.cuit
           )
+
+          // Si BCRA está caído, no creamos consulta vacía: registramos el error y seguimos.
+          if (bcraStatus === 'mantenimiento' || bcraStatus === 'error') {
+            results.push({
+              cuit: item.cuit,
+              ok: false,
+              error:
+                bcraStatus === 'mantenimiento'
+                  ? 'BCRA en mantenimiento (503)'
+                  : 'No se pudo consultar BCRA',
+            })
+            // Si BCRA está en mantenimiento, no tiene sentido seguir con el resto:
+            // muy probable que todos fallen. Cortamos el bulk acá.
+            if (bcraStatus === 'mantenimiento') break
+            continue
+          }
+
           const afip = await getAfipPadron(ctx.prisma, item.cuit)
           const summary = buildSummary({
             cuit: item.cuit,

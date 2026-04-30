@@ -155,7 +155,7 @@ export function calculateScore(args: {
   bcraHistoricas: BcraHistoricasResponse | null
   bcraCheques: BcraChequesResponse | null
   afip?: AfipPersona | null
-  bcraStatus?: 'ok' | 'not_found' | 'error'
+  bcraStatus?: 'ok' | 'not_found' | 'error' | 'mantenimiento'
 }): ScoreResult {
   const { bcraDeudas, bcraHistoricas, bcraCheques, afip, bcraStatus } = args
 
@@ -309,7 +309,7 @@ export function buildSummary(args: {
   bcraDeudas: BcraDeudasResponse | null
   bcraHistoricas: BcraHistoricasResponse | null
   bcraCheques: BcraChequesResponse | null
-  bcraStatus: 'ok' | 'not_found' | 'error'
+  bcraStatus: 'ok' | 'not_found' | 'error' | 'mantenimiento'
   afip?: AfipPersona | null
 }): ConsultaSummary {
   const { cuit, bcraDeudas, bcraHistoricas, bcraCheques, bcraStatus, afip } = args
