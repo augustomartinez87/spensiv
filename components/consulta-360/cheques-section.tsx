@@ -1,13 +1,23 @@
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, cn } from '@/lib/utils'
 import type { BcraChequesResponse } from '@/lib/consulta-360/types'
 import { CheckCircle2, AlertTriangle } from 'lucide-react'
 
 export function ChequesSection({ data }: { data: BcraChequesResponse | null }) {
   const causales = data?.results?.causales ?? []
-  const totalCheques = causales.reduce(
-    (s, c) => s + c.entidades.reduce((s2, e) => s2 + (e.detalle?.length ?? 0), 0),
-    0
-  )
+  let totalCheques = 0
+  let totalPendientes = 0
+  let montoPendienteArs = 0
+  for (const c of causales) {
+    for (const ent of c.entidades) {
+      for (const det of ent.detalle ?? []) {
+        totalCheques += 1
+        if (!det.fechaPago) {
+          totalPendientes += 1
+          montoPendienteArs += Number(det.monto) || 0
+        }
+      }
+    }
+  }
 
   if (totalCheques === 0) {
     return (
@@ -25,11 +35,18 @@ export function ChequesSection({ data }: { data: BcraChequesResponse | null }) {
     <div className="space-y-3">
       <div className="rounded-lg border border-red-500/20 bg-red-500/[0.04] p-4 flex items-center gap-3">
         <AlertTriangle className="h-5 w-5 text-red-400 shrink-0" />
-        <div>
+        <div className="flex-1">
           <p className="text-sm font-medium text-red-300">
             {totalCheques} cheque{totalCheques !== 1 && 's'} rechazado{totalCheques !== 1 && 's'}
+            {totalPendientes > 0 && (
+              <span className="ml-1 text-red-200/80">
+                · {totalPendientes} pendiente{totalPendientes !== 1 && 's'} ({formatCurrency(montoPendienteArs)})
+              </span>
+            )}
           </p>
-          <p className="text-xs text-muted-foreground">Detalle por causal y entidad.</p>
+          <p className="text-xs text-muted-foreground">
+            Detalle por causal y entidad. BCRA reporta monto en pesos.
+          </p>
         </div>
       </div>
 
@@ -43,6 +60,7 @@ export function ChequesSection({ data }: { data: BcraChequesResponse | null }) {
               <thead>
                 <tr className="text-left text-xs text-muted-foreground">
                   <th className="px-4 py-2 font-medium">N° Cheque</th>
+                  <th className="px-4 py-2 font-medium">Entidad</th>
                   <th className="px-4 py-2 font-medium">F. rechazo</th>
                   <th className="px-4 py-2 font-medium text-right">Monto</th>
                   <th className="px-4 py-2 font-medium">Estado</th>
@@ -50,18 +68,37 @@ export function ChequesSection({ data }: { data: BcraChequesResponse | null }) {
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
                 {c.entidades.flatMap((e) =>
-                  (e.detalle ?? []).map((d, di) => (
-                    <tr key={`${ci}-${e.entidad}-${di}`}>
-                      <td className="px-4 py-2 tabular-nums text-foreground">{d.numeroCheque}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{d.fechaRechazo ?? '—'}</td>
-                      <td className="px-4 py-2 tabular-nums text-right text-foreground">
-                        {formatCurrency((Number(d.monto) || 0) * 1000)}
-                      </td>
-                      <td className="px-4 py-2 text-xs text-muted-foreground">
-                        {d.fechaPago ? `Pagado ${d.fechaPago}` : 'Pendiente'}
-                      </td>
-                    </tr>
-                  ))
+                  (e.detalle ?? []).map((d, di) => {
+                    const pagado = !!d.fechaPago
+                    return (
+                      <tr key={`${ci}-${e.entidad}-${di}`}>
+                        <td className="px-4 py-2 tabular-nums text-foreground">{d.numeroCheque}</td>
+                        <td className="px-4 py-2 tabular-nums text-muted-foreground">{e.entidad}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{d.fechaRechazo ?? '—'}</td>
+                        <td className="px-4 py-2 tabular-nums text-right text-foreground">
+                          {formatCurrency(Number(d.monto) || 0)}
+                        </td>
+                        <td className="px-4 py-2 text-xs">
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 ring-1 ring-inset',
+                              pagado
+                                ? 'bg-green-500/10 text-green-300 ring-green-500/30'
+                                : 'bg-red-500/10 text-red-300 ring-red-500/30'
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'h-1.5 w-1.5 rounded-full',
+                                pagado ? 'bg-green-300' : 'bg-red-300'
+                              )}
+                            />
+                            {pagado ? `Pagado ${d.fechaPago}` : 'Pendiente'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>

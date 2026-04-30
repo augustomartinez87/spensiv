@@ -42,7 +42,9 @@ function historicasFor(periodos: { periodo: string; entidades: BcraEntidadDeuda[
   }
 }
 
-function chequesFor(detalles: { fechaRechazo: string; monto?: number }[]): BcraChequesResponse {
+function chequesFor(
+  detalles: { fechaRechazo: string; monto?: number; fechaPago?: string }[]
+): BcraChequesResponse {
   return {
     status: 200,
     results: {
@@ -59,6 +61,7 @@ function chequesFor(detalles: { fechaRechazo: string; monto?: number }[]): BcraC
                     numeroCheque: 1000 + i,
                     fechaRechazo: d.fechaRechazo,
                     monto: d.monto ?? 50,
+                    fechaPago: d.fechaPago,
                   })),
                 },
               ],
@@ -132,7 +135,7 @@ describe('calculateScore', () => {
     expect(r.score).toBeLessThanOrEqual(300)
   })
 
-  test('sin entidades → flag sin_historial_crediticio + componente entidades neutro', () => {
+  test('sin entidades → flag sin_historial_crediticio + componente entidades neutro + cap 600', () => {
     const r = calculateScore({
       bcraDeudas: null,
       bcraHistoricas: null,
@@ -142,9 +145,12 @@ describe('calculateScore', () => {
     const comp = r.components.find((c) => c.key === 'entidades')
     expect(comp?.neutral).toBe(true)
     expect(comp?.raw).toBe(500)
+    // Sin historial debe capear a 600 para no marcar "apto sin reservas" a un desconocido
+    expect(r.overrides.some((o) => o.capAt === 600)).toBe(true)
+    expect(r.score).toBeLessThanOrEqual(600)
   })
 
-  test('1 cheque rechazado dentro de 12m → -150, score baja', () => {
+  test('1 cheque PENDIENTE dentro de 12m → -250, comp = 750', () => {
     const recent = new Date()
     recent.setMonth(recent.getMonth() - 3)
     const r = calculateScore({
@@ -153,10 +159,26 @@ describe('calculateScore', () => {
       bcraCheques: chequesFor([{ fechaRechazo: recent.toISOString().slice(0, 10) }]),
     })
     const comp = r.components.find((c) => c.key === 'cheques')
-    expect(comp?.raw).toBe(850) // 1000 - 150
+    expect(comp?.raw).toBe(750) // 1000 - 250 (pendiente)
+    expect(r.flags).toContain('cheques_pendientes_1')
   })
 
-  test('3 cheques rechazados → -150 -150 -300 = -600, comp = 400', () => {
+  test('1 cheque PAGADO en 12m penaliza menos (-75)', () => {
+    const recent = new Date()
+    recent.setMonth(recent.getMonth() - 3)
+    const r = calculateScore({
+      bcraDeudas: deudasFor([entidad(1)]),
+      bcraHistoricas: historicasFor([]),
+      bcraCheques: chequesFor([
+        { fechaRechazo: recent.toISOString().slice(0, 10), fechaPago: '2026-01-15' },
+      ]),
+    })
+    const comp = r.components.find((c) => c.key === 'cheques')
+    expect(comp?.raw).toBe(925) // 1000 - 75 (pagado)
+    expect(r.flags).toContain('cheques_regularizados_1')
+  })
+
+  test('3 cheques pendientes → cap 400 + componente bajo', () => {
     const recent = new Date()
     recent.setMonth(recent.getMonth() - 3)
     const fechas = [0, 1, 2].map((i) => {
@@ -170,7 +192,10 @@ describe('calculateScore', () => {
       bcraCheques: chequesFor(fechas),
     })
     const comp = r.components.find((c) => c.key === 'cheques')
-    expect(comp?.raw).toBe(400)
+    // 1000 - 250 - 250 - 400 = 100
+    expect(comp?.raw).toBe(100)
+    expect(r.overrides.some((o) => o.capAt === 400)).toBe(true)
+    expect(r.score).toBeLessThanOrEqual(400)
   })
 
   test('cheques fuera de 12m no cuentan', () => {
@@ -183,6 +208,28 @@ describe('calculateScore', () => {
     })
     const comp = r.components.find((c) => c.key === 'cheques')
     expect(comp?.raw).toBe(1000)
+  })
+
+  test('AFIP estado != ACTIVO → flag + cap 350', () => {
+    const r = calculateScore({
+      bcraDeudas: deudasFor([entidad(1)]),
+      bcraHistoricas: historicasFor([]),
+      bcraCheques: chequesFor([]),
+      afip: { estadoClave: 'INACTIVO' },
+    })
+    expect(r.flags.some((f) => f.startsWith('afip_'))).toBe(true)
+    expect(r.overrides.some((o) => o.capAt === 350)).toBe(true)
+    expect(r.score).toBeLessThanOrEqual(350)
+  })
+
+  test('AFIP estado ACTIVO no penaliza', () => {
+    const r = calculateScore({
+      bcraDeudas: deudasFor([entidad(1)]),
+      bcraHistoricas: historicasFor([]),
+      bcraCheques: chequesFor([]),
+      afip: { estadoClave: 'ACTIVO' },
+    })
+    expect(r.flags.some((f) => f.startsWith('afip_'))).toBe(false)
   })
 
   test('5 entidades → componente entidades = 800', () => {
@@ -234,7 +281,7 @@ describe('calculateScore', () => {
     expect(comp?.raw).toBe(500)
   })
 
-  test('antigüedad: 24m con datos → 1000', () => {
+  test('antigüedad: 24m con datos limpios → 1000', () => {
     const periodos = Array.from({ length: 24 }, (_, i) => ({
       periodo: `2024${(i + 1).toString().padStart(2, '0')}`,
       entidades: [entidad(1)],
@@ -248,7 +295,7 @@ describe('calculateScore', () => {
     expect(comp?.raw).toBe(1000)
   })
 
-  test('antigüedad: 6m → 400', () => {
+  test('antigüedad: 6m limpios → 400', () => {
     const periodos = Array.from({ length: 6 }, (_, i) => ({
       periodo: `2026${(i + 1).toString().padStart(2, '0')}`,
       entidades: [entidad(1)],
@@ -260,5 +307,19 @@ describe('calculateScore', () => {
     })
     const comp = r.components.find((c) => c.key === 'antiguedad')
     expect(comp?.raw).toBe(400)
+  })
+
+  test('antigüedad: 24m de impagos NO premia (debe ser 100, no 1000)', () => {
+    const periodos = Array.from({ length: 24 }, (_, i) => ({
+      periodo: `2024${(i + 1).toString().padStart(2, '0')}`,
+      entidades: [entidad(3)], // siempre con problemas
+    }))
+    const r = calculateScore({
+      bcraDeudas: deudasFor([entidad(3)]),
+      bcraHistoricas: historicasFor(periodos),
+      bcraCheques: chequesFor([]),
+    })
+    const comp = r.components.find((c) => c.key === 'antiguedad')
+    expect(comp?.raw).toBe(100) // antes daba 1000 — bug premiar 24m de impagos
   })
 })

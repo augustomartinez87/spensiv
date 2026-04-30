@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ShieldCheck, Search, Clock, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { ShieldCheck, Search, Clock, ArrowRight, AlertCircle, CheckCircle2, FileSpreadsheet, ListFilter } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import type { RiesgoBanda } from '@/lib/consulta-360/types'
@@ -66,14 +66,30 @@ export default function Consulta360IndexPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-violet-400" />
-          Consulta 360°
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Evaluá la situación crediticia de un CUIT/CUIL/CDI con datos públicos del BCRA y AFIP.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <ShieldCheck className="h-6 w-6 text-violet-400" />
+            Consulta 360°
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Evaluá la situación crediticia de un CUIT/CUIL/CDI con datos públicos del BCRA y AFIP.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/dashboard/consulta-360/bulk">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <FileSpreadsheet className="h-4 w-4" />
+              Consulta masiva
+            </Button>
+          </Link>
+          <Link href="/dashboard/consulta-360/historial">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <ListFilter className="h-4 w-4" />
+              Historial
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Card>

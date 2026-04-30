@@ -57,3 +57,19 @@ export async function setCached(
     },
   })
 }
+
+/**
+ * Invalida cache para un CUIT (todas las fuentes o solo BCRA si se quiere preservar AFIP).
+ */
+export async function invalidateCache(
+  prisma: PrismaClient,
+  cuit: string,
+  options: { includeAfip?: boolean } = { includeAfip: true }
+): Promise<void> {
+  const sources: CacheSource[] = options.includeAfip
+    ? ['bcra_deudas', 'bcra_historicas', 'bcra_cheques', 'afip_padron']
+    : ['bcra_deudas', 'bcra_historicas', 'bcra_cheques']
+  await prisma.consulta360Cache.deleteMany({
+    where: { cuit, source: { in: sources } },
+  })
+}

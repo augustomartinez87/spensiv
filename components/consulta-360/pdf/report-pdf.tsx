@@ -8,6 +8,14 @@ import type {
   RiesgoBanda,
   BcraPeriodoDeuda,
 } from '@/lib/consulta-360/types'
+import { formatPeriodoCorto, formatPeriodoLargo } from '@/lib/consulta-360/periodo'
+import { buildExecutiveSummary } from '@/components/consulta-360/executive-summary'
+import {
+  evolucionAtrasos,
+  serie24m,
+  frasePermanencia,
+  TRAMOS_LABEL,
+} from '@/lib/consulta-360/historico-aux'
 
 const COLORS = {
   bg: '#0a0e1a',
@@ -167,9 +175,7 @@ function formatCuitFmt(cuit: string): string {
 }
 
 function periodoToShort(p: string): string {
-  if (p.length !== 6) return p
-  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-  return `${meses[parseInt(p.slice(4, 6), 10) - 1]} ${p.slice(2, 4)}`
+  return formatPeriodoCorto(p)
 }
 
 function colorForRaw(raw: number): string {
@@ -199,6 +205,10 @@ export type ReportPdfProps = {
   payloadHistorico: BcraHistoricasResponse | null
   payloadCheques: BcraChequesResponse | null
   payloadAfip: AfipPersona | null
+  /** "ALYCBUR SA" — solicitante. Se imprime en el header. */
+  solicitante?: string | null
+  /** Conteo de consultas internas por mes para "Consultas y seguimientos". */
+  consultasPorMes?: { periodo: string; cantidad: number }[]
 }
 
 export function ReportPdf({
@@ -208,6 +218,8 @@ export function ReportPdf({
   payloadHistorico,
   payloadCheques,
   payloadAfip,
+  solicitante,
+  consultasPorMes,
 }: ReportPdfProps) {
   const latestPeriodo = payloadBcra?.results?.periodos?.[0]
   const entidades = latestPeriodo?.entidades ?? []
@@ -221,18 +233,77 @@ export function ReportPdf({
 
   const consultadoEn = new Date(consulta.consultadoEn)
   const bandaColor = BANDA_COLOR[consulta.riesgo]
+  const periodoLargo = formatPeriodoLargo(latestPeriodo?.periodo)
+
+  const resumen = buildExecutiveSummary({
+    denominacion: consulta.denominacion,
+    riesgo: consulta.riesgo,
+    score: consulta.score,
+    bcraDeudas: payloadBcra,
+    bcraHistoricas: payloadHistorico,
+    bcraCheques: payloadCheques,
+    afip: payloadAfip,
+  })
+
+  const narrativaPermanencia = frasePermanencia(payloadHistorico, payloadBcra)
+  const serieAntecedentes = serie24m(payloadHistorico)
+  const atrasos = evolucionAtrasos(payloadHistorico)
+  const tramoTieneMonto = (() => {
+    const cols = ['normal', 't31_90', 't91_180', 't181_365', 'tMayor365', 'sit6'] as const
+    const has: Record<string, boolean> = {}
+    for (const c of cols) has[c] = atrasos.some((a) => a.tramos[c] > 0)
+    return has
+  })()
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={{ marginBottom: 12 }}>
-          <Text style={styles.h1}>Consulta 360° · Informe crediticio</Text>
-          <Text style={styles.muted}>
-            {consulta.denominacion ?? 'Sin denominación'} · {formatCuitFmt(consulta.cuit)}
-          </Text>
+        {/* Header tipo Nosis: solicitante + fecha + disclaimer */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            borderBottom: `0.5pt solid ${COLORS.border}`,
+            paddingBottom: 4,
+            marginBottom: 8,
+          }}
+        >
           <Text style={styles.faint}>
-            Generado el {consultadoEn.toLocaleString('es-AR')}
+            Solicitado por: {solicitante ?? 'Spensiv'}
+          </Text>
+          <Text style={styles.faint}>Fecha: {consultadoEn.toLocaleString('es-AR')}</Text>
+        </View>
+        <Text
+          style={[
+            styles.faint,
+            { textAlign: 'center', marginBottom: 2, fontStyle: 'italic' },
+          ]}
+        >
+          Información confidencial. Se prohíbe su exhibición o divulgación.
+        </Text>
+        <Text style={[styles.faint, { textAlign: 'center', marginBottom: 10 }]}>
+          No implica juicio de valor sobre las personas citadas ni sobre su solvencia.
+        </Text>
+
+        <Text style={styles.h1}>
+          Informe Individual ·{' '}
+          <Text style={{ color: COLORS.textMuted }}>{formatCuitFmt(consulta.cuit)}</Text>
+          {consulta.denominacion ? ` | ${consulta.denominacion}` : ''}
+        </Text>
+        <View
+          style={{
+            marginTop: 4,
+            paddingHorizontal: 6,
+            paddingVertical: 3,
+            backgroundColor: 'rgba(139,92,246,0.12)',
+            border: `0.5pt solid ${COLORS.violet}`,
+            borderRadius: 4,
+            alignSelf: 'flex-start',
+            marginBottom: 8,
+          }}
+        >
+          <Text style={{ fontSize: 8, color: COLORS.violet, fontWeight: 700 }}>
+            DATOS BCRA AL PERÍODO {periodoLargo.toUpperCase()}
           </Text>
         </View>
 
@@ -276,8 +347,25 @@ export function ReportPdf({
           </View>
         </View>
 
+        {/* Resumen ejecutivo */}
+        <View
+          style={{
+            backgroundColor: 'rgba(139,92,246,0.06)',
+            border: `0.5pt solid rgba(139,92,246,0.4)`,
+            borderRadius: 6,
+            padding: 8,
+            marginTop: 4,
+            marginBottom: 4,
+          }}
+        >
+          <Text style={[styles.faint, { color: COLORS.violet, marginBottom: 3 }]}>
+            RESUMEN EJECUTIVO
+          </Text>
+          <Text style={[styles.tableCell, { lineHeight: 1.4 }]}>{resumen}</Text>
+        </View>
+
         {/* Bloque B — Situación por entidad */}
-        <Text style={styles.h2}>Situación por entidad (período {latestPeriodo?.periodo ?? '—'})</Text>
+        <Text style={styles.h2}>Situación por entidad ({periodoLargo})</Text>
         {entidades.length === 0 ? (
           <View style={styles.card}>
             <Text style={styles.muted}>No hay deudas registradas en BCRA.</Text>
@@ -349,21 +437,314 @@ export function ReportPdf({
                 </View>
                 <Text style={styles.faint}>{periodoToShort(ult24[ult24.length - 1].periodo)}</Text>
               </View>
+              {narrativaPermanencia && (
+                <Text style={[styles.faint, { marginTop: 6, fontStyle: 'italic' }]}>
+                  {narrativaPermanencia}
+                </Text>
+              )}
             </>
           )}
         </View>
 
-        {/* Bloque D — Cheques */}
+        {/* Bloque C1.5 — Grid 24m: período × peor sit × cant entidades × deuda */}
+        {serieAntecedentes.length > 0 && (
+          <>
+            <Text style={styles.h2}>Antecedentes crediticios — 24 meses</Text>
+            <View style={[styles.card, { padding: 6 }]}>
+              <Text style={[styles.faint, { marginBottom: 4 }]}>
+                Importes en miles de pesos (BCRA).
+              </Text>
+              <View style={{ flexDirection: 'row' }}>
+                <View style={{ width: 80 }}>
+                  <Text
+                    style={[styles.tableHeaderCell, { paddingVertical: 2, paddingLeft: 2 }]}
+                  >
+                    Período
+                  </Text>
+                  <Text
+                    style={[styles.tableHeaderCell, { paddingVertical: 2, paddingLeft: 2 }]}
+                  >
+                    Sit. peor
+                  </Text>
+                  <Text
+                    style={[styles.tableHeaderCell, { paddingVertical: 2, paddingLeft: 2 }]}
+                  >
+                    Bancos
+                  </Text>
+                  <Text
+                    style={[styles.tableHeaderCell, { paddingVertical: 2, paddingLeft: 2 }]}
+                  >
+                    Deuda (k)
+                  </Text>
+                </View>
+                <View style={{ flex: 1, flexDirection: 'row' }}>
+                  {serieAntecedentes.map((row) => (
+                    <View
+                      key={row.periodo}
+                      style={{ flex: 1, alignItems: 'center', paddingHorizontal: 0.5 }}
+                    >
+                      <Text style={[styles.faint, { fontSize: 6 }]}>
+                        {periodoToShort(row.periodo)}
+                      </Text>
+                      <View
+                        style={{
+                          width: '100%',
+                          height: 10,
+                          backgroundColor:
+                            row.peor !== null ? SIT_COLOR[row.peor] : COLORS.white05,
+                          marginVertical: 1,
+                        }}
+                      />
+                      <Text style={[styles.tableCell, { fontSize: 7 }]}>
+                        {row.cantEntidades || '-'}
+                      </Text>
+                      <Text style={[styles.tableCell, { fontSize: 6 }]}>
+                        {row.deudaArs > 0
+                          ? Math.round(row.deudaArs / 1000).toLocaleString('es-AR')
+                          : '-'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* Bloque C1.6 — Evolución de atrasos por tramo */}
+        {atrasos.length > 0 && atrasos.some((a) => a.total > 0) && (
+          <>
+            <Text style={styles.h2}>Evolución de atrasos (12 meses)</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Período</Text>
+                {tramoTieneMonto.normal && (
+                  <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>
+                    {TRAMOS_LABEL.normal}
+                  </Text>
+                )}
+                {tramoTieneMonto.t31_90 && (
+                  <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>
+                    {TRAMOS_LABEL.t31_90}
+                  </Text>
+                )}
+                {tramoTieneMonto.t91_180 && (
+                  <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>
+                    {TRAMOS_LABEL.t91_180}
+                  </Text>
+                )}
+                {tramoTieneMonto.t181_365 && (
+                  <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>
+                    {TRAMOS_LABEL.t181_365}
+                  </Text>
+                )}
+                {tramoTieneMonto.tMayor365 && (
+                  <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>
+                    {TRAMOS_LABEL.tMayor365}
+                  </Text>
+                )}
+                {tramoTieneMonto.sit6 && (
+                  <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>
+                    {TRAMOS_LABEL.sit6}
+                  </Text>
+                )}
+                <Text
+                  style={[
+                    styles.tableHeaderCell,
+                    { flex: 1, textAlign: 'right', fontWeight: 700 },
+                  ]}
+                >
+                  Total
+                </Text>
+              </View>
+              {atrasos.map((a) => (
+                <View key={a.periodo} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, { flex: 1.2 }]}>
+                    {periodoToShort(a.periodo)}
+                  </Text>
+                  {tramoTieneMonto.normal && (
+                    <Text style={[styles.tableCell, { flex: 1, textAlign: 'right' }]}>
+                      {a.tramos.normal > 0 ? formatCurrency(a.tramos.normal) : '—'}
+                    </Text>
+                  )}
+                  {tramoTieneMonto.t31_90 && (
+                    <Text style={[styles.tableCell, { flex: 1, textAlign: 'right' }]}>
+                      {a.tramos.t31_90 > 0 ? formatCurrency(a.tramos.t31_90) : '—'}
+                    </Text>
+                  )}
+                  {tramoTieneMonto.t91_180 && (
+                    <Text style={[styles.tableCell, { flex: 1, textAlign: 'right' }]}>
+                      {a.tramos.t91_180 > 0 ? formatCurrency(a.tramos.t91_180) : '—'}
+                    </Text>
+                  )}
+                  {tramoTieneMonto.t181_365 && (
+                    <Text style={[styles.tableCell, { flex: 1, textAlign: 'right' }]}>
+                      {a.tramos.t181_365 > 0 ? formatCurrency(a.tramos.t181_365) : '—'}
+                    </Text>
+                  )}
+                  {tramoTieneMonto.tMayor365 && (
+                    <Text style={[styles.tableCell, { flex: 1, textAlign: 'right' }]}>
+                      {a.tramos.tMayor365 > 0 ? formatCurrency(a.tramos.tMayor365) : '—'}
+                    </Text>
+                  )}
+                  {tramoTieneMonto.sit6 && (
+                    <Text style={[styles.tableCell, { flex: 1, textAlign: 'right' }]}>
+                      {a.tramos.sit6 > 0 ? formatCurrency(a.tramos.sit6) : '—'}
+                    </Text>
+                  )}
+                  <Text
+                    style={[
+                      styles.tableCell,
+                      { flex: 1, textAlign: 'right', fontWeight: 700 },
+                    ]}
+                  >
+                    {formatCurrency(a.total)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Bloque C2 — Distribución por situación */}
+        {entidades.length > 1 && (() => {
+          const buckets = new Map<number, { monto: number; cant: number }>()
+          let total = 0
+          for (const e of entidades) {
+            const m = (Number(e.monto) || 0) * 1000
+            total += m
+            const b = buckets.get(e.situacion) ?? { monto: 0, cant: 0 }
+            b.monto += m
+            b.cant += 1
+            buckets.set(e.situacion, b)
+          }
+          if (total === 0) return null
+          const ordenado = [...buckets.entries()].sort((a, b) => a[0] - b[0])
+          return (
+            <>
+              <Text style={styles.h2}>Distribución de la deuda</Text>
+              <View style={styles.card}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    height: 8,
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    marginBottom: 6,
+                  }}
+                >
+                  {ordenado.map(([sit, b]) => (
+                    <View
+                      key={sit}
+                      style={{
+                        flex: b.monto,
+                        backgroundColor: SIT_COLOR[sit] ?? COLORS.zinc,
+                      }}
+                    />
+                  ))}
+                </View>
+                {ordenado.map(([sit, b]) => (
+                  <View
+                    key={sit}
+                    style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}
+                  >
+                    <View
+                      style={[
+                        styles.legendDot,
+                        { backgroundColor: SIT_COLOR[sit] ?? COLORS.zinc },
+                      ]}
+                    />
+                    <Text style={styles.tableCell}>
+                      Sit {sit} ({SIT_LABEL[sit] ?? '—'}):{' '}
+                      {formatCurrency(b.monto)} · {((b.monto / total) * 100).toFixed(0)}%
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )
+        })()}
+
+        {/* Bloque D — Cheques con detalle */}
         <Text style={styles.h2}>Cheques rechazados</Text>
-        <View style={styles.card}>
-          {totalCheques === 0 ? (
+        {totalCheques === 0 ? (
+          <View style={styles.card}>
             <Text style={[styles.muted, { color: COLORS.green }]}>Sin cheques rechazados.</Text>
-          ) : (
-            <Text style={styles.muted}>
-              {totalCheques} cheque(s) rechazado(s) en el histórico BCRA.
-            </Text>
-          )}
-        </View>
+          </View>
+        ) : (
+          (() => {
+            const filas: {
+              causal: string
+              entidad: number
+              numero: number
+              fechaRechazo: string
+              monto: number
+              pagado: boolean
+              fechaPago?: string
+            }[] = []
+            for (const c of payloadCheques?.results?.causales ?? []) {
+              for (const ent of c.entidades) {
+                for (const det of ent.detalle ?? []) {
+                  filas.push({
+                    causal: c.causal,
+                    entidad: ent.entidad,
+                    numero: det.numeroCheque,
+                    fechaRechazo: det.fechaRechazo ?? '—',
+                    monto: Number(det.monto) || 0,
+                    pagado: !!det.fechaPago,
+                    fechaPago: det.fechaPago,
+                  })
+                }
+              }
+            }
+            const pendientes = filas.filter((f) => !f.pagado).length
+            return (
+              <>
+                <View style={styles.card}>
+                  <Text style={styles.muted}>
+                    {totalCheques} cheque(s) rechazado(s){' '}
+                    {pendientes > 0
+                      ? `· ${pendientes} pendiente(s) de pago`
+                      : '· todos regularizados'}
+                    .
+                  </Text>
+                </View>
+                <View style={styles.table}>
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>N°</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Ent.</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>F. rechazo</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 2, textAlign: 'right' }]}>
+                      Monto
+                    </Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Estado</Text>
+                  </View>
+                  {filas.map((f, i) => (
+                    <View key={i} style={styles.tableRow}>
+                      <Text style={[styles.tableCell, { flex: 1.5 }]}>{f.numero}</Text>
+                      <Text style={[styles.tableCell, { flex: 1 }]}>{f.entidad}</Text>
+                      <Text style={[styles.tableCell, { flex: 1.5 }]}>{f.fechaRechazo}</Text>
+                      <Text style={[styles.tableCell, { flex: 2, textAlign: 'right' }]}>
+                        {formatCurrency(f.monto)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          {
+                            flex: 2,
+                            color: f.pagado ? COLORS.green : COLORS.red,
+                          },
+                        ]}
+                      >
+                        {f.pagado ? `Pagado ${f.fechaPago ?? ''}` : 'Pendiente'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )
+          })()
+        )}
 
         {/* Bloque E — AFIP */}
         <Text style={styles.h2}>Datos fiscales (AFIP)</Text>
@@ -452,6 +833,48 @@ export function ReportPdf({
           )}
         </View>
 
+        {/* Consultas y seguimientos — cuántas veces este CUIT fue consultado por el usuario */}
+        {consultasPorMes && consultasPorMes.length > 0 && (
+          <>
+            <Text style={styles.h2}>Consultas y seguimientos</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Período</Text>
+                {consultasPorMes.map((c) => (
+                  <Text
+                    key={c.periodo}
+                    style={[styles.tableHeaderCell, { flex: 1, textAlign: 'center' }]}
+                  >
+                    {periodoToShort(c.periodo)}
+                  </Text>
+                ))}
+                <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>
+                  Total
+                </Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, { flex: 2 }]}>Consultas internas</Text>
+                {consultasPorMes.map((c) => (
+                  <Text
+                    key={c.periodo}
+                    style={[styles.tableCell, { flex: 1, textAlign: 'center' }]}
+                  >
+                    {c.cantidad || '-'}
+                  </Text>
+                ))}
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { flex: 1, textAlign: 'right', fontWeight: 700 },
+                  ]}
+                >
+                  {consultasPorMes.reduce((s, c) => s + c.cantidad, 0)}
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
+
         {consulta.observaciones && (
           <>
             <Text style={styles.h2}>Nota privada</Text>
@@ -462,11 +885,9 @@ export function ReportPdf({
         )}
 
         <Text style={styles.footer}>
-          Datos públicos del BCRA (Central de Deudores) y AFIP (Padrón). Período BCRA:{' '}
-          {latestPeriodo?.periodo
-            ? `${latestPeriodo.periodo.slice(0, 4)}-${latestPeriodo.periodo.slice(4)}`
-            : '—'}
-          . Información de carácter informativo, no constituye un dictamen crediticio. Generado por Spensiv.
+          Datos públicos del BCRA (Central de Deudores) y AFIP (Padrón). Período BCRA: {periodoLargo}.
+          Información de carácter informativo, no constituye un dictamen crediticio. Generado por
+          Spensiv.
         </Text>
       </Page>
     </Document>
