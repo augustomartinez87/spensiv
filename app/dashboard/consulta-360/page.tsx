@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ShieldCheck, Search, Clock, ArrowRight, AlertCircle, CheckCircle2, FileSpreadsheet, ListFilter } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { BcraStatus } from '@/components/consulta-360/bcra-status'
 import type { RiesgoBanda } from '@/lib/consulta-360/types'
 
 const BANDA_BADGE: Record<RiesgoBanda, { text: string; bg: string; ring: string; label: string }> = {
@@ -44,6 +45,12 @@ export default function Consulta360IndexPage() {
   const showValidation = cuitInput.trim().length >= 11
 
   const { data: recents, isLoading: loadingRecents } = trpc.consulta360.recent.useQuery({ limit: 5 })
+  const { data: bcraHealth } = trpc.consulta360.health.useQuery(undefined, {
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  })
+  const bcraDown = bcraHealth?.status === 'mantenimiento' || bcraHealth?.status === 'error'
 
   const consultar = trpc.consulta360.consultar.useMutation({
     onSuccess: (res) => {
@@ -78,10 +85,13 @@ export default function Consulta360IndexPage() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-violet-400" />
-            Consulta 360°
-          </h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+              <ShieldCheck className="h-6 w-6 text-violet-400" />
+              Consulta 360°
+            </h1>
+            <BcraStatus />
+          </div>
           <p className="text-muted-foreground mt-1">
             Evaluá la situación crediticia de un CUIT/CUIL/CDI con datos públicos del BCRA y AFIP.
           </p>
@@ -134,9 +144,24 @@ export default function Consulta360IndexPage() {
                     </div>
                   )}
                 </div>
-                <Button type="submit" disabled={!valid || consultar.isPending} className="gap-2">
+                <Button
+                  type="submit"
+                  disabled={!valid || consultar.isPending || bcraDown}
+                  className="gap-2"
+                  title={
+                    bcraDown
+                      ? bcraHealth?.status === 'mantenimiento'
+                        ? 'BCRA está en mantenimiento. Probá en unos minutos.'
+                        : 'BCRA no responde. Probá en unos minutos.'
+                      : undefined
+                  }
+                >
                   <Search className="h-4 w-4" />
-                  {consultar.isPending ? 'Consultando…' : 'Consultar'}
+                  {consultar.isPending
+                    ? 'Consultando…'
+                    : bcraDown
+                      ? 'BCRA no disponible'
+                      : 'Consultar'}
                 </Button>
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">

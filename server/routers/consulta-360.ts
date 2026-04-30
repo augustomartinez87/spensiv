@@ -5,6 +5,7 @@ import { isValidCuit, normalizeCuit } from '@/lib/cuit'
 import { fetchAllBcra } from '@/server/services/consulta-360/bcra.service'
 import { getAfipPadron } from '@/server/services/consulta-360/afip.service'
 import { invalidateCache } from '@/server/services/consulta-360/cache'
+import { getBcraHealth } from '@/server/services/consulta-360/health'
 import { buildSummary, denominacionFromCheques } from '@/lib/consulta-360/score'
 
 const RATE_LIMIT_PER_HOUR = 30
@@ -21,6 +22,12 @@ const cuitInput = z.object({
 })
 
 export const consulta360Router = router({
+  /**
+   * Estado en vivo de BCRA — para indicador en UI.
+   * Cache server-side de 60s; aunque muchos clientes pidan, BCRA recibe ~1 ping/min.
+   */
+  health: protectedProcedure.query(async () => getBcraHealth()),
+
   /**
    * Ejecuta la consulta a BCRA + AFIP, calcula score, persiste en consultas_360.
    */

@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
+import { BcraStatus } from '@/components/consulta-360/bcra-status'
 import {
   ArrowLeft,
   Users,
@@ -96,7 +97,10 @@ export default function BulkPage() {
       </Link>
 
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Consulta masiva</h1>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold tracking-tight">Consulta masiva</h1>
+          <BcraStatus />
+        </div>
         <p className="text-muted-foreground mt-1">
           Evaluá a varios CUIT a la vez. Los ya consultados en las últimas 24 hs se saltean.
           Cada corrida procesa hasta 10 CUITs (límite por request) y tenés un máximo de 30
