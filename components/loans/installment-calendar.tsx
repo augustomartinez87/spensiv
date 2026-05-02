@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isSameMonth, addMonths as addMonthsFn, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { loanDisplayLabel } from './helpers'
 
 export function InstallmentCalendar({ onSelectLoan }: { onSelectLoan: (id: string) => void }) {
     const { data: loans, isLoading } = trpc.loans.list.useQuery()
@@ -28,7 +29,7 @@ export function InstallmentCalendar({ onSelectLoan }: { onSelectLoan: (id: strin
                     ...i,
                     dueDate: new Date(i.dueDate),
                     amount: Number(i.amount),
-                    borrowerName: loan.borrowerName,
+                    borrowerName: loanDisplayLabel(loan),
                     loanId: loan.id,
                     currency: loan.currency,
                 }))
@@ -59,7 +60,7 @@ export function InstallmentCalendar({ onSelectLoan }: { onSelectLoan: (id: strin
     const now = new Date()
 
     // Borrower color mapping
-    const borrowerNames = [...new Set((loans || []).map((l) => l.borrowerName))]
+    const borrowerNames = [...new Set((loans || []).map(loanDisplayLabel))]
     const colorPalette = [
         'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500',
         'bg-pink-500', 'bg-cyan-500', 'bg-orange-500', 'bg-indigo-500',

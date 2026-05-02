@@ -9,6 +9,7 @@ import { MessageCircle, Copy } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { loanDisplayName } from './helpers'
 import type { LoanDetail } from './types'
 
 export function CopyCollectionMessage({ loan }: { loan: LoanDetail }) {
@@ -20,7 +21,7 @@ export function CopyCollectionMessage({ loan }: { loan: LoanDetail }) {
     const nextInstallment = loan.loanInstallments.find((i) => !i.isPaid)
     if (!nextInstallment) return null
 
-    const nombre = loan.borrowerName.split(' - ')[0]
+    const nombre = loanDisplayName(loan)
     const fecha = format(new Date(nextInstallment.dueDate), "d 'de' MMMM", { locale: es })
     const monto = formatCurrency(Math.max(Number(nextInstallment.amount) - Number(nextInstallment.paidAmount ?? 0), 0), cur)
     const total = loan.loanInstallments.length

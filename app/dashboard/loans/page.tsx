@@ -131,6 +131,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   const [confirmComplete, setConfirmComplete] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
+  const [editConcept, setEditConcept] = useState('')
   const [editStartDate, setEditStartDate] = useState('')
   const [editTna, setEditTna] = useState('')
   const [assignPersonOpen, setAssignPersonOpen] = useState(false)
@@ -227,6 +228,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   function startEditing() {
     if (!loan) return
     setEditName(loan.borrowerName)
+    setEditConcept(loan.concept ?? '')
     setEditStartDate(formatDateToInput(new Date(loan.startDate)))
     setEditTna(String((Number(loan.tna) * 100).toFixed(2)))
     setEditing(true)
@@ -239,8 +241,13 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
     const newTnaPct = parseFloat(editTna)
     const tnaChanged = !isNaN(newTnaPct) && newTnaPct.toFixed(2) !== originalTnaPct && loan.status === 'active'
 
-    const changes: { id: string; borrowerName?: string; startDate?: string } = { id: loanId }
-    if (editName !== loan.borrowerName) changes.borrowerName = editName
+    const changes: { id: string; borrowerName?: string; concept?: string | null; startDate?: string } = { id: loanId }
+    if (!loan.person && editName !== loan.borrowerName) changes.borrowerName = editName
+    if (loan.person) {
+      const trimmed = editConcept.trim()
+      const current = loan.concept ?? ''
+      if (trimmed !== current) changes.concept = trimmed || null
+    }
     const currentStart = formatDateToInput(new Date(loan.startDate))
     if (editStartDate !== currentStart) changes.startDate = editStartDate
 
@@ -323,9 +330,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
   const isZeroRate = Number(loan.monthlyRate) === 0
   const isZeroRateAmortized = !isInterestOnly && isZeroRate
   const cur = loan.currency
-  const loanSubtitle = loan.person
-    ? loan.borrowerName.replace(loan.person.name || loan.person.alias || '', '').replace(/^\s*[-–]\s*/, '').trim()
-    : ''
+  const loanSubtitle = loan.person ? (loan.concept ?? '') : ''
   const paid = loan.loanInstallments.filter((i) => i.isPaid).length
   const total = loan.loanInstallments.length
   const totalCollected = (loan.loanPayments ?? []).reduce((sum, p) => sum + Number(p.amount), 0)
@@ -343,12 +348,25 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           </Button>
           {editing ? (
             <div className="space-y-2">
-              <Input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="text-lg font-bold h-9"
-                autoFocus
-              />
+              {loan.person ? (
+                <>
+                  <p className="text-lg font-bold text-foreground">{loan.person.name}</p>
+                  <Input
+                    value={editConcept}
+                    onChange={(e) => setEditConcept(e.target.value)}
+                    className="h-8 text-sm"
+                    placeholder="Concepto (opcional, ej: consumo, auto)"
+                    autoFocus
+                  />
+                </>
+              ) : (
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="text-lg font-bold h-9"
+                  autoFocus
+                />
+              )}
               <div className="flex items-center gap-2 flex-wrap">
                 <Label className="text-xs text-muted-foreground shrink-0">Fecha inicio:</Label>
                 <Input

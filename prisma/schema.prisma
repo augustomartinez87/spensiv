@@ -401,7 +401,8 @@ model Loan {
   collectorId String?
   collector   Person? @relation("LoanCollector", fields: [collectorId], references: [id], onDelete: SetNull)
 
-  borrowerName      String // Nombre/alias del deudor
+  borrowerName      String // Nombre/alias del deudor (legado: para préstamos sin Persona vinculada)
+  concept           String? // Concepto/destino del préstamo (ej: "consumo", "auto"). Solo cuando hay Persona vinculada.
   capital           Decimal  @db.Decimal(12, 2)
   currency          String   @default("ARS") // "ARS" | "USD" | "EUR"
   loanType          String   @default("amortized") // "amortized" | "interest_only"

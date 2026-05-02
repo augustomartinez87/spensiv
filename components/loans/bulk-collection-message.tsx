@@ -9,6 +9,7 @@ import { MessageCircle, Copy } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { format, differenceInCalendarDays } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { loanDisplayLabel } from './helpers'
 import type { LoanListItem } from './types'
 
 const WINDOW_OPTIONS = [7, 15, 30] as const
@@ -69,7 +70,7 @@ export function BulkCollectionMessage({ collectorName, loans }: BulkCollectionMe
                 if (daysUntil > days) continue
 
                 const line: LoanLine = {
-                    borrower: loan.borrowerName.split(' - ')[0],
+                    borrower: loanDisplayLabel(loan),
                     number: inst.number,
                     totalInstallments: loan.loanInstallments.length,
                     date: format(dueDate, "d/MM", { locale: es }),

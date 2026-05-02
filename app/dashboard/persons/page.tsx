@@ -376,7 +376,7 @@ function PersonDrawerContent({ personId, onViewFull }: { personId: string; onVie
             return (
               <div key={loan.id} className="p-3 rounded-lg bg-muted/50 space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{loan.borrowerName}</p>
+                  <p className="text-sm font-medium">{loan.concept ?? loan.borrowerName}</p>
                   <span className="text-sm font-semibold">{formatCurrency(Number(loan.capital), loan.currency)}</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -567,7 +567,7 @@ function PersonDetail({ personId, onBack }: { personId: string; onBack: () => vo
                 return (
                   <div key={loan.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                     <div>
-                      <p className="text-sm font-medium">{loan.borrowerName}</p>
+                      <p className="text-sm font-medium">{loan.concept ?? loan.borrowerName}</p>
                       <p className="text-xs text-muted-foreground">
                         {formatCurrency(Number(loan.capital), loan.currency)} · {paid}/{total} cuotas
                       </p>

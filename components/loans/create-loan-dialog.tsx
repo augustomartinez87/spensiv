@@ -33,6 +33,7 @@ export function CreateLoanDialog({
 }) {
     const utils = trpc.useUtils()
     const [borrowerName, setBorrowerName] = useState('')
+    const [concept, setConcept] = useState('')
     const [capital, setCapital] = useState(defaultValues?.capital || '')
     const [currency, setCurrency] = useState<'ARS' | 'USD' | 'EUR'>('ARS')
     const [loanType, setLoanType] = useState<'amortized' | 'interest_only'>('amortized')
@@ -164,6 +165,7 @@ export function CreateLoanDialog({
             utils.loans.getDashboardMetricsDebtor.invalidate()
             onOpenChange(false)
             setBorrowerName('')
+            setConcept('')
             setCapital('')
             setCurrency('ARS')
             setLoanType('amortized')
@@ -185,9 +187,17 @@ export function CreateLoanDialog({
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
+
+        // Cuando hay Persona vinculada, borrowerName se deriva del Person.name
+        // y el texto que el usuario tipea va al campo `concept`.
+        const selectedPerson = selectedPersonId ? persons?.find((p) => p.id === selectedPersonId) : null
+        const finalBorrowerName = selectedPerson ? selectedPerson.name : borrowerName
+        const finalConcept = selectedPerson ? concept.trim() || undefined : undefined
+
         if (loanType === 'interest_only') {
             createMutation.mutate({
-                borrowerName,
+                borrowerName: finalBorrowerName,
+                concept: finalConcept,
                 capital: parseFloat(capital),
                 currency,
                 loanType: 'interest_only',
@@ -201,7 +211,8 @@ export function CreateLoanDialog({
             })
         } else {
             createMutation.mutate({
-                borrowerName,
+                borrowerName: finalBorrowerName,
+                concept: finalConcept,
                 capital: parseFloat(capital),
                 currency,
                 loanType: 'amortized',
@@ -235,18 +246,20 @@ export function CreateLoanDialog({
                     {/* ── Datos del préstamo ── */}
                     <fieldset className="space-y-3">
                         <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Datos del préstamo</legend>
-                        <div className="space-y-2">
-                            <Label htmlFor="borrowerName">
-                                {direction === 'lender' ? 'Nombre del Deudor' : 'Descripción'}
-                            </Label>
-                            <Input
-                                id="borrowerName"
-                                value={borrowerName}
-                                onChange={(e) => setBorrowerName(e.target.value)}
-                                placeholder={direction === 'lender' ? 'Ej: Juan Perez' : 'Ej: Tarjeta Visa - Cuotas celular'}
-                                required
-                            />
-                        </div>
+                        {(direction === 'borrower' || !selectedPersonId) && (
+                            <div className="space-y-2">
+                                <Label htmlFor="borrowerName">
+                                    {direction === 'lender' ? 'Nombre del Deudor' : 'Descripción'}
+                                </Label>
+                                <Input
+                                    id="borrowerName"
+                                    value={borrowerName}
+                                    onChange={(e) => setBorrowerName(e.target.value)}
+                                    placeholder={direction === 'lender' ? 'Ej: Juan Perez' : 'Ej: Tarjeta Visa - Cuotas celular'}
+                                    required
+                                />
+                            </div>
+                        )}
 
                         {direction === 'borrower' && (
                             <div className="space-y-2">
@@ -267,10 +280,6 @@ export function CreateLoanDialog({
                             <Select value={selectedPersonId} onValueChange={(v) => {
                                 const id = v === '__none__' ? '' : v
                                 setSelectedPersonId(id)
-                                if (id) {
-                                    const p = persons.find((p) => p.id === id)
-                                    if (p && !borrowerName) setBorrowerName(p.name)
-                                }
                             }}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Sin persona asignada" />
@@ -309,6 +318,22 @@ export function CreateLoanDialog({
                                     </div>
                                 )
                             })()}
+                        </div>
+                    )}
+
+                    {/* Concepto — solo cuando hay Persona vinculada (lender) */}
+                    {direction === 'lender' && selectedPersonId && (
+                        <div className="space-y-2">
+                            <Label htmlFor="loanConcept">Concepto (opcional)</Label>
+                            <Input
+                                id="loanConcept"
+                                value={concept}
+                                onChange={(e) => setConcept(e.target.value)}
+                                placeholder="Ej: consumo, auto, GPU, notebook"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Útil para distinguir entre varios préstamos de la misma persona.
+                            </p>
                         </div>
                     )}
 

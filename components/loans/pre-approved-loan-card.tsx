@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CheckCircle2, Trash2 } from 'lucide-react'
-import { loanRateInfo } from './helpers'
+import { loanRateInfo, loanDisplayLabel } from './helpers'
 import type { LoanListItem } from './types'
 
 export function PreApprovedLoanCard({
@@ -35,7 +35,7 @@ export function PreApprovedLoanCard({
             <CardContent className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                        <h3 className="font-bold text-foreground truncate">{loan.borrowerName}</h3>
+                        <h3 className="font-bold text-foreground truncate">{loanDisplayLabel(loan)}</h3>
                         <p className="text-sm text-muted-foreground">
                             {formatCurrency(Number(loan.capital), cur)}
                             {' · '}

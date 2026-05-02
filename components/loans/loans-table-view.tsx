@@ -82,11 +82,7 @@ function parseCardTitleSubtitle(loan: LoanListItem) {
     let subtitle: string | null = null
     if (loan.person) {
         title = loan.person.name || loan.person.alias || loan.borrowerName
-        const parts = loan.borrowerName.split(' - ')
-        if (parts.length > 1) {
-            const personName = loan.person.name || loan.person.alias || ''
-            subtitle = parts.filter(p => p.trim() !== personName.trim()).join(' - ') || null
-        }
+        subtitle = loan.concept ?? null
     } else {
         const parts = loan.borrowerName.split(' - ')
         title = parts[0]

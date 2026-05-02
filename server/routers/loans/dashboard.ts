@@ -14,6 +14,7 @@ export const loanDashboardRouter = router({
       ctx.prisma.loan.findMany({
         where: { userId: ctx.user.id, status: 'active', direction: 'lender' },
         include: {
+          person: { select: { name: true, alias: true } },
           loanInstallments: {
             where: {
               OR: [
@@ -75,11 +76,15 @@ export const loanDashboardRouter = router({
         .filter((i) => !i.isPaid && Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0) > 0)
         .map((i) => {
           const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
+          const baseName = loan.person
+            ? loan.person.name || loan.person.alias || loan.borrowerName.split(' - ')[0]
+            : loan.borrowerName.split(' - ')[0]
+          const borrowerName = loan.person && loan.concept ? `${baseName} (${loan.concept})` : baseName
           return {
             ...i,
             amount: remaining,
             amountArs: pesify(remaining, loan.currency, mepRate),
-            borrowerName: loan.borrowerName,
+            borrowerName,
             loanId: loan.id,
             currency: loan.currency,
           }

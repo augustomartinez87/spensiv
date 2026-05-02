@@ -9,6 +9,7 @@ import { getSmartDueDates } from '@/lib/business-days'
 
 const createLoanInput = z.object({
   borrowerName: z.string().min(1, 'El nombre del deudor es requerido'),
+  concept: z.string().optional(),
   capital: z.number().positive(),
   currency: z.enum(['ARS', 'USD', 'EUR']).default('ARS'),
   loanType: z.enum(['amortized', 'interest_only']).default('amortized'),
@@ -103,6 +104,7 @@ export const loanCrudRouter = router({
         data: {
           userId: ctx.user.id,
           borrowerName: input.borrowerName,
+          concept: input.concept?.trim() || null,
           capital: input.capital,
           currency: input.currency,
           loanType: plan.loanType,
@@ -251,6 +253,7 @@ export const loanCrudRouter = router({
     .input(z.object({
       id: z.string(),
       borrowerName: z.string().min(1).optional(),
+      concept: z.string().nullable().optional(),
       startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       personId: z.string().nullable().optional(),
       collectorId: z.string().nullable().optional(),
@@ -267,6 +270,7 @@ export const loanCrudRouter = router({
 
       const updates: Prisma.LoanUncheckedUpdateInput = {}
       if (input.borrowerName) updates.borrowerName = input.borrowerName
+      if (input.concept !== undefined) updates.concept = input.concept ? input.concept.trim() || null : null
       if (input.startDate) updates.startDate = new Date(input.startDate + 'T12:00:00')
       if (input.personId !== undefined) updates.personId = input.personId
       if (input.collectorId !== undefined) updates.collectorId = input.collectorId
@@ -422,6 +426,7 @@ export const loanCrudRouter = router({
         data: {
           userId: ctx.user.id,
           borrowerName: input.borrowerName,
+          concept: input.concept?.trim() || null,
           capital: input.capital,
           currency: input.currency,
           loanType: plan.loanType,

@@ -11,6 +11,7 @@ import { ChevronDown, ChevronRight, Users } from 'lucide-react'
 import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { BulkCollectionMessage } from './bulk-collection-message'
+import { loanDisplayLabel } from './helpers'
 import type { LoanListItem } from './types'
 
 interface CollectorGroup {
@@ -168,7 +169,7 @@ function CollectorGroupCard({
                                 >
                                     <div className="min-w-0 flex-1">
                                         <div className="font-medium text-sm truncate">
-                                            {loan.borrowerName.split(' - ')[0]}
+                                            {loanDisplayLabel(loan)}
                                         </div>
                                         <div className="text-xs text-muted-foreground">
                                             {formatCurrency(Number(loan.capital), cur)}
