@@ -10,7 +10,7 @@ export const loanDashboardRouter = router({
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
     const { year: currentYear, month: currentMonth } = parsePeriod(getCurrentPeriod())
 
-    const [activeLoans, mepRate, monthlyAccruals] = await Promise.all([
+    const [activeLoans, mepRate, monthlyAccruals, amortizedLoans] = await Promise.all([
       ctx.prisma.loan.findMany({
         where: { userId: ctx.user.id, status: 'active', direction: 'lender' },
         include: {
@@ -46,6 +46,30 @@ export const loanDashboardRouter = router({
           interestCollectedCurrent: true,
           overdueInterestCollected: true,
           loan: { select: { currency: true } },
+        },
+      }),
+      // Para la métrica "Ganancia nominal · Amortizados".
+      // Incluye active+completed+defaulted: lo cobrado en completed cuenta como ganancia,
+      // y los defaulted aportan a la pérdida (intereses no cobrables + capital).
+      ctx.prisma.loan.findMany({
+        where: {
+          userId: ctx.user.id,
+          direction: 'lender',
+          loanType: 'amortized',
+          status: { in: ['active', 'completed', 'defaulted'] },
+        },
+        select: {
+          status: true,
+          currency: true,
+          principalOutstanding: true,
+          loanInstallments: {
+            select: {
+              interest: true,
+              amount: true,
+              paidAmount: true,
+              isPaid: true,
+            },
+          },
         },
       }),
     ])
@@ -151,6 +175,53 @@ export const loanDashboardRouter = router({
     }
     const interestGap = Math.max(interestAccruedThisMonth - interestCollectedThisMonth, 0)
 
+    // ── Ganancia nominal · solo préstamos amortizados ───────────────────
+    // Por cuota: el waterfall paga intereses antes que capital, así que
+    // interés cobrado = min(paidAmount, interest) en cada cuota.
+    let amortizedInterestCollected = 0
+    let amortizedInterestRemaining = 0
+    let amortizedInterestContractual = 0
+    let amortizedInterestLost = 0
+    let amortizedPrincipalLost = 0
+    let amortizedActiveCount = 0
+    let amortizedCompletedCount = 0
+    let amortizedDefaultedCount = 0
+
+    for (const loan of amortizedLoans) {
+      const currency = loan.currency
+      let loanInterestCollected = 0
+      let loanInterestRemaining = 0
+      let loanInterestTotal = 0
+
+      for (const inst of loan.loanInstallments) {
+        const interest = Number(inst.interest)
+        const paidAmount = Number(inst.paidAmount ?? 0)
+        const collectedInterest = Math.min(paidAmount, interest)
+        const remainingInterest = Math.max(interest - collectedInterest, 0)
+        loanInterestCollected += collectedInterest
+        loanInterestRemaining += remainingInterest
+        loanInterestTotal += interest
+      }
+
+      const collectedArs = pesify(loanInterestCollected, currency, mepRate)
+      const remainingArs = pesify(loanInterestRemaining, currency, mepRate)
+      const contractualArs = pesify(loanInterestTotal, currency, mepRate)
+
+      amortizedInterestCollected += collectedArs
+      amortizedInterestContractual += contractualArs
+
+      if (loan.status === 'active') {
+        amortizedActiveCount++
+        amortizedInterestRemaining += remainingArs
+      } else if (loan.status === 'completed') {
+        amortizedCompletedCount++
+      } else if (loan.status === 'defaulted') {
+        amortizedDefaultedCount++
+        amortizedInterestLost += remainingArs
+        amortizedPrincipalLost += pesify(Number(loan.principalOutstanding), currency, mepRate)
+      }
+    }
+
     return {
       activeLoansCount: activeLoans.length,
       totalCapitalActive,
@@ -168,6 +239,16 @@ export const loanDashboardRouter = router({
       interestAccruedThisMonth,
       interestCollectedThisMonth,
       interestGap,
+      amortizedYield: {
+        interestCollected: amortizedInterestCollected,
+        interestRemaining: amortizedInterestRemaining,
+        interestContractual: amortizedInterestContractual,
+        interestLost: amortizedInterestLost,
+        principalLost: amortizedPrincipalLost,
+        activeCount: amortizedActiveCount,
+        completedCount: amortizedCompletedCount,
+        defaultedCount: amortizedDefaultedCount,
+      },
     }
   }),
 

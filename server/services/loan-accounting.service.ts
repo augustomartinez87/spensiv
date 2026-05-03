@@ -691,21 +691,37 @@ export class LoanAccountingService {
 
     const contractualIrr = calculateContractualIrr(loan)
 
-    // Build projected cashflows: real cashflows + pending installment amounts
+    // For defaulted loans, the real IRR is computed only from realized cashflows
+    // (the pending installments are presumed lost — projecting them would mask the loss).
+    // For active/completed loans, project pending installments at their scheduled dates.
+    const isDefaulted = loan.status === 'defaulted'
     const directionSign = loan.direction === 'lender' ? 1 : -1
-    const pendingFlows = loan.loanInstallments
-      .filter((i) => !i.isPaid)
-      .map((i) => {
-        const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
-        return {
-          flowDate: i.dueDate,
-          amountSigned: new Decimal(directionSign * remaining),
-        }
-      })
-      .filter((f) => Number(f.amountSigned) !== 0)
 
-    const projectedCashflows = [...cashflows, ...pendingFlows]
-    const realResult = calculateRealIrr(projectedCashflows)
+    let realResult: { rate: number | null; status: 'ok' | 'insufficient_flows' | 'no_convergence' }
+    if (isDefaulted) {
+      const hasAnyCollection = cashflows.some(
+        (f) => f.component !== 'disbursement' && Number(f.amountSigned) * directionSign > 0,
+      )
+      if (!hasAnyCollection) {
+        // Total loss: lender disbursed and recovered nothing → -100% return.
+        realResult = { rate: -1, status: 'ok' }
+      } else {
+        realResult = calculateRealIrr(cashflows)
+      }
+    } else {
+      const pendingFlows = loan.loanInstallments
+        .filter((i) => !i.isPaid)
+        .map((i) => {
+          const remaining = Math.max(Number(i.amount) - Number(i.paidAmount ?? 0), 0)
+          return {
+            flowDate: i.dueDate,
+            amountSigned: new Decimal(directionSign * remaining),
+          }
+        })
+        .filter((f) => Number(f.amountSigned) !== 0)
+
+      realResult = calculateRealIrr([...cashflows, ...pendingFlows])
+    }
 
     const slippageBps = contractualIrr !== null && realResult.rate !== null
       ? Math.round((realResult.rate - contractualIrr) * 10000)

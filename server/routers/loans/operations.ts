@@ -490,7 +490,7 @@ export const loanOperationsRouter = router({
       await ctx.prisma.$transaction([
         ctx.prisma.loan.update({
           where: { id: loan.id },
-          data: { status: 'defaulted' },
+          data: { status: 'defaulted', cashflowRevision: { increment: 1 } },
         }),
         ctx.prisma.loanActivityLog.create({
           data: {
@@ -501,6 +501,9 @@ export const loanOperationsRouter = router({
           },
         }),
       ])
+
+      const service = new LoanAccountingService(ctx.prisma)
+      await service.recalculateIrrCache(loan.id)
 
       return { success: true }
     }),
@@ -520,7 +523,7 @@ export const loanOperationsRouter = router({
       await ctx.prisma.$transaction([
         ctx.prisma.loan.update({
           where: { id: loan.id },
-          data: { status: 'active' },
+          data: { status: 'active', cashflowRevision: { increment: 1 } },
         }),
         ctx.prisma.loanActivityLog.create({
           data: {
@@ -531,6 +534,9 @@ export const loanOperationsRouter = router({
           },
         }),
       ])
+
+      const service = new LoanAccountingService(ctx.prisma)
+      await service.recalculateIrrCache(loan.id)
 
       return { success: true }
     }),

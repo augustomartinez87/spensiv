@@ -64,6 +64,7 @@ import { useToast } from '@/hooks/use-toast'
 
 import { amountClass, loanRateInfo } from '@/components/loans/helpers'
 import { LoansDashboardSummary, OverdueBanner } from '@/components/loans/loans-dashboard-summary'
+import { AmortizedYieldCard } from '@/components/loans/amortized-yield-card'
 import { DebtsDashboardSummary } from '@/components/loans/debts-dashboard-summary'
 
 import { LoanListHeader } from '@/components/loans/loan-list-header'
@@ -109,6 +110,7 @@ export default function LoansPage() {
       {tab === 'lender' ? (
         <div className="space-y-6">
           <LoansDashboardSummary />
+          <AmortizedYieldCard />
           {mainContent}
         </div>
       ) : (
@@ -664,12 +666,24 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           <Card className="bg-muted/30">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">TIR Proyectada (XIRR)</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                  {loan.status === 'defaulted' ? 'TIR Realizada' : 'TIR Proyectada (XIRR)'}
+                </p>
                 {loan.irrStatus === 'no_convergence' && <AlertCircle className="h-3 w-3 text-amber-500" aria-label="Sin convergencia" />}
               </div>
-              <p className="text-xl font-bold text-foreground mt-1">
-                {loan.irrRealAnnual ? `${(Number(loan.irrRealAnnual) * 100).toFixed(2)}%` : 'N/D'}
+              <p className={cn(
+                "text-xl font-bold mt-1",
+                loan.status === 'defaulted' && loan.irrRealAnnual !== null && Number(loan.irrRealAnnual) < 0
+                  ? "text-accent-danger"
+                  : "text-foreground",
+              )}>
+                {loan.irrRealAnnual !== null && loan.irrRealAnnual !== undefined
+                  ? `${(Number(loan.irrRealAnnual) * 100).toFixed(2)}%`
+                  : 'N/D'}
               </p>
+              {loan.status === 'defaulted' && (
+                <p className="text-[10px] text-muted-foreground mt-1">Solo flujos cobrados</p>
+              )}
             </CardContent>
           </Card>
           <Card className="bg-muted/30">
