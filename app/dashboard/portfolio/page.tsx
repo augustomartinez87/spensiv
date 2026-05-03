@@ -129,10 +129,48 @@ export default function PortfolioPage() {
                     <span className="text-4xl font-bold text-accent-positive tabular-nums tracking-tighter">
                       {(yieldMetrics.weightedTEM * 100).toFixed(2)}%
                     </span>
-                    <span className="text-lg font-medium text-primary">TEM</span>
+                    <span className="text-lg font-medium text-primary">TEM bruta</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Tasa efectiva mensual ponderada · incobrables cuentan como 0%</p>
+                  <p className="text-xs text-muted-foreground mt-1">Ponderada por capital · incobrables aportan 0% (ya no rinden) y siguen pesando en el denominador</p>
                 </div>
+
+                {/* TEM neta de pérdidas realizadas — comparable directamente con FCI */}
+                {(yieldMetrics.realizedLosses.capitalLost > 0 || yieldMetrics.realizedLosses.interestLost > 0) && (
+                  <div className="rounded-lg bg-muted/30 border border-border/40 px-3 py-2">
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-baseline justify-between gap-2 cursor-help">
+                          <div className="flex items-baseline gap-2">
+                            <span className={cn(
+                              'text-2xl font-bold tabular-nums tracking-tight',
+                              yieldMetrics.netRealizedTEM >= 0 ? 'text-accent-positive' : 'text-accent-danger'
+                            )}>
+                              {(yieldMetrics.netRealizedTEM * 100).toFixed(2)}%
+                            </span>
+                            <span className="text-sm font-medium text-muted-foreground">TEM neta</span>
+                          </div>
+                          <span className={cn(
+                            'text-xs font-medium tabular-nums',
+                            yieldMetrics.netRealizedTEM < yieldMetrics.weightedTEM ? 'text-accent-danger' : 'text-muted-foreground'
+                          )}>
+                            {((yieldMetrics.netRealizedTEM - yieldMetrics.weightedTEM) * 100).toFixed(2)} pp
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[280px]">
+                        <p className="text-xs leading-relaxed">
+                          (Interés cobrado − capital incobrable − interés no cobrable) ÷ (Σ capital × meses desplegado).
+                          Comparable contra el TEM de un FCI money market.
+                        </p>
+                        <p className="text-xs mt-1.5 text-muted-foreground">
+                          Pérdida realizada: {formatCurrency(yieldMetrics.realizedLosses.capitalLost + yieldMetrics.realizedLosses.interestLost)}
+                          {' · '}
+                          {formatCurrency(yieldMetrics.realizedLosses.capitalLost)} capital + {formatCurrency(yieldMetrics.realizedLosses.interestLost)} interés
+                        </p>
+                      </TooltipContent>
+                    </UITooltip>
+                  </div>
+                )}
 
                 <div className="flex items-baseline gap-4">
                   <div>

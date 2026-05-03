@@ -704,7 +704,7 @@ function LoanDetail({ loanId, onBack }: { loanId: string; onBack: () => void }) 
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-accent-danger">Préstamo marcado como incobrable</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              En la cartera, su TIR se calcula con los flujos realmente cobrados. Si no se cobró nada, contribuye con -100% al rendimiento ponderado.
+              En la cartera, su TIR realizada se calcula con los flujos efectivamente cobrados (-100% si no entró ningún cobro). Su TEM contribuye 0% al promedio ponderado del portfolio.
             </p>
           </div>
           <Button

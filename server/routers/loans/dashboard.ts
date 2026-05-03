@@ -10,7 +10,7 @@ export const loanDashboardRouter = router({
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
     const { year: currentYear, month: currentMonth } = parsePeriod(getCurrentPeriod())
 
-    const [activeLoans, mepRate, monthlyAccruals, amortizedLoans] = await Promise.all([
+    const [activeLoans, mepRate, monthlyAccruals, amortizedLoans, defaultedInterestOnlyLoans] = await Promise.all([
       ctx.prisma.loan.findMany({
         where: { userId: ctx.user.id, status: 'active', direction: 'lender' },
         include: {
@@ -62,6 +62,30 @@ export const loanDashboardRouter = router({
           status: true,
           currency: true,
           principalOutstanding: true,
+          loanInstallments: {
+            select: {
+              interest: true,
+              amount: true,
+              paidAmount: true,
+              isPaid: true,
+            },
+          },
+        },
+      }),
+      // Préstamos interest_only marcados incobrables: capital perdido + interés no cobrable.
+      // Van a la "Pérdida" total junto con los amortizados defaulted.
+      ctx.prisma.loan.findMany({
+        where: {
+          userId: ctx.user.id,
+          direction: 'lender',
+          loanType: 'interest_only',
+          status: 'defaulted',
+        },
+        select: {
+          currency: true,
+          capital: true,
+          principalOutstanding: true,
+          installmentAmount: true,
           loanInstallments: {
             select: {
               interest: true,
@@ -222,6 +246,32 @@ export const loanDashboardRouter = router({
       }
     }
 
+    // ── Pérdidas de préstamos interest_only incobrables ─────────────────
+    // Capital perdido = principalOutstanding (siempre = capital en interest_only).
+    // Interés no cobrable = suma de cuotas de interés impagas (devengadas).
+    let interestOnlyDefaultedCount = 0
+    let interestOnlyPrincipalLost = 0
+    let interestOnlyInterestLost = 0
+    for (const loan of defaultedInterestOnlyLoans) {
+      interestOnlyDefaultedCount++
+      interestOnlyPrincipalLost += pesify(Number(loan.principalOutstanding), loan.currency, mepRate)
+      let unpaidInterest = 0
+      for (const inst of loan.loanInstallments) {
+        if (inst.isPaid) continue
+        const interest = Number(inst.interest)
+        const paidAmount = Number(inst.paidAmount ?? 0)
+        unpaidInterest += Math.max(interest - paidAmount, 0)
+      }
+      interestOnlyInterestLost += pesify(unpaidInterest, loan.currency, mepRate)
+    }
+
+    // Totales que cruzan tipos de préstamo — son los que se muestran en la
+    // card de "Pérdida" porque al usuario le importa la pérdida real, no
+    // el corte por loanType.
+    const totalDefaultedCount = amortizedDefaultedCount + interestOnlyDefaultedCount
+    const totalPrincipalLost = amortizedPrincipalLost + interestOnlyPrincipalLost
+    const totalInterestLost = amortizedInterestLost + interestOnlyInterestLost
+
     return {
       activeLoansCount: activeLoans.length,
       totalCapitalActive,
@@ -243,11 +293,17 @@ export const loanDashboardRouter = router({
         interestCollected: amortizedInterestCollected,
         interestRemaining: amortizedInterestRemaining,
         interestContractual: amortizedInterestContractual,
-        interestLost: amortizedInterestLost,
-        principalLost: amortizedPrincipalLost,
+        // interestLost / principalLost / defaultedCount son TOTALES (incluyen
+        // interest_only defaulted) porque la card de "Pérdida" representa
+        // la pérdida real del portfolio, no sólo de amortizados.
+        interestLost: totalInterestLost,
+        principalLost: totalPrincipalLost,
         activeCount: amortizedActiveCount,
         completedCount: amortizedCompletedCount,
-        defaultedCount: amortizedDefaultedCount,
+        defaultedCount: totalDefaultedCount,
+        // Desagregado por tipo para tooltips/leyendas.
+        amortizedDefaultedCount,
+        interestOnlyDefaultedCount,
       },
     }
   }),

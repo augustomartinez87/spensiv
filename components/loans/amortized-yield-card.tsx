@@ -17,8 +17,12 @@ export function AmortizedYieldCard() {
     const yld = metrics?.amortizedYield
     if (!yld) return null
 
-    const totalLoans = yld.activeCount + yld.completedCount + yld.defaultedCount
-    if (totalLoans === 0) return null
+    // El conteo de "préstamos" en el header es de amortizados (que es de
+    // donde salen los números de Cobrada/Por cobrar/Contractual). Los
+    // incobrables interest_only se muestran aparte porque conceptualmente
+    // no aportan a esos totales pero sí a la pérdida.
+    const amortizedTotal = yld.activeCount + yld.completedCount + yld.amortizedDefaultedCount
+    if (amortizedTotal === 0 && yld.interestOnlyDefaultedCount === 0) return null
 
     const collectedPct = yld.interestContractual > 0
         ? (yld.interestCollected / yld.interestContractual) * 100
@@ -34,10 +38,11 @@ export function AmortizedYieldCard() {
                         Ganancia nominal · Amortizados
                     </p>
                     <p className="text-[10px] text-muted-foreground tabular-nums">
-                        {totalLoans} préstamo{totalLoans !== 1 ? 's' : ''}
+                        {amortizedTotal} préstamo{amortizedTotal !== 1 ? 's' : ''}
                         {yld.activeCount > 0 && ` · ${yld.activeCount} activo${yld.activeCount !== 1 ? 's' : ''}`}
                         {yld.completedCount > 0 && ` · ${yld.completedCount} completado${yld.completedCount !== 1 ? 's' : ''}`}
-                        {hasDefaulted && ` · ${yld.defaultedCount} incobrable${yld.defaultedCount !== 1 ? 's' : ''}`}
+                        {yld.amortizedDefaultedCount > 0 && ` · ${yld.amortizedDefaultedCount} incobrable${yld.amortizedDefaultedCount !== 1 ? 's' : ''}`}
+                        {yld.interestOnlyDefaultedCount > 0 && ` · +${yld.interestOnlyDefaultedCount} interés mensual incobrable${yld.interestOnlyDefaultedCount !== 1 ? 's' : ''}`}
                     </p>
                 </div>
 

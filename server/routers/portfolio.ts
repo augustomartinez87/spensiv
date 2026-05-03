@@ -38,7 +38,7 @@ async function loadPortfolioData(prisma: PrismaClient, userId: string) {
       where: { userId },
       include: {
         loans: {
-          where: { status: { in: ['active', 'defaulted'] }, direction: 'lender' },
+          where: { status: 'active', direction: 'lender' },
           select: { capital: true, currency: true },
         },
       },
@@ -85,17 +85,25 @@ function computeMetrics(
   personScores: Map<string, ReturnType<typeof calculatePersonScore>>,
   mepRate: number,
 ) {
-  const totalCapital = capitalCache.reduce((s, c) => s + c, 0)
-  const capitalByPerson = buildCapitalByPerson(lenderLoans, capitalCache)
-
+  // Capital "total" = capital activo (no incluye incobrables). Los incobrables
+  // se reportan aparte como `defaultedCapital`. La distribución por deudor,
+  // top1/top3 y alertas de concentración se calculan sobre la cartera viva.
+  const activeLoanIndices: number[] = []
+  let totalCapital = 0
   let defaultedCapital = 0
   let defaultedLoansCount = 0
   for (let i = 0; i < lenderLoans.length; i++) {
     if (lenderLoans[i].status === 'defaulted') {
       defaultedCapital += capitalCache[i]
       defaultedLoansCount++
+    } else {
+      totalCapital += capitalCache[i]
+      activeLoanIndices.push(i)
     }
   }
+  const activeLoans = activeLoanIndices.map((i) => lenderLoans[i])
+  const activeCapitalCache = activeLoanIndices.map((i) => capitalCache[i])
+  const capitalByPerson = buildCapitalByPerson(activeLoans, activeCapitalCache)
 
   const exposures = [...capitalByPerson.values()]
     .map((e) => ({
@@ -108,7 +116,7 @@ function computeMetrics(
   const top3Percentage = exposures.slice(0, 3).reduce((s, e) => s + e.percentage, 0)
 
   let highRiskCapital = 0
-  for (let i = 0; i < lenderLoans.length; i++) {
+  for (const i of activeLoanIndices) {
     const loan = lenderLoans[i]
     if (loan.personId) {
       const s = personScores.get(loan.personId)
@@ -154,9 +162,12 @@ function computeMetrics(
     totalEV += calculateExpectedValue(capitalCache[i], totalInterest, defaultProb)
   }
 
+  // Porcentaje de incobrables sobre el capital desplegado (activo + perdido),
+  // que es el universo relevante para "qué fracción de mis préstamos defaulteó".
+  const deployedCapital = totalCapital + defaultedCapital
   return {
     totalCapital,
-    activeLoansCount: lenderLoans.length,
+    activeLoansCount: lenderLoans.length - defaultedLoansCount,
     overdueCapital,
     totalEV,
     exposures,
@@ -166,7 +177,7 @@ function computeMetrics(
     highRiskPercentage: totalCapital > 0 ? (highRiskCapital / totalCapital) * 100 : 0,
     defaultedCapital,
     defaultedLoansCount,
-    defaultedPercentage: totalCapital > 0 ? (defaultedCapital / totalCapital) * 100 : 0,
+    defaultedPercentage: deployedCapital > 0 ? (defaultedCapital / deployedCapital) * 100 : 0,
     mepRate,
   }
 }
@@ -179,6 +190,7 @@ function computeYieldMetrics(
   if (lenderLoans.length === 0) {
     return {
       weightedTEM: 0,
+      netRealizedTEM: 0,
       monthlyIncomeExpected: 0,
       weightedIRR: 0,
       amortizedLoansCount: 0,
@@ -187,6 +199,7 @@ function computeYieldMetrics(
       interestRatio: 0,
       weightedDuration: 0,
       activeLoansCount: 0,
+      realizedLosses: { capitalLost: 0, interestLost: 0, capitalMonths: 0 },
     }
   }
 
@@ -204,6 +217,15 @@ function computeYieldMetrics(
   let interestCollected = 0
   let interestProjected = 0
 
+  // Para TEM neta de pérdidas realizadas
+  let realizedCapitalLost = 0
+  let realizedInterestLost = 0
+  // Capital · meses desplegado (denominador del rendimiento mensualizado).
+  // Se acumula sobre toda la vida de cada préstamo, incluidos los incobrables
+  // (porque su capital estuvo a riesgo durante ese tiempo).
+  let totalCapitalMonths = 0
+  const now = new Date()
+
   for (let i = 0; i < lenderLoans.length; i++) {
     const loan = lenderLoans[i]
     const capital = capitalCache[i]
@@ -212,6 +234,15 @@ function computeYieldMetrics(
     const monthlyRate = Number(loan.monthlyRate)
     const installments = loan.loanInstallments
     const isDefaulted = loan.status === 'defaulted'
+
+    // Meses transcurridos desde el inicio del préstamo (mínimo 1 para no
+    // dividir por cero en préstamos recientes).
+    const startDate = new Date(loan.startDate)
+    const monthsElapsed = Math.max(
+      1,
+      (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth())
+    )
+    totalCapitalMonths += capital * monthsElapsed
 
     // TEM ponderada — préstamos defaulted contribuyen con tasa efectiva 0
     // (su capital sigue ocupando lugar en la cartera pero ya no rinde).
@@ -223,6 +254,7 @@ function computeYieldMetrics(
     // Interés cobrado: cuotas pagas de cualquier estado.
     // Interés proyectado: para defaulted, solo lo ya cobrado (no proyectamos
     // cuotas pendientes que no se van a cobrar).
+    // Pérdida realizada: capital incobrable + interés contractual no cobrado.
     for (const inst of installments) {
       const intArs = pesify(Number(inst.interest), loan.currency, mepRate)
       if (!Number.isFinite(intArs)) continue
@@ -231,7 +263,16 @@ function computeYieldMetrics(
         interestProjected += intArs
       } else if (!isDefaulted) {
         interestProjected += intArs
+      } else {
+        // Defaulted + cuota impaga: interés que el contrato esperaba pero
+        // no va a entrar. Cuenta como pérdida realizada de ingreso.
+        const paid = pesify(Number(inst.paidAmount ?? 0), loan.currency, mepRate)
+        realizedInterestLost += Math.max(intArs - paid, 0)
       }
+    }
+
+    if (isDefaulted) {
+      realizedCapitalLost += pesify(Number(loan.principalOutstanding), loan.currency, mepRate)
     }
 
     // TIR solo para préstamos amortizados con cuotas definidas
@@ -284,10 +325,20 @@ function computeYieldMetrics(
     }
   }
 
+  const activeLoansOnly = lenderLoans.filter((l) => l.status !== 'defaulted').length
+
+  // TEM neta de pérdidas realizadas:
+  //   (interés cobrado − capital perdido − interés perdido) / (Σ capital × meses)
+  // Comparable directamente con el TEM de un FCI: refleja el rendimiento real
+  // ya descontadas las pérdidas por incobrabilidad.
+  const netRealizedNumerator = interestCollected - realizedCapitalLost - realizedInterestLost
+  const netRealizedTEM = totalCapitalMonths > 0 ? netRealizedNumerator / totalCapitalMonths : 0
+
   return {
     // TEM ponderada por capital. Los préstamos defaulted contribuyen
     // con tasa 0 — siguen pesando en el denominador como capital "muerto".
     weightedTEM: totalCapitalForTEM > 0 ? totalWeightedTEM / totalCapitalForTEM : 0,
+    netRealizedTEM,
     // Ingreso mensual esperado en ARS — excluye préstamos incobrables.
     monthlyIncomeExpected: totalWeightedTEM,
     // TIR ponderada (solo amortizados con cuotas)
@@ -297,7 +348,12 @@ function computeYieldMetrics(
     interestProjected,
     interestRatio: interestProjected > 0 ? interestCollected / interestProjected : 0,
     weightedDuration: totalWeightForDuration > 0 ? totalWeightedDuration / totalWeightForDuration : 0,
-    activeLoansCount: lenderLoans.length,
+    activeLoansCount: activeLoansOnly,
+    realizedLosses: {
+      capitalLost: realizedCapitalLost,
+      interestLost: realizedInterestLost,
+      capitalMonths: totalCapitalMonths,
+    },
   }
 }
 
@@ -342,10 +398,18 @@ function computeConcentrationAlerts(
   lenderLoans: PortfolioLoans,
   capitalCache: number[],
 ) {
-  const totalCapital = capitalCache.reduce((s, c) => s + c, 0)
+  // Concentración sobre cartera viva: los incobrables ya son pérdida realizada
+  // y no representan un "riesgo de concentración" futuro.
+  const activeIdx: number[] = []
+  for (let i = 0; i < lenderLoans.length; i++) {
+    if (lenderLoans[i].status !== 'defaulted') activeIdx.push(i)
+  }
+  const activeLoans = activeIdx.map((i) => lenderLoans[i])
+  const activeCache = activeIdx.map((i) => capitalCache[i])
+  const totalCapital = activeCache.reduce((s, c) => s + c, 0)
   if (totalCapital === 0) return []
 
-  const capitalByPerson = buildCapitalByPerson(lenderLoans, capitalCache)
+  const capitalByPerson = buildCapitalByPerson(activeLoans, activeCache)
 
   return [...capitalByPerson.values()]
     .map((e) => {
@@ -467,7 +531,9 @@ export const portfolioRouter = router({
 
   getRiskAnalysis: protectedProcedure.query(async ({ ctx }) => {
     const { loans, persons, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
-    const lenderLoans = loans.filter((l) => l.direction === 'lender')
+    // Análisis de riesgo es sobre cartera viva: los incobrables ya son
+    // pérdida realizada, no aportan a "qué pasa si X defaultea".
+    const lenderLoans = loans.filter((l) => l.direction === 'lender' && l.status !== 'defaulted')
     const capitalCache = buildCapitalCache(lenderLoans, mepRate)
     const totalCapital = capitalCache.reduce((s, c) => s + c, 0)
 
@@ -475,7 +541,7 @@ export const portfolioRouter = router({
     const personScores = new Map<string, ReturnType<typeof calculatePersonScore>>()
     for (const p of persons) personScores.set(p.id, calculatePersonScore(p))
 
-    // Build per-person capital (pesified)
+    // Build per-person capital (pesified) — solo sobre préstamos activos
     const personCapital = new Map<string, number>()
     for (let i = 0; i < lenderLoans.length; i++) {
       const loan = lenderLoans[i]
@@ -547,7 +613,9 @@ export const portfolioRouter = router({
     .input(z.object({ personId: z.string() }))
     .query(async ({ ctx, input }) => {
       const { loans, persons, mepRate } = await loadPortfolioData(ctx.prisma, ctx.user.id)
-      const lenderLoans = loans.filter((l) => l.direction === 'lender')
+      // Sólo cartera viva: el "current exposure" de una persona no debe
+      // incluir préstamos ya marcados incobrables.
+      const lenderLoans = loans.filter((l) => l.direction === 'lender' && l.status !== 'defaulted')
       const capitalCache = buildCapitalCache(lenderLoans, mepRate)
       const totalCapital = capitalCache.reduce((s, c) => s + c, 0)
 
