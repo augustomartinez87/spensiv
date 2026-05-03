@@ -131,7 +131,7 @@ export default function PortfolioPage() {
                     </span>
                     <span className="text-lg font-medium text-primary">TEM</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Tasa efectiva mensual ponderada · todos los préstamos</p>
+                  <p className="text-xs text-muted-foreground mt-1">Tasa efectiva mensual ponderada · incobrables cuentan como 0%</p>
                 </div>
 
                 <div className="flex items-baseline gap-4">

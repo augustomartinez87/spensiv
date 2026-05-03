@@ -116,9 +116,12 @@ function computeMetrics(
     }
   }
 
+  // Mora: solo de préstamos activos. Los defaulted ya son pérdida realizada,
+  // no "cuotas vencidas pendientes de cobro".
   const now = new Date()
   let overdueCapital = 0
   for (const loan of lenderLoans) {
+    if (loan.status === 'defaulted') continue
     for (const inst of loan.loanInstallments) {
       if (!inst.isPaid && new Date(inst.dueDate) < now) {
         const remaining = Math.max(Number(inst.amount) - Number(inst.paidAmount ?? 0), 0)
@@ -127,9 +130,20 @@ function computeMetrics(
     }
   }
 
+  // Valor esperado: para defaulted la probabilidad de default es 1 (ya ocurrió),
+  // así que su EV se reduce a lo ya cobrado. Para activos, modelo de scoring.
   let totalEV = 0
   for (let i = 0; i < lenderLoans.length; i++) {
     const loan = lenderLoans[i]
+    if (loan.status === 'defaulted') {
+      let collectedSoFar = 0
+      for (const inst of loan.loanInstallments) {
+        const paid = Math.min(Number(inst.paidAmount ?? 0), Number(inst.amount))
+        collectedSoFar += pesify(paid, loan.currency, mepRate)
+      }
+      totalEV += collectedSoFar
+      continue
+    }
     const defaultProb = loan.personId
       ? (personScores.get(loan.personId)?.defaultProbability ?? 0.18)
       : 0.18
@@ -197,24 +211,31 @@ function computeYieldMetrics(
 
     const monthlyRate = Number(loan.monthlyRate)
     const installments = loan.loanInstallments
+    const isDefaulted = loan.status === 'defaulted'
 
-    // TEM ponderada — todos los préstamos con tasa > 0
+    // TEM ponderada — préstamos defaulted contribuyen con tasa efectiva 0
+    // (su capital sigue ocupando lugar en la cartera pero ya no rinde).
     if (monthlyRate > 0) {
-      totalWeightedTEM += monthlyRate * capital
+      totalWeightedTEM += (isDefaulted ? 0 : monthlyRate) * capital
       totalCapitalForTEM += capital
     }
 
-    // Interés cobrado/proyectado desde cuotas
+    // Interés cobrado: cuotas pagas de cualquier estado.
+    // Interés proyectado: para defaulted, solo lo ya cobrado (no proyectamos
+    // cuotas pendientes que no se van a cobrar).
     for (const inst of installments) {
       const intArs = pesify(Number(inst.interest), loan.currency, mepRate)
       if (!Number.isFinite(intArs)) continue
-      interestProjected += intArs
-      if (inst.isPaid) interestCollected += intArs
+      if (inst.isPaid) {
+        interestCollected += intArs
+        interestProjected += intArs
+      } else if (!isDefaulted) {
+        interestProjected += intArs
+      }
     }
 
     // TIR solo para préstamos amortizados con cuotas definidas
     if (loan.loanType === 'amortized' && installments.length > 0) {
-      const isDefaulted = loan.status === 'defaulted'
 
       // Para préstamos incobrables: TIR realizada (solo flujos efectivamente cobrados).
       // Para préstamos activos: TIR contractual (todas las cuotas como si fueran a pagarse).
@@ -255,15 +276,19 @@ function computeYieldMetrics(
         }
       }
 
-      totalWeightedDuration += installments.length * capital
-      totalWeightForDuration += capital
+      // Duración solo de préstamos activos productivos
+      if (!isDefaulted) {
+        totalWeightedDuration += installments.length * capital
+        totalWeightForDuration += capital
+      }
     }
   }
 
   return {
-    // TEM ponderada por capital (todos los préstamos)
+    // TEM ponderada por capital. Los préstamos defaulted contribuyen
+    // con tasa 0 — siguen pesando en el denominador como capital "muerto".
     weightedTEM: totalCapitalForTEM > 0 ? totalWeightedTEM / totalCapitalForTEM : 0,
-    // Ingreso mensual esperado = Σ(capital × TEM) — en ARS
+    // Ingreso mensual esperado en ARS — excluye préstamos incobrables.
     monthlyIncomeExpected: totalWeightedTEM,
     // TIR ponderada (solo amortizados con cuotas)
     weightedIRR: totalWeightForIRR > 0 ? totalWeightedIRR / totalWeightForIRR : 0,
@@ -289,6 +314,8 @@ function computeCashFlowProjection(
   }
 
   for (const loan of lenderLoans) {
+    // Préstamos incobrables no proyectan flujos futuros — ya no se esperan cobros.
+    if (loan.status === 'defaulted') continue
     for (const inst of loan.loanInstallments) {
       if (inst.isPaid) continue
       const due = new Date(inst.dueDate)
