@@ -58,6 +58,7 @@ export default function PortfolioPage() {
   const riskBreakdown = data?.riskBreakdown
 
   return (
+    <TooltipProvider>
     <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -67,25 +68,23 @@ export default function PortfolioPage() {
             Dashboard de inversión crediticia
           </p>
         </div>
-        <TooltipProvider>
-          <div className="flex items-center gap-3">
-            {metrics?.mepRate && (
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border border-border shadow-sm cursor-help">
-                    <div className="flex flex-col">
-                      <span className="uppercase text-[10px] font-semibold text-muted-foreground tracking-widest leading-none mb-0.5">Dólar MEP</span>
-                      <span className="text-sm font-medium text-foreground tabular-nums leading-none">{formatCurrency(metrics.mepRate)}</span>
-                    </div>
+        <div className="flex items-center gap-3">
+          {metrics?.mepRate && (
+            <UITooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border border-border shadow-sm cursor-help">
+                  <div className="flex flex-col">
+                    <span className="uppercase text-[10px] font-semibold text-muted-foreground tracking-widest leading-none mb-0.5">Dólar MEP</span>
+                    <span className="text-sm font-medium text-foreground tabular-nums leading-none">{formatCurrency(metrics.mepRate)}</span>
                   </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-[220px]">
-                  <p className="text-xs">Cotización del dólar MEP. Se usa para convertir préstamos en USD/EUR a pesos en las métricas de cartera.</p>
-                </TooltipContent>
-              </UITooltip>
-            )}
-          </div>
-        </TooltipProvider>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[220px]">
+                <p className="text-xs">Cotización del dólar MEP. Se usa para convertir préstamos en USD/EUR a pesos en las métricas de cartera.</p>
+              </TooltipContent>
+            </UITooltip>
+          )}
+        </div>
       </div>
 
       {/* Row 1: Yield Hero + Stat Cards */}
@@ -476,6 +475,7 @@ export default function PortfolioPage() {
       {/* Row 4: Alerts */}
       <AlertsPanel alerts={alerts} riskBreakdown={riskBreakdown} />
     </div>
+    </TooltipProvider>
   )
 }
 
